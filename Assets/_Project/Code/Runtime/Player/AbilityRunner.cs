@@ -193,7 +193,7 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
             // held is true only while the player can act, so a channel or sprint ends the instant a
             // stun, silence or death lands (AbilityModule.OwnerTick).
             bool held = canAct && IsHeld(SlotFromIndex(i));
-            module.OwnerTick(deltaTime, held, canAct);
+            module.OwnerTick(deltaTime, held, actorBlock);
         }
     }
 

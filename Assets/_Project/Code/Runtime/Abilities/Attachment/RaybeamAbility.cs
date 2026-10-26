@@ -69,9 +69,9 @@ namespace Overpower.Abilities
         [Header("Wind-up")]
         [SerializeField, Tooltip("Seconds from pressing the Raybeam to the beams firing. Meanwhile a red hexagon shrinks at your gun " +
                  "for everyone who can see you, and you can still move and aim: the beams fire from wherever your gun is and points " +
-                 "when it ends. Being stunned, overheating or dying during it cancels the Raybeam, and your ultimate meter stays " +
-                 "full. 0 fires at the press.")]
-        private float windupSeconds = 0.4f;
+                 "when it ends. Being stunned or dying during it cancels the Raybeam, and your ultimate meter stays full; " +
+                 "overheating does not, the beams still fire. 0 fires at the press.")]
+        private float windupSeconds = 0.2f;
 
         [Header("Visuals")]
         [SerializeField, Tooltip("The visible beam: the three hit lines drawn as ONE beam spanning the outer lines' outer edges (each " +
@@ -168,11 +168,11 @@ namespace Overpower.Abilities
             return true;
         }
 
-        public override void OwnerTick(float deltaTime, bool held, bool canAct)
+        public override void OwnerTick(float deltaTime, bool held, CastBlock actorBlock)
         {
             if (!windingUp)
                 return;
-            RaybeamWindupStep step = RaybeamWindup.Step(Time.time - windupStartedAt, windupSeconds, canAct);
+            RaybeamWindupStep step = RaybeamWindup.Step(Time.time - windupStartedAt, windupSeconds, actorBlock);
             if (step != RaybeamWindupStep.Waiting)
                 EndWindup(step);
         }
@@ -181,6 +181,8 @@ namespace Overpower.Abilities
         /// hexagon everywhere else.</summary>
         public override void Interrupt(InterruptReason reason)
         {
+            if (!RaybeamWindup.InterruptCancels(reason))
+                return;
             if (windingUp)
                 EndWindup(RaybeamWindupStep.Cancel);
             if (charge != null)

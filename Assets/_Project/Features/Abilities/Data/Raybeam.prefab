@@ -55,7 +55,7 @@ MonoBehaviour:
   hitMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  windupSeconds: 0.4
+  windupSeconds: 0.2
   beamVfx: {fileID: 857787765400938120, guid: eb1a4ec38fd78114fade88ec925051fd, type: 3}
   beamVisualSeconds: 0.15
   scorchVfx: {fileID: 982991884354598782, guid: c60bdd267a4aaf943803a5ce0a9bf532, type: 3}

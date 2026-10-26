@@ -3,14 +3,15 @@ using System.Reflection;
 using NUnit.Framework;
 using Overpower.Abilities;
 using Overpower.Arena;
+using Overpower.Combat;
 using Overpower.Vision;
 using Overpower.Weapons;
 using UnityEngine;
 
 namespace Overpower.Tests
 {
-    /// <summary>The Raybeam's wind-up: from the press the beams wait, then fire from wherever the gun is and points at that moment; a stun,
-    /// an overheat or death first cancels them and the ultimate meter stays full. Meanwhile every client draws a red hexagon with the caster's
+    /// <summary>The Raybeam's wind-up: from the press the beams wait, then fire from wherever the gun is and points at that moment; a stun
+    /// or death first cancels them and the ultimate meter stays full, while an overheat does not (the Raybeam is an ultimate, not the gun). Meanwhile every client draws a red hexagon with the caster's
     /// team edge shrinking at the caster's gun. The body colour comes from the look table's row (Gold here, so a hard-coded red is caught).</summary>
     public class RaybeamWindupTests
     {
@@ -24,13 +25,74 @@ namespace Overpower.Tests
         [Test]
         public void TheBeamsFireAtTheEndOfTheWindupAndAStunOrDeathCancelsThem()
         {
-            Assert.AreEqual(RaybeamWindupStep.Waiting, RaybeamWindup.Step(0f, 0.4f, true), "just pressed");
-            Assert.AreEqual(RaybeamWindupStep.Waiting, RaybeamWindup.Step(0.39f, 0.4f, true), "still charging");
-            Assert.AreEqual(RaybeamWindupStep.Fire, RaybeamWindup.Step(0.4f, 0.4f, true), "the wind-up is over: fire");
-            Assert.AreEqual(RaybeamWindupStep.Fire, RaybeamWindup.Step(0.47f, 0.4f, true), "a slow frame fires a little late, never skips the shot");
-            Assert.AreEqual(RaybeamWindupStep.Cancel, RaybeamWindup.Step(0.2f, 0.4f, false), "stunned, overheated or dead while charging");
-            Assert.AreEqual(RaybeamWindupStep.Cancel, RaybeamWindup.Step(0.4f, 0.4f, false), "a stun on the last frame still cancels: a stunned player never fires");
-            Assert.AreEqual(RaybeamWindupStep.Fire, RaybeamWindup.Step(0f, 0f, true), "no wind-up set: it fires at once");
+            Assert.AreEqual(RaybeamWindupStep.Waiting, RaybeamWindup.Step(0f, 0.4f, CastBlock.None), "just pressed");
+            Assert.AreEqual(RaybeamWindupStep.Waiting, RaybeamWindup.Step(0.39f, 0.4f, CastBlock.None), "still charging");
+            Assert.AreEqual(RaybeamWindupStep.Fire, RaybeamWindup.Step(0.4f, 0.4f, CastBlock.None), "the wind-up is over: fire");
+            Assert.AreEqual(RaybeamWindupStep.Fire, RaybeamWindup.Step(0.47f, 0.4f, CastBlock.None), "a slow frame fires a little late, never skips the shot");
+            Assert.AreEqual(RaybeamWindupStep.Cancel, RaybeamWindup.Step(0.2f, 0.4f, CastBlock.Stunned), "stunned while charging");
+            Assert.AreEqual(RaybeamWindupStep.Cancel, RaybeamWindup.Step(0.2f, 0.4f, CastBlock.Dead), "dead while charging");
+            Assert.AreEqual(RaybeamWindupStep.Cancel, RaybeamWindup.Step(0.4f, 0.4f, CastBlock.Stunned), "a stun on the last frame still cancels: a stunned player never fires");
+            Assert.AreEqual(RaybeamWindupStep.Fire, RaybeamWindup.Step(0f, 0f, CastBlock.None), "no wind-up set: it fires at once");
+        }
+
+        [Test]
+        public void AnOverheatDuringTheWindupStillLetsTheBeamsFire()
+        {
+            Assert.AreEqual(RaybeamWindupStep.Waiting, RaybeamWindup.Step(0.2f, 0.4f, CastBlock.Silenced), "overheated while charging: still charging");
+            Assert.AreEqual(RaybeamWindupStep.Fire, RaybeamWindup.Step(0.4f, 0.4f, CastBlock.Silenced), "overheated as it ends: the beams fire");
+        }
+
+        [Test]
+        public void OnlyAStunOrDeathCancelsTheWindupNotAnOverheat()
+        {
+            AssertAll(
+                (RaybeamWindup.BlockCancels(CastBlock.Stunned), "a stun cancels"),
+                (RaybeamWindup.BlockCancels(CastBlock.Dead), "death cancels"),
+                (!RaybeamWindup.BlockCancels(CastBlock.Silenced), "an overheat does not cancel"),
+                (!RaybeamWindup.BlockCancels(CastBlock.None), "nothing in the way: nothing cancels"),
+                (RaybeamWindup.InterruptCancels(InterruptReason.Stunned), "the stun's interrupt cancels"),
+                (RaybeamWindup.InterruptCancels(InterruptReason.Died), "the death's interrupt cancels"),
+                (RaybeamWindup.InterruptCancels(InterruptReason.Unequipped), "swapping the Raybeam out cancels"),
+                (!RaybeamWindup.InterruptCancels(InterruptReason.Silenced), "the overheat's interrupt does not cancel"));
+        }
+
+        [Test]
+        public void AnOverheatedCasterStillFiresTheBeamsAndAStunnedOneKeepsTheMeter()
+        {
+            var go = new GameObject("raybeam overheat test");
+            try
+            {
+                UltimateCharge meter = go.AddComponent<UltimateCharge>();
+                typeof(UltimateCharge).GetField("state", Any).SetValue(meter, new UltimateChargeState(100f, 0f, 0f, 0f, 0f));
+                RaybeamAbility ability = go.AddComponent<RaybeamAbility>();
+                ability.Bind(null, new AbilityOwner(go), null);
+                FieldInfo windingUp = typeof(RaybeamAbility).GetField("windingUp", Any);
+                FieldInfo startedAt = typeof(RaybeamAbility).GetField("windupStartedAt", Any);
+                typeof(RaybeamAbility).GetField("windupSeconds", Any).SetValue(ability, 10f);
+
+                meter.Fill();
+                startedAt.SetValue(ability, Time.time);
+                windingUp.SetValue(ability, true);
+                ability.Interrupt(InterruptReason.Silenced);
+                Assert.IsTrue((bool)windingUp.GetValue(ability), "the overheat landing does not end the wind-up");
+                ability.OwnerTick(0.016f, false, CastBlock.Silenced);
+                Assert.IsTrue((bool)windingUp.GetValue(ability), "nor does a frame spent overheated");
+                startedAt.SetValue(ability, Time.time - 11f);
+                ability.OwnerTick(0.016f, false, CastBlock.Silenced);
+                Assert.IsFalse((bool)windingUp.GetValue(ability), "the wind-up is over");
+                Assert.IsFalse(meter.IsFull, "and the beams fired, spending the meter, overheated or not");
+
+                meter.Fill();
+                startedAt.SetValue(ability, Time.time);
+                windingUp.SetValue(ability, true);
+                ability.OwnerTick(0.016f, false, CastBlock.Stunned);
+                Assert.IsFalse((bool)windingUp.GetValue(ability), "a stun ends the wind-up");
+                Assert.IsTrue(meter.IsFull, "without firing: the meter stays full");
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
         }
 
         [Test]
@@ -179,6 +241,10 @@ namespace Overpower.Tests
                 (IlWiring.Uses(typeof(RaybeamAbility), nameof(RaybeamAbility.OwnerTick), step), "the owner's frame asks the wind-up rule"),
                 (IlWiring.Uses(typeof(RaybeamAbility), nameof(RaybeamAbility.Interrupt), typeof(RaybeamAbility).GetMethod("EndWindup", Any)),
                     "a stun or death ends the wind-up the moment it lands"),
+                (IlWiring.ResultDecidesABranch(typeof(RaybeamAbility), nameof(RaybeamAbility.Interrupt), typeof(RaybeamWindup).GetMethod(nameof(RaybeamWindup.InterruptCancels))),
+                    "the rule decides which interrupts end the wind-up"),
+                (IlWiring.ResultDecidesABranch(typeof(RaybeamWindup), nameof(RaybeamWindup.Step), typeof(RaybeamWindup).GetMethod(nameof(RaybeamWindup.BlockCancels))),
+                    "the owner's frame cancels on the rule's blocks only"),
                 (IlWiring.ResultDecidesABranch(typeof(RaybeamAbility), "EndWindup", typeof(RaybeamWindup).GetMethod(nameof(RaybeamWindup.SpendsUltimate))),
                     "the meter is spent only when the rule says the beams fire"),
                 (IlWiring.Uses(typeof(RaybeamAbility), "EndWindup", typeof(AbilityModule).GetMethod("CurrentContext", Any)),
@@ -195,11 +261,11 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheOwnersFrameHandsCanActToTheRuleAndActsOnItsAnswer()
+        public void TheOwnersFrameHandsTheActorBlockToTheRuleAndActsOnItsAnswer()
         {
-            // OwnerTick(deltaTime, held, canAct): canAct (ldarg.3) carries the runner's stun, overheat and death check into the rule; the step the
+            // OwnerTick(deltaTime, held, actorBlock): actorBlock (ldarg.3) carries the runner's death, stun or overheat into the rule; the step the
             // rule returns decides whether the wind-up ends and is what EndWindup is handed.
-            MethodInfo tick = typeof(RaybeamAbility).GetMethod(nameof(RaybeamAbility.OwnerTick));
+            MethodInfo tick = OwnerTickWithBlock(typeof(RaybeamAbility));
             MethodInfo step = typeof(RaybeamWindup).GetMethod(nameof(RaybeamWindup.Step));
             MethodInfo end = typeof(RaybeamAbility).GetMethod("EndWindup", Any);
             byte[] il = tick.GetMethodBody().GetILAsByteArray();
@@ -209,10 +275,26 @@ namespace Overpower.Tests
             Assert.AreEqual(1, endAt.Count);
             int local = StoredLocal(il, stepAt[0] + 5);
             AssertAll(
-                (il[stepAt[0] - 1] == 0x05, "canAct is the rule's last argument, not a constant"),
+                (tick.DeclaringType == typeof(RaybeamAbility), "the Raybeam reads the block itself, not the runner's yes/no"),
+                (il[stepAt[0] - 1] == 0x05, "the actor block is the rule's last argument, not a constant"),
                 (IlWiring.ResultDecidesABranch(typeof(RaybeamAbility), nameof(RaybeamAbility.OwnerTick), step), "the rule's step decides whether the wind-up ends"),
                 (local >= 0 && LoadsLocal(il, endAt[0], local), "and the step itself is what ends it (fire or cancel)"));
         }
+
+        [Test]
+        public void TheRunnerHandsEveryModuleTheActorBlock()
+        {
+            MethodInfo withBlock = OwnerTickWithBlock(typeof(AbilityModule));
+            MethodInfo update = typeof(AbilityRunner).GetMethod("Update", Any);
+            var at = IlWiring.CallOffsets(update, withBlock);
+            Assert.AreEqual(1, at.Count, "the runner's frame ticks each module with the block, so an overheat can differ from a stun");
+            byte[] il = update.GetMethodBody().GetILAsByteArray();
+            int blockLocal = StoredLocal(il, IlWiring.CallOffsets(update, typeof(AbilityRunner).GetMethod("ActorBlock", Any))[0] + 5);
+            Assert.IsTrue(blockLocal >= 0 && LoadsLocal(il, at[0], blockLocal), "the block handed over is this frame's ActorBlock");
+        }
+
+        private static MethodInfo OwnerTickWithBlock(System.Type type) =>
+            type.GetMethod(nameof(AbilityModule.OwnerTick), new[] { typeof(float), typeof(bool), typeof(CastBlock) });
 
         // The local a value is stored in right at il[at] (stloc.0-3 or stloc.s), or -1.
         private static int StoredLocal(byte[] il, int at)

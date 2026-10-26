@@ -72,6 +72,10 @@ namespace Overpower.Abilities
         /// </summary>
         public virtual void OwnerTick(float deltaTime, bool held, bool canAct) { }
 
+        /// <summary>What the runner calls: the same frame with the reason the player can't act, for a module that treats an overheat
+        /// differently from a stun (the Raybeam's wind-up). Override one of the two, never both.</summary>
+        public virtual void OwnerTick(float deltaTime, bool held, CastBlock actorBlock) => OwnerTick(deltaTime, held, actorBlock == CastBlock.None);
+
         /// <summary>Owner only. Sends a later moment of this ability (a channel completing or being
         /// cancelled) through the runner's one RPC, so every client's ExecuteCast sees it with the
         /// given phase. The id travels with it, so it can never reach the wrong module.</summary>
