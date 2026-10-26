@@ -7,7 +7,7 @@ using Overpower.Weapons;
 
 /// <summary>
 /// Draws where this player's shots can actually go: two edge lines from the muzzle out to the
-/// weapon's range, plus an arc joining them at that range.
+/// weapon's range, plus an arc joining them at that range. A designer switch (UiTheme.showAimCone), off by default.
 ///
 /// OWNER ONLY (as PlayerHud). Built as plain child GameObjects in Awake, not prefab children, so
 /// nothing on the prefab has to be kept in sync by hand.
@@ -140,12 +140,11 @@ public class AimConeView : MonoBehaviourPun
     {
         // LoadoutScreen.IsOpen is checked explicitly even though its tool-focus claim already makes
         // InputSuppressed true, so this does not silently break if that focus semantics change.
-        bool hide = (lifecycle != null && !lifecycle.IsAlive) ||
-                    (input != null && input.InputSuppressed) ||
-                    LoadoutScreen.IsOpen ||
-                    weaponFiring.Weapon == null;
-
-        if (hide)
+        if (!CrosshairRules.DrawAimCone(theme.showAimCone,
+                                        lifecycle == null || lifecycle.IsAlive,
+                                        input != null && input.InputSuppressed,
+                                        LoadoutScreen.IsOpen,
+                                        weaponFiring.Weapon != null))
         {
             SetLinesEnabled(false);
             return;
@@ -162,8 +161,6 @@ public class AimConeView : MonoBehaviourPun
             forward.Normalize();
         else
             forward = transform.forward;
-
-        float half = aim.EffectiveConeAngle / 2f;
 
         RefreshWeaponCache(weapon);
 
@@ -195,7 +192,7 @@ public class AimConeView : MonoBehaviourPun
         // the outer lines and arc show that, not the bare cone. The fan's own dimmer lines
         // (coneFanLineColor) mark the fixed pattern without jitter.
         bool isShotgun = weapon.Simultaneous && weapon.SpreadDegrees > 0f;
-        float outerHalf = isShotgun ? weapon.SpreadDegrees / 2f + half : half;
+        float outerHalf = CrosshairRules.OuterHalfAngle(weapon.Simultaneous, weapon.SpreadDegrees, aim.EffectiveConeAngle);
 
         Vector3 leftEnd = RayEnd(origin, forward, -outerHalf, range, ignoresWalls);
         Vector3 rightEnd = RayEnd(origin, forward, outerHalf, range, ignoresWalls);

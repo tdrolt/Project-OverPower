@@ -49,10 +49,10 @@ public class PlayerInputRouter : MonoBehaviour
     // Each of the four ability slots has both a polled Held property and an edge event on purpose: a
     // charge weapon reads Held every frame, a dash only cares about the instant of press.
     //
-    // Primary and Attachment also gate on !pointerOverUi: both are mouse buttons, so they can land on
+    // Primary and Attachment gate on PointerFireBlocked (the pointer over UI as well): both are mouse buttons, so they can land on
     // a UI click; the other two Held properties are keys and cannot.
-    public bool PrimaryHeld => gameplayMap != null && !InputSuppressed && !pointerOverUi && primaryAction.IsPressed();
-    public bool AttachmentHeld => gameplayMap != null && !InputSuppressed && !pointerOverUi && attachmentAction.IsPressed();
+    public bool PrimaryHeld => gameplayMap != null && !PointerFireBlocked && primaryAction.IsPressed();
+    public bool AttachmentHeld => gameplayMap != null && !PointerFireBlocked && attachmentAction.IsPressed();
     public bool UltimateHeld => gameplayMap != null && !InputSuppressed && ultimateAction.IsPressed();
     public bool MobilityHeld => gameplayMap != null && !InputSuppressed && mobilityAction.IsPressed();
 
@@ -81,6 +81,12 @@ public class PlayerInputRouter : MonoBehaviour
     /// Deliberately NOT gated on PlayerOverheat.CanAct: overheat silencing is an ability-level rule the
     /// ability system enforces, and an overheated player must still be able to walk away.</summary>
     public bool InputSuppressed => !isAlive || IsTypingInChat() || toolFocusOwners.Count > 0;
+
+    /// <summary>Whether a mouse-button click is kept from firing: input suppressed, or the pointer over a clickable panel. The
+    /// crosshair shows exactly where this is false (CrosshairRules.ShowCrosshair), so the arrow is back wherever a click is for the UI.</summary>
+    public static bool FireBlocked(bool inputSuppressed, bool pointerOverUi) => inputSuppressed || pointerOverUi;
+
+    public bool PointerFireBlocked => FireBlocked(InputSuppressed, pointerOverUi);
 
     /// <summary>Only typing in chat blocks Shop (a player waiting to respawn can shop, D4). A tool holding
     /// general focus must not: P is how the loadout screen (itself a focus owner) closes, and F1 being open
@@ -218,7 +224,7 @@ public class PlayerInputRouter : MonoBehaviour
     /// screen) blocks firing; the HUD canvas has no GraphicRaycaster.</summary>
     private void EmitPointerGated(System.Action evt)
     {
-        if (!InputSuppressed && !pointerOverUi)
+        if (!PointerFireBlocked)
             evt?.Invoke();
     }
 

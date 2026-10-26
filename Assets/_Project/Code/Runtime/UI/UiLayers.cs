@@ -30,6 +30,9 @@ namespace Overpower.UI
         public const int ChatInLobbyRoom = 101;
         /// <summary>The F1 test range panel: a designer opened it on purpose.</summary>
         public const int TestRange = 500;
+        /// <summary>The crosshair: over every panel it can show over. Every panel that takes a click shows the arrow instead
+        /// (CrosshairRules.ShowCrosshair), so the crosshair never needs to sit over those.</summary>
+        public const int Crosshair = 600;
         /// <summary>The Escape pop-up: a decision to close the game is never hidden behind anything but a lost connection.</summary>
         public const int QuitConfirm = 700;
         public const int ConnectionLost = 900;

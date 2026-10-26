@@ -140,6 +140,10 @@ public class PlayerAim : MonoBehaviour
     /// </summary>
     public void SetAimOverride(Vector3? worldPoint) => aimOverride = worldPoint;
 
+    /// <summary>True while SetAimOverride drives the aim: the cursor's screen position then means nothing (the crosshair projects
+    /// GroundPointUnderCursor instead).</summary>
+    public bool HasAimOverride => aimOverride.HasValue;
+
     public void RegisterShot() => coneState.RegisterShot();
 
     /// <summary>

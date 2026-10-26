@@ -794,6 +794,10 @@ namespace Overpower.UI
         public Color overPowerArmedColor = new Color(1f, 0.25f, 0.55f, 0.45f);
 
         [Header("Aim cone")]
+        [Tooltip("Draw the aim cone: two lines from your gun showing how far and how wide your shots can go. A designer switch, set " +
+                 "here only and never offered in the game's menus, so players learn their guns' cones by playing. Off by default; " +
+                 "the crosshair shows the spread either way.")]
+        public bool showAimCone = false;
         [Tooltip("Colour of the two lines showing where your shots can go.")] public Color coneLineColor = new Color(1f, 1f, 1f, 0.55f);
         [Tooltip("Colour of the shotgun's inner fan lines.")] public Color coneFanLineColor = new Color(1f, 1f, 1f, 0.25f);
         [Tooltip("Width of the cone lines in metres.")] public float coneLineWidth = 0.04f;
@@ -839,6 +843,46 @@ namespace Overpower.UI
         public float chargeRingStepTickLength = 0.3f;
         [Tooltip("Thickness of a step tick, in metres.")]
         public float chargeRingStepTickWidth = 0.05f;
+
+        [Header("Crosshair")]
+        [Tooltip("Colour of the crosshair's four ticks and its small centre hexagon. Kept the same for every team, so it never " +
+                 "reads as an ally or an enemy marker.")]
+        public Color crosshairColor = new Color(0.85f, 1f, 1f, 0.95f);
+        [Tooltip("Colour of the thin dark edge drawn around every part of the crosshair, so it stays readable on a bright floor " +
+                 "as well as a dark one.")]
+        public Color crosshairOutlineColor = new Color(0f, 0f, 0f, 0.8f);
+        [Tooltip("How thick that dark edge is, in canvas units. 0 draws no edge.")]
+        public float crosshairOutlineWidth = 1.5f;
+        [Tooltip("Width of the small hexagon at the exact point you aim at, corner to corner, in canvas units.")]
+        public float crosshairCentreSize = 9f;
+        [Tooltip("Line thickness of that centre hexagon, in canvas units.")]
+        public float crosshairCentreLineWidth = 2f;
+        [Tooltip("Length of each of the four ticks, in canvas units.")]
+        public float crosshairTickLength = 9f;
+        [Tooltip("Thickness of each of the four ticks, in canvas units.")]
+        public float crosshairTickWidth = 2.5f;
+        [Tooltip("Gap from the centre to the inner end of each tick when the gun would fire dead straight, in canvas units. Keep " +
+                 "it larger than half the Charge Hex Size, or the ticks sit on the charge hexagon.")]
+        public float crosshairRestRadius = 20f;
+        [Tooltip("How far the ticks move out for every degree a shot can stray from the aim, in canvas units. The stray comes " +
+                 "from the gun itself (its spread, its bloom from firing, moving or standing still), so a bigger number makes " +
+                 "the same bloom read larger on screen.")]
+        public float crosshairUnitsPerDegree = 5f;
+        [Tooltip("The farthest the ticks ever move out from the centre, in canvas units, however wide the gun's spread is.")]
+        public float crosshairMaxRadius = 120f;
+        [Tooltip("How quickly the ticks follow a change in spread, in seconds: about how long they take to get most of the way. " +
+                 "0 snaps them at once; a little smooths a shot's bloom so the opening reads as a movement.")]
+        public float crosshairRadiusSmoothSeconds = 0.05f;
+        [Tooltip("Width of the hexagon around the centre that fills while you charge a charging gun, corner to corner, in canvas units.")]
+        public float crosshairChargeHexSize = 30f;
+        [Tooltip("Line thickness of the charge hexagon, in canvas units.")]
+        public float crosshairChargeLineWidth = 3f;
+        [Tooltip("Colour of the faint full charge hexagon behind the fill, so how full it is reads like a meter.")]
+        public Color crosshairChargeTrackColor = new Color(1f, 1f, 1f, 0.18f);
+        [Tooltip("Colour of the charge hexagon's fill while it is still filling.")]
+        public Color crosshairChargeFillColor = new Color(1f, 0.82f, 0.2f, 0.95f);
+        [Tooltip("Colour the charge hexagon switches to the moment the charge is full.")]
+        public Color crosshairChargeFullColor = new Color(1f, 0.95f, 0.6f, 1f);
 
         [Header("Debug log (F1)")]
         // These four are in SCREEN PIXELS, not canvas units, and deliberately so: the debug log is IMGUI, which

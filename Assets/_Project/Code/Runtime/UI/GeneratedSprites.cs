@@ -3,7 +3,7 @@ using UnityEngine;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Plain white shapes the minimap draws with (disc, upward triangle, the triangular Mask and its edge shape),
+    /// Plain white shapes the minimap and the crosshair draw with (disc, upward triangle, the triangular Mask and its edge shape, hexagon outline),
     /// generated once in code and tinted by each Image's colour. A sprite is required: a Filled Image without one
     /// ignores its fill amount and draws full (the capture ring is a Filled disc). Every shape carries a mip chain,
     /// or a bubble shrinking with the map shimmers. Textures and sprites are HideAndDontSave, not DontSave, which
@@ -49,6 +49,26 @@ namespace Overpower.UI
         {
             float band = LargeSize * Mathf.Max(0f, bandFraction);
             return Build("Generated Edge Triangle", LargeSize, (x, y) => TriangleEdgeAlpha(x, y, LargeSize, band));
+        }
+
+        /// <summary>A pointy-top hexagon outline (corners up and down, flat sides left and right), corners 2 px inside the sprite's
+        /// edge. The line is bandFraction x the sprite's size, so pass the wanted line width / the Image's displayed size. Not
+        /// cached: the band comes from UiTheme.</summary>
+        public static Sprite BuildHexRing(float bandFraction)
+        {
+            float band = Size * Mathf.Clamp01(bandFraction);
+            return Build("Generated Hex Ring", Size, (x, y) => HexRingAlpha(x, y, Size, band));
+        }
+
+        /// <summary>Alpha of BuildHexRing's sprite at pixel centre (x, y): 1 on the line, 0 inside and outside, anti-aliased by half a pixel.</summary>
+        public static float HexRingAlpha(float x, float y, int size, float band)
+        {
+            float half = size / 2f;
+            float apothem = (half - TriangleCornerInset) * 0.8660254f;
+            float ax = Mathf.Abs(x - half), ay = Mathf.Abs(y - half);
+            // Distance along the nearest side's normal: the sides face 0, 60 and 120 degrees.
+            float d = Mathf.Max(ax, 0.5f * ax + 0.8660254f * ay);
+            return Mathf.Clamp01(Mathf.Min(apothem - d + 0.5f, d - (apothem - band) + 0.5f));
         }
 
         private static Sprite Build(string name, int size, System.Func<float, float, float> alphaAt)
