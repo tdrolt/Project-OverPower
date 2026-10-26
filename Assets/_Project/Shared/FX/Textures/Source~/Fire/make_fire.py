@@ -1,6 +1,6 @@
 """Procedural flame-tongue flipbook, variant q3 (built from bake-off winner p2): readability first at game scale.
 
-Writes the game's sheets "Fire Body.png" and "Fire Core.png" (8x8 grid, 128 px cells, straight alpha, sRGB) two folders up, in
+Writes the game's sheets "Fire Body.png" and "Fire Core.png", their plain team copies "Fire Body Team.png" and "Fire Core Team.png" (8x8 grid, 128 px cells, straight alpha, sRGB) two folders up, in
 Shared/FX/Textures, and params.json (the bake-off renderer's numbers) next to this script.
 Same teardrop-eroded-by-scrolling-noise idea as p2, but tuned to read from a top-down camera at 5 m:
 - fewer, larger tongues (low-frequency splitting noise, 2-3 tongues per flame instead of many small licks);
@@ -110,6 +110,10 @@ def to_srgb(lin):
 
 body_sheet = np.zeros((ROWS * CELL, COLS * CELL, 4), np.float32)
 core_sheet = np.zeros_like(body_sheet)
+# Team fire takes all its colour from the team's ramp, so its sheets are the same frames in grey: the rim-to-inner-tongue step is brightness
+# only (a coloured sheet would multiply a blue or purple ramp down to near black), and the heart is plain white.
+team_body_sheet = np.zeros_like(body_sheet)
+team_core_sheet = np.zeros_like(body_sheet)
 for k in range(N):
     a, ht, ca = frame(k)
     # linear heat ramp: deep red rim (1, .22, .06) -> orange -> yellow inner (1, .95, .55)
@@ -119,9 +123,14 @@ for k in range(N):
     body_sheet[sl] = np.concatenate([to_srgb(rgb), a[..., None]], -1)
     crgb = np.stack([np.ones_like(ca), 0.82 + 0.18 * ca, 0.45 + 0.4 * ca], -1)
     core_sheet[sl] = np.concatenate([to_srgb(crgb), ca[..., None]], -1)
+    grey = np.repeat((0.85 + 0.15 * ht)[..., None], 3, -1)
+    team_body_sheet[sl] = np.concatenate([to_srgb(grey), a[..., None]], -1)
+    team_core_sheet[sl] = np.concatenate([np.ones_like(grey), ca[..., None]], -1)
 
 Image.fromarray((body_sheet * 255 + 0.5).astype(np.uint8), "RGBA").save(os.path.join(HERE, "..", "..", "Fire Body.png"))
 Image.fromarray((core_sheet * 255 + 0.5).astype(np.uint8), "RGBA").save(os.path.join(HERE, "..", "..", "Fire Core.png"))
+Image.fromarray((team_body_sheet * 255 + 0.5).astype(np.uint8), "RGBA").save(os.path.join(HERE, "..", "..", "Fire Body Team.png"))
+Image.fromarray((team_core_sheet * 255 + 0.5).astype(np.uint8), "RGBA").save(os.path.join(HERE, "..", "..", "Fire Core Team.png"))
 
 params = {
     "_note": "q3b: q3 with the late-life ramp fading out before it darkens (no brown ghost flames at the jet tail / ground centre).",
@@ -138,4 +147,4 @@ params = {
 }
 with open(os.path.join(HERE, "params.json"), "w", encoding="utf-8") as fh:
     json.dump(params, fh, indent=1)
-print("wrote Fire Body.png, Fire Core.png, params.json")
+print("wrote Fire Body.png, Fire Core.png, Fire Body Team.png, Fire Core Team.png, params.json")

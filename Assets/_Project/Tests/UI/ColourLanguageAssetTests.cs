@@ -8,10 +8,10 @@ using UnityEngine;
 namespace Overpower.Tests
 {
     /// <summary>The colour language on the saved assets: a team colour is a colour (white and grey mean neutral), each team is one hue in every
-    /// list that draws it, the neutral greys, the whites, the reds and the golds never read as a team, fire is orange-red (on the red side
-    /// of the Orange team and of the Shield's gold, and only its heart glows past white), the Conquest scan wave is white and the low
-    /// barriers are painted as dark as the rest of the arena with a light stripe down their top. Relations only: the colours themselves
-    /// stay free to tune.</summary>
+    /// list that draws it, the neutral greys, the whites, the reds and the golds never read as a team, fire burns in the hue of the team
+    /// that fired it with a paler heart (orange-red when no team is known, on the red side of the Shield's gold; only its heart glows past
+    /// white), the Conquest scan wave is white and the low barriers are painted as dark as the rest of the arena with a light stripe down
+    /// their top. Relations only: the colours themselves stay free to tune.</summary>
     public class ColourLanguageAssetTests
     {
         private const float MinTeamSaturation = 0.4f;
@@ -138,17 +138,59 @@ namespace Overpower.Tests
             Assert.Less(Sat(t.fireCoreColor), Sat(t.fireEdgeColor), "the fire's heart is paler than its orange-red");
         }
 
-        // The colour a player sees is the ramp times the sheet's own colour, not the ramp alone: the Fire Body sheet is a warm orange-yellow,
-        // so the drawn flames sit yellower than Fire Body Over Life says (about 22 degrees at birth against the Orange team's 25).
+        // Fire burns in the hue of the team that fired it (Tudor, 26 October), so whose fire it is reads at a glance. The colour a player
+        // sees is the ramp times its sheet's own colour, so each team's flames are checked as drawn: every solid, coloured part of them and
+        // of their hearts is nearer its own team's hue than any other team's, and the heart is paler than the flame around it.
         [Test]
-        [Ignore("Fails on today's ramp: drawn flames are hue 22 at birth against the Orange team's 25. Waiting on Tudor: a redder ramp, or a looser rule.")]
-        public void TheFlamesAsDrawnAreOrangeRedApartFromTheTeamsAndTheShieldGold()
+        public void TheFlamesAsDrawnBurnInTheShootersTeamHueWithAPalerHeart()
         {
             UiTheme t = Theme();
             ArenaLook look = Look();
-            foreach ((string name, Gradient ramp, Material material) in new[] { ("Fire Body Over Life", t.fireBodyOverLife, look.flameJetMaterial), ("Fire Core Over Life", t.fireCoreOverLife, look.flameCoreMaterial) })
+            Assert.AreSame(look, t.arenaLook, "the theme draws with the shipped Arena Look");
+            for (int team = 0; team < t.teamShotColors.Length; team++)
             {
-                Color sheet = MeanOpaqueColour(material);
+                Overpower.Abilities.FlameLook.FireColours fire = Overpower.Abilities.FlameLook.Colours(t, t.fireEdgeColor, team);
+                Assert.IsTrue(fire.TeamSheets, $"team {team} fires its own fire");
+                var paleness = new float[2];
+                foreach ((bool heart, Gradient ramp) in new[] { (false, fire.Body), (true, fire.Core) })
+                {
+                    string name = $"team {team}'s {(heart ? "hearts" : "flames")}";
+                    Color sheet = MeanOpaqueColour(Overpower.Abilities.FlameLook.SheetMaterial(look, heart, true));
+                    int coloured = 0;
+                    float saturation = 0f;
+                    for (int i = 0; i <= 50; i++)
+                    {
+                        Color at = ramp.Evaluate(i / 50f);
+                        if (at.a < 0.5f)
+                            continue;
+                        Color drawn = Drawn(at, sheet);
+                        saturation += Sat(drawn);
+                        coloured++;
+                        if (Sat(drawn) < 0.25f)
+                            continue;
+                        for (int other = 0; other < t.teamShotColors.Length; other++)
+                            if (other != team)
+                                Assert.Less(HueDegreesApart(drawn, t.teamShotColors[team]), HueDegreesApart(drawn, t.teamShotColors[other]),
+                                    $"{name} at {i / 50f:F2} of their life are drawn {drawn} (hue {Hue(drawn):F1}): nearer team {other}'s hue than their own");
+                    }
+                    Assert.Greater(coloured, 0, name + " are solid for part of their life");
+                    paleness[heart ? 1 : 0] = saturation / coloured;
+                }
+                Assert.Less(paleness[1], paleness[0], $"team {team}'s hearts are paler than their flames");
+            }
+        }
+
+        // Fire of no known team stays the theme's orange-red, as drawn on the orange sheets: clearly on the red side of the Shield's gold.
+        [Test]
+        public void TeamlessFlamesAsDrawnSitOnTheRedSideOfTheShieldGold()
+        {
+            UiTheme t = Theme();
+            ArenaLook look = Look();
+            Overpower.Abilities.FlameLook.FireColours fire = Overpower.Abilities.FlameLook.Colours(t, t.fireEdgeColor, -1);
+            Assert.IsFalse(fire.TeamSheets);
+            foreach ((bool heart, Gradient ramp) in new[] { (false, fire.Body), (true, fire.Core) })
+            {
+                Color sheet = MeanOpaqueColour(Overpower.Abilities.FlameLook.SheetMaterial(look, heart, false));
                 int samples = 0;
                 for (int i = 0; i <= 50; i++)
                 {
@@ -156,15 +198,18 @@ namespace Overpower.Tests
                     if (at.a < 0.5f)
                         continue;
                     samples++;
-                    Color linear = at.linear, under = sheet.linear;
-                    Color fire = new Color(linear.r * under.r, linear.g * under.g, linear.b * under.b, 1f).gamma;
-                    for (int team = 0; team < t.teamShotColors.Length; team++)
-                        Assert.IsTrue(ReadApart(fire, t.teamShotColors[team]) || RedSideOf(fire, t.teamShotColors[team]),
-                            $"{name} at {i / 50f:F2} of its life is drawn {fire} (hue {Hue(fire):F1}, saturation {Sat(fire):F2}) and reads as team {team} (hue {Hue(t.teamShotColors[team]):F1})");
-                    Assert.IsTrue(ReadApart(fire, t.immuneBarColor) && RedSideOf(fire, t.immuneBarColor), $"{name} at {i / 50f:F2} is drawn {fire}: not clearly on the red side of the Shield's gold");
+                    Color drawn = Drawn(at, sheet);
+                    Assert.IsTrue(ReadApart(drawn, t.immuneBarColor) && RedSideOf(drawn, t.immuneBarColor),
+                        $"{(heart ? "the hearts" : "the flames")} at {i / 50f:F2} of their life are drawn {drawn}: not clearly on the red side of the Shield's gold");
                 }
-                Assert.Greater(samples, 0, name + " is solid for part of its life");
+                Assert.Greater(samples, 0);
             }
+        }
+
+        private static Color Drawn(Color ramp, Color sheet)
+        {
+            Color linear = ramp.linear, under = sheet.linear;
+            return new Color(linear.r * under.r, linear.g * under.g, linear.b * under.b, 1f).gamma;
         }
 
         // The sheet's mean colour over its solid pixels, read from the file the way TheShippedFireShapeNeverDrawsOutsideItsCircle reads it.

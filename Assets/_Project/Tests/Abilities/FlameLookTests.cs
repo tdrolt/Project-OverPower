@@ -61,7 +61,7 @@ namespace Overpower.Tests
             GameObject cone = Object.Instantiate(prefab);
             var visual = cone.GetComponent<FlameConeVisual>();
             visual.Configure(Range, angle, Color.red, Color.red, true);
-            visual.ConfigureFire(Range, angle, theme, 21);
+            visual.ConfigureFire(Range, angle, theme, 21, -1);
             ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
             PinTuning(tongues);
             visual.Place(Vector3.zero, Vector3.forward, Muzzle);
@@ -216,7 +216,7 @@ namespace Overpower.Tests
                 look.flameJetReach = 0.85f;
                 var visual = cone.GetComponent<FlameConeVisual>();
                 visual.Configure(Range, Angle, Color.red, Color.red, true);
-                visual.ConfigureFire(Range, Angle, theme, 21);
+                visual.ConfigureFire(Range, Angle, theme, 21, -1);
                 ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
                 PinTuning(tongues);
                 visual.Place(new Vector3(0f, 0.05f, 0f), Vector3.forward, new Vector3(0f, 0.05f, 0f) + Muzzle);
@@ -414,7 +414,7 @@ namespace Overpower.Tests
                 look.flameCoreSize = 0.8f;
                 var visual = cone.GetComponent<FlameConeVisual>();
                 visual.Configure(Range, Angle, Color.red, Color.red, true);
-                visual.ConfigureFire(Range, Angle, theme, 21);
+                visual.ConfigureFire(Range, Angle, theme, 21, -1);
                 visual.Place(Vector3.zero, Vector3.forward, Muzzle);
                 ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
                 ParticleSystem core = CoreOf(tongues);
@@ -681,7 +681,7 @@ namespace Overpower.Tests
                 look.flameJetMostFlames = 2500;
                 var visual = cone.GetComponent<FlameConeVisual>();
                 visual.Configure(Range, Angle, Color.red, Color.red, true);
-                visual.ConfigureFire(Range, Angle, theme, 21);
+                visual.ConfigureFire(Range, Angle, theme, 21, -1);
                 ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
                 float life = tongues.main.startLifetime.constantMax;
                 visual.Place(Vector3.zero, Vector3.forward, Muzzle);
@@ -941,7 +941,7 @@ namespace Overpower.Tests
                 theme.arenaLook = look;
                 look.flameJetSpread = 0.4f;
                 look.flameJetStartSize = 0.15f;
-                cone.GetComponent<FlameConeVisual>().ConfigureFire(3.25f, 71f, theme, 21);
+                cone.GetComponent<FlameConeVisual>().ConfigureFire(3.25f, 71f, theme, 21, -1);
                 ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
                 foreach (ParticleSystem system in tongues.GetComponentsInChildren<ParticleSystem>(true))
                 {
@@ -999,7 +999,7 @@ namespace Overpower.Tests
                 ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
                 float shareOfWidest = tongues.main.startSize.constantMin / tongues.main.startSize.constantMax;
                 visual.Configure(Range, Angle, Color.red, Color.red, true);
-                visual.ConfigureFire(Range, Angle, theme, 21);
+                visual.ConfigureFire(Range, Angle, theme, 21, -1);
                 var apex = new Vector3(10f, 0f, -4f);
                 visual.Place(apex, Vector3.right, apex + new Vector3(0.68f, 1.49f, -0.07f));
                 Vector3 expected = FlameLook.JetFrom(cone.transform.InverseTransformPoint(apex + new Vector3(0.68f, 1.49f, -0.07f)), Range, Angle);
@@ -1110,7 +1110,7 @@ namespace Overpower.Tests
                 visual.Configure(Range, Angle, Color.red, Color.red, true);
                 byte full = cone.transform.Find("Fan").GetComponent<MeshFilter>().sharedMesh.colors32.Max(c => c.a);
                 look.flameFanStrength = 0.4f;
-                visual.ConfigureFire(Range, Angle, theme, 21);
+                visual.ConfigureFire(Range, Angle, theme, 21, -1);
                 byte faint = cone.transform.Find("Fan").GetComponent<MeshFilter>().sharedMesh.colors32.Max(c => c.a);
                 Assert.Greater(full, 20, "the fan drew before");
                 Assert.AreEqual(full * 0.4f, faint, 1.5f, "Flame Fan Strength of what it was");
@@ -1147,7 +1147,7 @@ namespace Overpower.Tests
                 theme.arenaLook = look;
                 var visual = cone.GetComponent<FlameConeVisual>();
                 visual.Configure(Range, Angle, Color.red, Color.red, true);
-                visual.ConfigureFire(Range, Angle, theme, 21);
+                visual.ConfigureFire(Range, Angle, theme, 21, -1);
                 // Far from any collider in the open scene, so only the jet's own work is measured. GC.GetAllocatedBytesForCurrentThread
                 // reads 0 in the Editor's Mono whatever is allocated; the profiler's GC.Alloc samples do count.
                 var apex = new Vector3(5000f, 0f, 5000f);
@@ -1205,7 +1205,7 @@ namespace Overpower.Tests
                 theme.fireCoreOverLife = test.Core;
                 theme.fireCoreColor = new Color(0.9f, 0.8f, 0.3f, 1f);
                 theme.arenaLook = look;
-                FlameLook.Apply(tongues, Range, Angle, FlameLook.Colours(theme, new Color(0.8f, 0.3f, 0.1f, 1f)), look);
+                FlameLook.Apply(tongues, Range, Angle, FlameLook.Colours(theme, new Color(0.8f, 0.3f, 0.1f, 1f), -1), look);
                 foreach ((ParticleSystem flame, Gradient ramp) in new[] { (tongues, test.Body), (CoreOf(tongues), test.Core) })
                 {
                     Assert.AreEqual(Color.white, flame.main.startColor.color, flame.name + ": every flame starts plain white: its colour is its age");

@@ -191,7 +191,8 @@ namespace Overpower.Weapons
             StartCoroutine(Burn());
         }
 
-        /// <summary>The floor flames over exactly the radius this field was sent, and the rim at its edge: the shooter's team accent.</summary>
+        /// <summary>The floor flames over exactly the radius this field was sent, burning in the shooter's team hue, and the rim at its edge:
+        /// the shooter's team accent.</summary>
         private void ShowLook()
         {
             Color fire = theme != null ? LookColours.For(LookFamily.Fire, sourceTeamId, theme) : Color.white;
@@ -201,7 +202,7 @@ namespace Overpower.Weapons
                 bool laidOut = theme != null && theme.arenaLook != null;
                 flames.gameObject.SetActive(laidOut);
                 if (laidOut)
-                    FlameLook.ApplyFloor(flames, radius, FlameLook.Colours(theme, fire), theme.arenaLook);
+                    FlameLook.ApplyFloor(flames, radius, FlameLook.Colours(theme, fire, sourceTeamId), theme.arenaLook);
             }
 
             if (rim != null)

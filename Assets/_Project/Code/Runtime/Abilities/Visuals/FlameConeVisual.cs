@@ -131,9 +131,10 @@ namespace Overpower.Abilities
             }
         }
 
-        /// <summary>Spreads the flames, their hearts and the embers over the real cone in the theme's fire colours (FlameLook.Colours, the
-        /// embers' cool end from the Flamethrower's row of the look table), and dims the fan to the Arena Look's faint marker.</summary>
-        public void ConfigureFire(float range, float fullAngleDegrees, UiTheme theme, int abilityId)
+        /// <summary>Spreads the flames, their hearts and the embers over the real cone in the theme's fire colours in the hue of
+        /// <paramref name="team"/>, the caster's (FlameLook.Colours, the embers' cool end from the Flamethrower's row of the look table), and
+        /// dims the fan to the Arena Look's faint marker.</summary>
+        public void ConfigureFire(float range, float fullAngleDegrees, UiTheme theme, int abilityId, int team)
         {
             if (theme == null || theme.arenaLook == null)
                 return;
@@ -143,7 +144,7 @@ namespace Overpower.Abilities
             if (tongues == null)
                 return;
             jetSystems ??= tongues.GetComponentsInChildren<ParticleSystem>(true);
-            FlameLook.Apply(tongues, range, fullAngleDegrees, FlameLook.Colours(theme, FlameLook.Edge(theme, abilityId)), look);
+            FlameLook.Apply(tongues, range, fullAngleDegrees, FlameLook.Colours(theme, FlameLook.Edge(theme, abilityId), team), look);
         }
 
         /// <summary>Tip on the floor under <paramref name="apex"/>, opening along <paramref name="forward"/>'s flat direction; the flames

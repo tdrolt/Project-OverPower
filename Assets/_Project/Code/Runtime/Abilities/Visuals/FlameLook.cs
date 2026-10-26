@@ -58,19 +58,43 @@ namespace Overpower.Abilities
             public readonly Gradient Core;
             public readonly Color Hot;
             public readonly Color Edge;
+            /// <summary>Drawn on the plain team sheets (SheetMaterial), so the colours over life are the colours seen.</summary>
+            public readonly bool TeamSheets;
 
-            public FireColours(Gradient body, Gradient core, Color hot, Color edge)
+            public FireColours(Gradient body, Gradient core, Color hot, Color edge, bool teamSheets = false)
             {
                 Body = body;
                 Core = core;
                 Hot = hot;
                 Edge = edge;
+                TeamSheets = teamSheets;
             }
         }
 
-        /// <summary>The theme's fire, with <paramref name="edge"/> (the look table's colour for this fire) as the embers' cool end.</summary>
-        public static FireColours Colours(UiTheme theme, Color edge) =>
-            new FireColours(theme.fireBodyOverLife, theme.fireCoreOverLife, LookColours.FireCore(theme), edge);
+        /// <summary>The theme's fire, with <paramref name="edge"/> (the look table's colour for this fire) as the embers' cool end, burning in
+        /// the hue of <paramref name="team"/>, the team that fired it (TeamFire, by the Arena Look's Fire Team Hue and Fire Team Heart
+        /// Whiteness). A team the theme does not know, Fire Team Hue 0 or no Arena Look leaves the theme's orange-red fire.</summary>
+        public static FireColours Colours(UiTheme theme, Color edge, int team)
+        {
+            ArenaLook look = theme.arenaLook;
+            if (look == null || look.fireTeamHue <= 0f || !TeamPalette.Holds(theme.teamShotColors, team))
+                return new FireColours(theme.fireBodyOverLife, theme.fireCoreOverLife, LookColours.FireCore(theme), edge);
+            Color shot = theme.teamShotColors[team];
+            float hue = look.fireTeamHue, white = look.fireTeamHeartWhiteness;
+            return new FireColours(TeamFire.Ramp(theme.fireBodyOverLife, shot, hue, 0f), TeamFire.Ramp(theme.fireCoreOverLife, shot, hue, white),
+                TeamFire.Tint(LookColours.FireCore(theme), shot, hue, white), TeamFire.Tint(edge, shot, hue, 0f), true);
+        }
+
+        /// <summary>What a flame (or its heart) is drawn with: a team's fire on the plain team sheets, orange-red fire on the orange ones;
+        /// an empty slot falls back to the orange sheet, then to Fx Alpha (Fx Additive for a heart).</summary>
+        public static Material SheetMaterial(ArenaLook look, bool heart, bool teamSheets)
+        {
+            Material team = heart ? look.flameCoreTeamMaterial : look.flameJetTeamMaterial;
+            if (teamSheets && team != null)
+                return team;
+            return heart ? (look.flameCoreMaterial != null ? look.flameCoreMaterial : look.fxAdditive)
+                         : (look.flameJetMaterial != null ? look.flameJetMaterial : look.fxAlpha);
+        }
 
         /// <summary>Where the jet leaves from, in the cone's local space (feet at the origin, aim along +Z): the gun's muzzle, pulled inside
         /// the cone when it pokes out of it, and never past half the range so the flames always have room to fly.</summary>
@@ -199,8 +223,8 @@ namespace Overpower.Abilities
 
         /// <summary>Each spray: the flames and their hearts on the jet's spread and the embers on the cone's whole sector, the flames and hearts
         /// in their colours over life, the embers from the fire's hot heart to <see cref="FireColours.Edge"/>; with the Arena Look's materials.
-        /// The flames draw with Flame Jet Material (else Fx Alpha), their hearts with Flame Core Material (else Fx Additive), the embers with
-        /// Fx Additive; a slot left empty keeps the prefab's material. How many flames and how big is AimJet's, every step.</summary>
+        /// The flames and their hearts draw with SheetMaterial's sheets, the embers with Fx Additive; a slot left empty keeps the prefab's
+        /// material. How many flames and how big is AimJet's, every step.</summary>
         public static void Apply(ParticleSystem flames, float range, float coneAngle, FireColours colours, ArenaLook look)
         {
             ParticleSystem core = CoreOf(flames);
@@ -228,7 +252,7 @@ namespace Overpower.Abilities
                 {
                     ShapeJet(system, look);
                     bool heart = system == core;
-                    Flames(system, FireOverLife(heart ? colours.Core : colours.Body, 0f), 1f, heart, true, look);
+                    Flames(system, FireOverLife(heart ? colours.Core : colours.Body, 0f), 1f, heart, true, colours.TeamSheets, look);
                 }
                 else
                 {
@@ -323,7 +347,7 @@ namespace Overpower.Abilities
 
         // The cone and floor rules count on a flame drawing only inside the circle that fits its square, whichever way it is turned, so
         // a jet flame is a square turned along its flight on the screen (never stretched) and a floor flame a square standing up.
-        private static void Flames(ParticleSystem system, Gradient overLife, float opacity, bool heart, bool jet, ArenaLook look)
+        private static void Flames(ParticleSystem system, Gradient overLife, float opacity, bool heart, bool jet, bool teamSheets, ArenaLook look)
         {
             ParticleSystem.MainModule main = system.main;
             main.startColor = new Color(1f, 1f, 1f, Mathf.Clamp01(opacity));
@@ -356,8 +380,7 @@ namespace Overpower.Abilities
                 // Drawn after its flame, so the light it adds is never covered by the flame's own see-through colour.
                 renderer.sortingFudge = heart ? -HeartAhead : 0f;
             }
-            SetMaterial(system, heart ? (look.flameCoreMaterial != null ? look.flameCoreMaterial : look.fxAdditive)
-                                      : (look.flameJetMaterial != null ? look.flameJetMaterial : look.fxAlpha));
+            SetMaterial(system, SheetMaterial(look, heart, teamSheets));
             SetGlow(system, heart ? look.flameGlow : look.flameBodyGlow);
         }
 
@@ -493,7 +516,7 @@ namespace Overpower.Abilities
                 if (flame)
                 {
                     bool heart = system == core;
-                    Flames(system, FireOverLife(heart ? colours.Core : colours.Body, look.fireFieldFlameCatch), look.fireFieldFlameOpacity, heart, false, look);
+                    Flames(system, FireOverLife(heart ? colours.Core : colours.Body, look.fireFieldFlameCatch), look.fireFieldFlameOpacity, heart, false, colours.TeamSheets, look);
                 }
                 else
                 {

@@ -199,6 +199,16 @@ namespace Overpower.Arena
         [Tooltip("How strong the flat fan on the floor under the Flamethrower's spray is: 1 is fully bright, lower leaves a faint marker of the ground that burns.")]
         [Range(0f, 1f)] public float flameFanStrength = 0.4f;
 
+        [Header("Team fire")]
+        [Tooltip("How fully the fire of the Flamethrower and of the Rocket's burning ground takes the colour of the team that fired it: 1 burns in the team's own colour, lower turns it part of the way from orange-red toward it, and 0 leaves every fire orange-red. Each flame keeps its own brightness either way. Fire whose team is unknown is always orange-red.")]
+        [Range(0f, 1f)] public float fireTeamHue = 1f;
+        [Tooltip("How much paler than its flame the hot heart of a team's fire is: 0 gives the heart the flame's full colour, 1 makes it plain white with only its glow. Higher reads hotter but tells the teams apart less in the middle of the fire.")]
+        [Range(0f, 1f)] public float fireTeamHeartWhiteness = 0.4f;
+        [Tooltip("The see-through material put on the flames of a team's fire: the same Fire Body frames as Flame Jet Material in plain grey, so the team colour over its life comes through unchanged (the orange sheet would darken a blue or purple flame almost to black). Made by make_fire.py in Shared/FX/Textures/Source~. Empty draws team fire on Flame Jet Material.")]
+        public Material flameJetTeamMaterial;
+        [Tooltip("The material that adds light, put on the hot heart of a team's fire: the Fire Core frames of Flame Core Material in plain white, so the heart glows in the team's paled colour. Empty draws it on Flame Core Material.")]
+        public Material flameCoreTeamMaterial;
+
         [Header("Rocket Cursor Fire")]
         [Tooltip("How many flames rise each second from every square metre of the Rocket's burning ground: more makes a denser fire, fewer leaves a few big, lazy flames. Together with each flame's life (on the Fire Field prefab) it sets how many burn at once.")]
         [Min(0f)] public float fireFieldFlamesPerSquareMetre = 3f;
