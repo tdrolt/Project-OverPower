@@ -90,8 +90,9 @@ namespace Overpower.Tests
                 core.GetPropertyBlock(block);
                 Color glow = block.GetColor(EmissionColorId);
                 Assert.AreEqual(3f, glow.b, 1e-4f, "the blue glows past 1 and blooms");
-                Assert.AreEqual(0.2f, glow.r, 1e-4f, "red stays at its share, so the bolt never turns pale cyan");
-                Assert.AreEqual(0.45f, glow.g, 1e-4f, "and so does green");
+                Color kept = TowerLookRules.GlowKeepingHue(new Color(0.2f, 0.45f, 1f, 1f), 3f);
+                Assert.AreEqual(kept.r, glow.r, 1e-4f, "red grows only as the hue-keeping glow lets it, so the bolt never turns pale cyan");
+                Assert.AreEqual(kept.g, glow.g, 1e-4f, "and so does green");
             }
             finally
             {

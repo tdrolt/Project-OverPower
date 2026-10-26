@@ -32,26 +32,36 @@ namespace Overpower.Arena
             spawn ? new CaptureRingState(CaptureRingPhase.Idle, 0f, TerritoryMap.Neutral, state.OutlineTeam, TerritoryMap.Neutral, false, state.OutOfPlay)
                   : state;
 
-        /// <summary>The colour brightened by glow without changing its hue on screen. The tonemapper squeezes every bright channel
-        /// toward the same level, so a weaker channel stops at its share of the colour at full strength (or purple's red would catch
-        /// up with its blue and turn it pink), while a channel close to the brightest grows with it (or white's blue alone would glow
-        /// and turn it lavender, cyan's blue alone sky blue).</summary>
+        /// <summary>The colour brightened by glow keeping its hue on screen, in light and under the fog. Up to full strength the glow
+        /// scales the whole colour; past it the brightest channel keeps growing (what the bloom picks up) while a weaker one grows only
+        /// by the glow to the power WeakChannelGrowth, and no further once the brightest reaches the tonemapper's white. In light the
+        /// tonemapper squeezes bright channels together (a weaker one grown in full turns orange yellow, purple pink); the fog dims
+        /// them apart again (one held back turns orange red, purple blue): the power sits between. A channel close to the brightest
+        /// grows with it in full, or white would turn lavender and cyan sky blue.</summary>
         public static Color GlowKeepingHue(Color colour, float glow)
         {
             float peak = colour.maxColorComponent;
             if (peak <= 0f)
                 return colour;
-            return new Color(Channel(colour.r, peak, glow), Channel(colour.g, peak, glow), Channel(colour.b, peak, glow), colour.a);
+            float whole = Math.Min(glow, Math.Max(1f, 1f / peak));
+            float past = Math.Min(glow / whole, Math.Max(1f, ScreenWhite / (peak * whole)));
+            float weak = whole * Mathf.Pow(past, WeakChannelGrowth);
+            return new Color(Channel(colour.r, peak, glow, weak), Channel(colour.g, peak, glow, weak), Channel(colour.b, peak, glow, weak), colour.a);
         }
+
+        // Measured on the project's own screen (TowerGlowTests): 0.35 keeps every team's glow within 8 degrees of its hue in light and fog.
+        private const float WeakChannelGrowth = 0.35f;
+
+        // URP's Neutral tonemapper reaches white at 5.3 linear; a brighter channel only feeds the bloom.
+        private static readonly float ScreenWhite = Mathf.LinearToGammaSpace(5.3f);
 
         // A channel this close to the brightest (a share of it) starts to grow with it, and from the second share on grows fully.
         private const float NearPeakFrom = 0.85f, NearPeakFull = 0.92f;
 
-        private static float Channel(float value, float peak, float glow)
+        private static float Channel(float value, float peak, float glow, float weak)
         {
-            float capped = Math.Min(value * glow, Math.Max(value, value / peak));
             float near = Mathf.Clamp01((value / peak - NearPeakFrom) / (NearPeakFull - NearPeakFrom));
-            return capped + (value * glow - capped) * near;
+            return value * Mathf.Lerp(weak, glow, near);
         }
     }
 }

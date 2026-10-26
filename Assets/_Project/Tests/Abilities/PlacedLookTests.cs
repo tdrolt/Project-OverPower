@@ -93,7 +93,9 @@ namespace Overpower.Tests
                 "two arcs at different heights never move as one");
             Color team = new Color(0.8f, 0.4f, 0.2f, 1f);
             Assert.AreEqual(new Color(0.4f, 0.2f, 0.1f, 1f), FenceArcsRule.PylonBody(team, 0.5f), "a darker team colour, solid");
-            Assert.AreEqual(new Color(1.2f, 0.5f, 0.25f, 1f), FenceArcsRule.PylonGlow(team, 1.5f), "the brightest channel glows, the weaker ones stop at their share (hue kept)");
+            Color glow = TowerLookRules.GlowKeepingHue(team, 1.5f);
+            glow.a = 1f;
+            Assert.AreEqual(glow, FenceArcsRule.PylonGlow(team, 1.5f), "the pylon glows by the hue-keeping rule, solid");
         }
 
         // ---- views ----
@@ -483,7 +485,7 @@ namespace Overpower.Tests
             var purple = new Color(0.68f, 0.32f, 1f, 1f);
             Color pylon = FenceArcsRule.PylonGlow(purple, 1.5f);
             Assert.AreEqual(TowerLookRules.GlowKeepingHue(purple, 1.5f), pylon, "one glow rule for every team-owned glow");
-            Assert.AreEqual(0.68f, pylon.r, 1e-4f, "purple's red stays at its share, or the glow would turn pink");
+            Assert.Less(pylon.r / pylon.b, purple.r / purple.b, "purple's red grows less than its blue, or the glow would turn pink");
             Assert.AreEqual(1f, pylon.a);
             Assert.IsTrue(IlWiring.Uses(typeof(MineView), nameof(MineView.PaintCap), typeof(TowerLookRules).GetMethod(nameof(TowerLookRules.GlowKeepingHue))),
                 "the mine's cap glows through the same rule");

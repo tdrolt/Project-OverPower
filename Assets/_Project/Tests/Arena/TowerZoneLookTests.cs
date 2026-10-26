@@ -106,33 +106,80 @@ namespace Overpower.Tests
         }
     }
 
-    /// <summary>A tower's glow brightens its colour without changing its hue: the screen clips each channel at full strength,
-    /// so a second channel pushed past it (purple's red) would catch up with the first and turn the colour pink.</summary>
+    /// <summary>A glow brightens a colour without changing its hue on screen, in light and under the fog (a tower hides its own top
+    /// from sight, so a crown is always under it). The screen here is the project's: the colour made linear, the fog blended over it,
+    /// then URP's Neutral tonemapper; fed today's crown colours it gives the crown pixels captured in the Game view to within 3 levels.</summary>
     public class TowerGlowTests
     {
+        private static readonly Color Orange = new Color(1f, 0.45f, 0.05f, 1f);
         private static readonly Color Purple = new Color(0.68f, 0.32f, 1f, 1f);
         private static readonly Color Cyan = new Color(0.15f, 0.95f, 1f, 1f);
+        private static readonly Color StunBlue = new Color(0.2f, 0.45f, 1f, 1f);
         private static readonly Color White = new Color(0.93f, 0.97f, 1f, 1f);
         private static readonly Color Red = new Color(1f, 0.2f, 0.15f, 0.8f);
+        private static readonly Color FogColour = new Color(0.102f, 0.11f, 0.133f, 1f);
+        private static readonly float[] FogDarkness = { 0f, 0.35f, 0.65f };
+        private const float HueToleranceDegrees = 8f;
 
-        private static Color Clipped(Color c) => new Color(Mathf.Min(c.r, 1f), Mathf.Min(c.g, 1f), Mathf.Min(c.b, 1f));
+        // URP Colors.hlsl NeutralTonemap, one channel of a linear colour.
+        private static float NeutralCurve(float x) =>
+            (x * (0.2f * x + 0.24f * 0.29f) + 0.272f * 0.02f) / (x * (0.2f * x + 0.29f) + 0.272f * 0.3f) - 0.02f / 0.3f;
 
-        [Test]
-        public void OnScreenAGlowingColourKeepsItsHue()
+        private static float Neutral(float x)
         {
-            foreach (Color colour in new[] { Purple, Red, Color.Lerp(Purple, Red, 0.4f) })
-                foreach (float glow in new[] { 1.5f, 2.5f })
-                {
-                    Color shown = Clipped(TowerLookRules.GlowKeepingHue(colour, glow));
-                    float peak = colour.maxColorComponent, shownPeak = shown.maxColorComponent;
-                    string label = colour + " x" + glow;
-                    Assert.AreEqual(colour.r / peak, shown.r / shownPeak, 1e-4f, label + " r");
-                    Assert.AreEqual(colour.g / peak, shown.g / shownPeak, 1e-4f, label + " g");
-                    Assert.AreEqual(colour.b / peak, shown.b / shownPeak, 1e-4f, label + " b");
-                }
+            float whiteScale = 1f / NeutralCurve(5.3f);
+            return Mathf.Min(1f, NeutralCurve(x * whiteScale) * whiteScale);
         }
 
-        // The tonemapper compresses every bright channel toward the same level: if only white's blue glowed, its red and green would fall
+        private static Color OnScreen(Color colour, float fogDarkness)
+        {
+            Color c = colour.linear, fog = FogColour.linear;
+            float Channel(float value, float fogValue) => Mathf.LinearToGammaSpace(Neutral(Mathf.Lerp(value, fogValue, fogDarkness)));
+            return new Color(Channel(c.r, fog.r), Channel(c.g, fog.g), Channel(c.b, fog.b), 1f);
+        }
+
+        private static float Hue(Color c)
+        {
+            Color.RGBToHSV(c, out float h, out _, out _);
+            return h * 360f;
+        }
+
+        [Test]
+        public void TheScreenModelGivesTheCapturedCrowns()
+        {
+            AssertPixels(new Color(1.5f, 0.45f, 0.05f), 201, 75, 29);
+            AssertPixels(new Color(0.68f, 0.32f, 1.5f), 110, 55, 201);
+            AssertPixels(new Color(0.15f, 1.425f, 1.5f), 32, 195, 201);
+
+            void AssertPixels(Color crown, int r, int g, int b)
+            {
+                Color shown = OnScreen(crown, 0.65f);
+                Assert.AreEqual(r, shown.r * 255f, 3f, crown + " red");
+                Assert.AreEqual(g, shown.g * 255f, 3f, crown + " green");
+                Assert.AreEqual(b, shown.b * 255f, 3f, crown + " blue");
+            }
+        }
+
+        [Test]
+        public void EachTeamsGlowKeepsItsHueOnScreenInLightAndUnderTheFog()
+        {
+            var teamGlows = new[] { 1.2f, 1.5f, 2f, 2.5f };
+            var cases = new (string name, Color colour, float[] glows)[]
+            {
+                ("orange", Orange, teamGlows), ("purple", Purple, teamGlows), ("cyan", Cyan, teamGlows),
+                ("stun blue", StunBlue, new[] { 2f, 3f, 4f, 6f }),
+            };
+            foreach ((string name, Color colour, float[] glows) in cases)
+                foreach (float glow in glows)
+                    foreach (float fog in FogDarkness)
+                    {
+                        Color shown = OnScreen(TowerLookRules.GlowKeepingHue(colour, glow), fog);
+                        Assert.LessOrEqual(Mathf.Abs(Mathf.DeltaAngle(Hue(colour), Hue(shown))), HueToleranceDegrees,
+                            $"{name} glowing x{glow} under fog {fog} shows as {shown}");
+                    }
+        }
+
+        // The tonemapper squeezes every bright channel toward the same level: if only white's blue glowed, its red and green would fall
         // behind and the crown would read lavender (cyan's green: sky blue). A channel close to the brightest glows with it.
         [Test]
         public void WhiteGlowsWhiteAndCyanKeepsItsGreen()
@@ -144,16 +191,16 @@ namespace Overpower.Tests
                 Assert.AreEqual(White.g / White.b, white.g / white.b, 1e-4f, "white's green grows with its blue, x" + glow);
                 Color cyan = TowerLookRules.GlowKeepingHue(Cyan, glow);
                 Assert.AreEqual(Cyan.g / Cyan.b, cyan.g / cyan.b, 1e-4f, "cyan's green grows with its blue, x" + glow);
-                Assert.AreEqual(Cyan.r, cyan.r, 1e-4f, "cyan's faint red stays at its share");
             }
         }
 
         [Test]
-        public void TheBrightestChannelStillGlowsPastFullStrength()
+        public void TheBrightestChannelGlowsPastFullStrengthAndAWeakerOneLess()
         {
             Color purple = TowerLookRules.GlowKeepingHue(Purple, 1.5f);
             Assert.AreEqual(1.5f, purple.b, 1e-4f, "past 1, so the bloom picks it up");
-            Assert.AreEqual(0.68f, purple.r, 1e-4f, "red stays at its share of a full-strength purple");
+            Assert.Greater(purple.r, Purple.r, "red grows too, or the fog would turn purple blue");
+            Assert.Less(purple.r / purple.b, Purple.r / Purple.b, "but less than blue, or the light would turn it pink");
             Assert.Greater(TowerLookRules.GlowKeepingHue(White, 1.5f).maxColorComponent, 1f);
         }
 
@@ -165,6 +212,8 @@ namespace Overpower.Tests
             Assert.AreEqual(0.6f, lit.r, 1e-4f);
             Assert.AreEqual(0.4f, lit.g, 1e-4f);
             Assert.AreEqual(0.8f, lit.b, 1e-4f);
+            Color dimmed = TowerLookRules.GlowKeepingHue(Orange, 0.5f);
+            Assert.AreEqual(Orange.g * 0.5f, dimmed.g, 1e-4f, "a glow under 1 dims the whole colour");
         }
 
         [Test]
