@@ -18,6 +18,7 @@ namespace Overpower.UI
         private readonly Transform parent;
         private RectTransform banner, small, shrinkRoot;
         private TextMeshProUGUI shrink;
+        private Material shrinkMaterial;
         private string shownShrink;
 
         public bool BannerShowing => banner != null && banner.gameObject.activeSelf;
@@ -52,6 +53,7 @@ namespace Overpower.UI
             string text = DominionHudText.ShrinkLine(theme.dominionShrinkFormat, secondsUntilStopped);
             bool showShrink = text.Length > 0;
             if (shrinkRoot.gameObject.activeSelf != showShrink) shrinkRoot.gameObject.SetActive(showShrink);
+            if (showShrink) MinimapLabelPlacement.PlaceUnder(shrinkRoot, theme, theme.minimapCornerSize, theme.dominionShrinkSize * 1.5f);
             if (showShrink && text != shownShrink) { shrink.text = text; shownShrink = text; }
         }
 
@@ -60,6 +62,7 @@ namespace Overpower.UI
             if (banner != null) Object.Destroy(banner.gameObject);
             if (small != null) Object.Destroy(small.gameObject);
             if (shrinkRoot != null) Object.Destroy(shrinkRoot.gameObject);
+            if (shrinkMaterial != null) Object.Destroy(shrinkMaterial);
             banner = small = shrinkRoot = null;
         }
 
@@ -94,9 +97,10 @@ namespace Overpower.UI
             var go = new GameObject("Circle Countdown", typeof(RectTransform));
             go.transform.SetParent(parent, false);
             shrinkRoot = (RectTransform)go.transform;
-            DominionHud.PlaceUnderMinimap(shrinkRoot, theme, theme.dominionShrinkSize * 1.5f);
-            shrink = kit.Text(shrinkRoot, "Line", "", kit.Display, theme.dominionShrinkSize, theme.suddenDeathColor, TextAlignmentOptions.Midline);
+            MinimapLabelPlacement.PlaceUnder(shrinkRoot, theme, theme.minimapCornerSize, theme.dominionShrinkSize * 1.5f);
+            shrink = kit.Text(shrinkRoot, "Line", "", null, theme.dominionShrinkSize, theme.suddenDeathColor, TextAlignmentOptions.Midline);
             shrink.overflowMode = TextOverflowModes.Overflow;
+            shrinkMaterial = MinimapLabelPlacement.ApplyLook(shrink, theme);
             LobbyUiKit.Stretch(shrink.rectTransform);
             banner.gameObject.SetActive(false);
             small.gameObject.SetActive(false);

@@ -676,6 +676,17 @@ namespace Overpower.UI
             }
         }
 
+        /// <summary>How far below the corner box's centre the drawn frame reaches, in canvas units at the corner size, as it is turned now. With no
+        /// corner map built (a spectator, the first frames of a match) the frame is taken to fill its box.</summary>
+        public static float CornerShapeBottomBelowCentre(UiTheme theme)
+        {
+            MinimapView view = Local;
+            if (view == null || !view.built || view.viewport == null || view.config == null)
+                return theme.minimapCornerSize / 2f;
+            return MinimapLabelPlacement.ShapeBottomBelowCentre(view.config.RectangularFrame, view.frameSize,
+                theme.minimapCornerSize * GeneratedSprites.CentredTriangleRadiusFraction, view.viewport.localEulerAngles.z);
+        }
+
         private void ApplyYawIfChanged()
         {
             float yaw = CameraTracking.Instance != null ? CameraTracking.Instance.Yaw : 0f;

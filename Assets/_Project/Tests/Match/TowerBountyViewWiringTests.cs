@@ -52,7 +52,7 @@ namespace Overpower.Tests
         {
             System.Reflection.MethodInfo helper = typeof(Overpower.UI.HudScreenLayout).GetMethod(nameof(Overpower.UI.HudScreenLayout.CornerMinimapRect));
             Assert.IsTrue(IlWiring.Uses(typeof(TowerBountyView), "AvoidRect", helper));
-            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.Vision.CentreScanCountdownView), "PlaceUnderCornerMinimap", helper));
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.MinimapLabelPlacement), "PlaceUnder", helper)); // the lines under the minimap
         }
 
         [Test]

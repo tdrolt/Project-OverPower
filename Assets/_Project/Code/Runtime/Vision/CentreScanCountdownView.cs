@@ -14,7 +14,7 @@ namespace Overpower.Vision
     /// Countdown Font Size, colour Scan Wave Colour.
     /// A second label with the same text sits under the corner minimap, fixed on screen, so the countdown is readable when the
     /// tower is off screen: same conditions minus the camera test. It stays under the CORNER map when M opens the large one
-    /// (the large map is centred and leaves the corner free). Size and offset: UiTheme > Scan Minimap Countdown Font Size / Offset.
+    /// (the large map is centred and leaves the corner free). Its spot and look are MinimapLabelPlacement's; size: UiTheme > Scan Minimap Countdown Font Size.
     /// Reads "Scan 12", whole seconds, and keeps counting while a wave travels (the full interval as a wave starts). Hidden when
     /// CentreScan has no countdown, Scan Countdown Visible is off, or the anchor is behind the camera. Wording and size are on
     /// the UiTheme; height and on/off on the Vision Config.
@@ -106,11 +106,9 @@ namespace Overpower.Vision
                 label.gameObject.SetActive(true);
         }
 
-        // Straight under the corner minimap's box (top right: margin + frame band in, then the map's size down), centred on it.
         private void PlaceUnderCornerMinimap(UiTheme theme)
         {
-            Rect box = Overpower.UI.HudScreenLayout.CornerMinimapRect(theme.minimapCornerMargin, theme.minimapFrameWidth, theme.minimapCornerSize);
-            minimapLabel.rectTransform.anchoredPosition = new Vector2(box.center.x + theme.scanMinimapCountdownOffset.x, box.yMin + theme.scanMinimapCountdownOffset.y);
+            MinimapLabelPlacement.PlaceUnder(minimapLabel.rectTransform, theme, theme.minimapCornerSize, theme.scanMinimapCountdownFontSize * 1.5f);
         }
 
         private void Hide()
@@ -152,28 +150,29 @@ namespace Overpower.Vision
             // No GraphicRaycaster: nothing here is clickable.
             canvasRect = canvasGo.GetComponent<RectTransform>();
 
-            label = NewLabel("Countdown Label", theme, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), out labelMaterial);
+            label = NewLabel("Countdown Label", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            if (theme.font != null)
+                label.font = theme.font; // before the material is touched (assigning a font swaps the material)
+            label.fontStyle = FontStyles.Bold;
+            labelMaterial = new Material(label.fontSharedMaterial);
+            theme.ApplyHudTextStyle(labelMaterial);
+            label.fontSharedMaterial = labelMaterial;
             // Under the corner minimap: anchored to the top right with its top edge at the point PlaceUnderCornerMinimap sets.
-            minimapLabel = NewLabel("Minimap Countdown Label", theme, Vector2.one, new Vector2(0.5f, 1f), out minimapLabelMaterial);
+            minimapLabel = NewLabel("Minimap Countdown Label", Vector2.one, new Vector2(0.5f, 1f));
+            minimapLabelMaterial = MinimapLabelPlacement.ApplyLook(minimapLabel, theme);
             minimapLabel.alignment = TextAlignmentOptions.Top; // the text hugs the top of its box, right under the minimap
             return true;
         }
 
-        private TextMeshProUGUI NewLabel(string name, UiTheme theme, Vector2 anchor, Vector2 pivot, out Material material)
+        private TextMeshProUGUI NewLabel(string name, Vector2 anchor, Vector2 pivot)
         {
             GameObject go = TMP_DefaultControls.CreateText(new TMP_DefaultControls.Resources());
             go.name = name;
             go.transform.SetParent(canvasGo.transform, false);
             TextMeshProUGUI text = go.GetComponent<TextMeshProUGUI>();
-            if (theme.font != null)
-                text.font = theme.font; // before the material is touched (assigning a font swaps the material)
-            text.fontStyle = FontStyles.Bold;
             text.alignment = TextAlignmentOptions.Center;
             text.enableWordWrapping = false;
             text.raycastTarget = false;
-            material = new Material(text.fontSharedMaterial);
-            theme.ApplyHudTextStyle(material);
-            text.fontSharedMaterial = material;
             RectTransform rect = text.rectTransform;
             rect.sizeDelta = new Vector2(400f, 80f);
             rect.pivot = pivot;

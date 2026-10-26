@@ -700,9 +700,6 @@ namespace Overpower.UI
         [Tooltip("Text size of the second countdown, the one fixed under the corner minimap, in reference pixels (1080p). Same words " +
                  "and colour as the one above the tower; it is always on screen while there is a scan, so it can stay smaller.")]
         [Min(1f)] public float scanMinimapCountdownFontSize = 22f;
-        [Tooltip("Where that countdown sits relative to the spot straight under the middle of the corner minimap, in canvas units: " +
-                 "x moves it right, y moves it up (a negative y moves it further down, away from the map).")]
-        public Vector2 scanMinimapCountdownOffset = new Vector2(0f, -4f);
         [Tooltip("The yellow text floating above a tower that carries a bounty in Dominion. {0} is the points the team that takes the zone will get, " +
                  "e.g. \"BOUNTY {0}\" reads \"BOUNTY 150\".")]
         public string bountyLabelFormat = "BOUNTY {0}";
@@ -1130,9 +1127,15 @@ namespace Overpower.UI
         [Tooltip("What a round says when it opens nothing new in the shop.")]
         public string dominionOpensNothing = "nothing new";
 
+        [Header("Under the minimap")]
+        [Tooltip("Gap between the bottom of the corner minimap's triangle and the line under it (the scan countdown in Conquest, the centre " +
+                 "countdown and the circle countdown in Dominion), in canvas units. Smaller tucks the line closer to the map.")]
+        public float minimapLinesGap = 6f;
+        [Tooltip("Font of the lines under the corner minimap. Leave it empty to use the HUD font (Text > Font), the one the minimap's own " +
+                 "labels and the ability bar use; set the display font here to match Dominion's round bar instead.")]
+        public TMP_FontAsset minimapLinesFont;
+
         [Header("Dominion HUD: under the minimap")]
-        [Tooltip("Gap between the minimap's lower edge and the Dominion lines under it (the centre countdown, the circle countdown).")]
-        public float dominionUnderMinimapGap = 12f;
         [Tooltip("Size of the centre countdown line (CENTRE +200 IN 12).")]
         public float dominionCentreSize = 30f;
         [Tooltip("Size of the line saying who holds the centre.")]

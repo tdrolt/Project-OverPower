@@ -252,7 +252,6 @@ MonoBehaviour:
   scanCountdownFormat: Scan {0}
   scanCountdownFontSize: 28
   scanMinimapCountdownFontSize: 22
-  scanMinimapCountdownOffset: {x: 0, y: -4}
   bountyLabelFormat: BOUNTY {0}
   bountyLabelGoldFormat: BOUNTY {0} GOLD
   bountyPopFormat: +{0}
@@ -426,7 +425,8 @@ MonoBehaviour:
   dominionOpensArmorMore: '{0} armor upgrades'
   dominionOpensAnd: ' and '
   dominionOpensNothing: nothing new
-  dominionUnderMinimapGap: 12
+  minimapLinesGap: 6
+  minimapLinesFont: {fileID: 0}
   dominionCentreSize: 30
   dominionCentreHolderSize: 21
   dominionCentreFormat: CENTRE <color=#E8B931>+{0}</color> IN {1}

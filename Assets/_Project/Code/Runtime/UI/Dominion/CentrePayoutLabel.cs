@@ -16,6 +16,7 @@ namespace Overpower.UI
         private readonly Transform parent;
         private RectTransform root;
         private TextMeshProUGUI line, holder;
+        private Material lineMaterial, holderMaterial;
         // The whole numbers the lines were last built from; the words are only formatted when one moved.
         private bool lineDrawn;
         private int drawnPoints, drawnSeconds;
@@ -41,6 +42,7 @@ namespace Overpower.UI
         {
             if (root == null) Build();
             SetVisible(true);
+            MinimapLabelPlacement.PlaceUnder(root, theme, theme.minimapCornerSize, Height);
             if (!lineDrawn || points != drawnPoints || secondsLeft != drawnSeconds)
             {
                 line.text = DominionHudText.CentreLine(theme.dominionCentreFormat, points, secondsLeft);
@@ -57,6 +59,8 @@ namespace Overpower.UI
         public void Destroy()
         {
             if (root != null) Object.Destroy(root.gameObject);
+            if (lineMaterial != null) Object.Destroy(lineMaterial);
+            if (holderMaterial != null) Object.Destroy(holderMaterial);
             root = null;
         }
 
@@ -65,16 +69,20 @@ namespace Overpower.UI
             var go = new GameObject("Centre Countdown", typeof(RectTransform));
             go.transform.SetParent(parent, false);
             root = (RectTransform)go.transform;
-            DominionHud.PlaceUnderMinimap(root, theme, theme.dominionCentreSize * 1.5f + theme.dominionCentreHolderSize * 1.5f);
-            line = kit.Text(root, "Line", "", kit.Display, theme.dominionCentreSize, theme.lobbyOffWhiteColor, TextAlignmentOptions.Midline, 0f, false, true);
+            MinimapLabelPlacement.PlaceUnder(root, theme, theme.minimapCornerSize, Height);
+            line = kit.Text(root, "Line", "", null, theme.dominionCentreSize, theme.lobbyOffWhiteColor, TextAlignmentOptions.Midline, 0f, false, true);
             line.overflowMode = TextOverflowModes.Overflow;
+            lineMaterial = MinimapLabelPlacement.ApplyLook(line, theme);
             Place(line.rectTransform, 0f, theme.dominionCentreSize * 1.5f);
-            holder = kit.Text(root, "Holder", "", kit.Bold, theme.dominionCentreHolderSize, theme.dominionDimColor, TextAlignmentOptions.Midline);
+            holder = kit.Text(root, "Holder", "", null, theme.dominionCentreHolderSize, theme.dominionDimColor, TextAlignmentOptions.Midline);
             holder.overflowMode = TextOverflowModes.Overflow;
+            holderMaterial = MinimapLabelPlacement.ApplyLook(holder, theme);
             Place(holder.rectTransform, theme.dominionCentreSize * 1.5f, theme.dominionCentreHolderSize * 1.5f);
             lineDrawn = false;
             shownHolderTeam = -2;
         }
+
+        private float Height => theme.dominionCentreSize * 1.5f + theme.dominionCentreHolderSize * 1.5f;
 
         private static void Place(RectTransform rect, float top, float height)
         {

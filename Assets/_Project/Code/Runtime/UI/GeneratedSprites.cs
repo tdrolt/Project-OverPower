@@ -15,6 +15,7 @@ namespace Overpower.UI
         // The Mask's stencil test and the edge shape that covers its seam (BuildFrame) both want the smoothest
         // possible source contour, so they get a dedicated, higher-resolution texture rather than sharing Size.
         private const int LargeSize = 512;
+        private const float TriangleCornerInset = 2f; // pixels between the centred triangle's corners and the sprite's edge
 
         private static Sprite disc;
         private static Sprite triangle;
@@ -104,11 +105,14 @@ namespace Overpower.UI
         private static void CentredTriangleVertices(int size, float shrink, out Vector2 v0, out Vector2 v1, out Vector2 v2)
         {
             float half = size / 2f;
-            float r = half - 2f - shrink;
+            float r = half - TriangleCornerInset - shrink;
             v0 = new Vector2(half, half + r);
             v1 = new Vector2(half - r * 0.8660254f, half - r * 0.5f);
             v2 = new Vector2(half + r * 0.8660254f, half - r * 0.5f);
         }
+
+        /// <summary>The centred triangle's corner distance from the centre as a share of the sprite's size (CentredTriangleVertices, unshrunk).</summary>
+        public static float CentredTriangleRadiusFraction => (LargeSize / 2f - TriangleCornerInset) / LargeSize;
 
         private static float TriangleMaskAlpha(float x, float y, int size, float shrink)
         {

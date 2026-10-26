@@ -292,15 +292,5 @@ namespace Overpower.UI
             result = new DominionResultPanel(kit, resultCanvas.transform);
             return true;
         }
-
-        /// <summary>Places a line under the corner minimap: top right, as wide as the minimap, below it by Under Minimap Gap. The centre countdown
-        /// and the circle countdown share this spot (they never show at the same time).</summary>
-        public static void PlaceUnderMinimap(RectTransform rect, UiTheme theme, float height)
-        {
-            float inset = theme.minimapCornerMargin + theme.minimapFrameWidth;
-            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(1f, 1f);
-            rect.sizeDelta = new Vector2(theme.minimapCornerSize, height);
-            rect.anchoredPosition = new Vector2(-inset, -(inset + theme.minimapCornerSize + theme.dominionUnderMinimapGap));
-        }
     }
 }
