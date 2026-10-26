@@ -52,10 +52,13 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     // The whole overhead bar's root GameObject ("Bar", the shared parent of the three Images above
     // on HealthBarCanvas) - cached in Awake from healthFillImage's own parent rather than a new
-    // serialized field, so wiring this needs no prefab edit. Deliberately NOT HealthBarCanvas
-    // itself: that canvas also carries the floating name text (PlayerNameTag), which must stay
-    // visible over a corpse. See SetOverheadBarVisible.
+    // serialized field, so wiring this needs no prefab edit. Deliberately not the whole plate or
+    // HealthBarCanvas: the name on the plate (PlayerNameTag) must stay visible over a corpse.
+    // See SetOverheadBarVisible.
     private GameObject overheadBarRoot;
+
+    // The plate round the bar and the name (NameplateView); null when the player has no theme or overhead canvas.
+    private Overpower.UI.NameplateView nameplate;
 
     // The yellow "shield immunity" look is a FRAME (four thin edge Images) round the shared health/shield rect: not a
     // recolour of either fill and not a translucent whole-bar overlay, which read grey over the blue shield fill (see
@@ -110,6 +113,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     /// <summary>The world-space canvas the overhead bar and the name sit on - null when the prefab has no health
     /// fill assigned. The status label is built onto it.</summary>
     public Canvas OverheadCanvas => healthFillImage != null ? healthFillImage.GetComponentInParent<Canvas>(true) : null; // includes a canvas EnemyVisibility switched off (Image.canvas reads null then)
+
+    /// <summary>The health-and-armour bar on the plate over this player's head (the parent of the two fills), or null.</summary>
+    public RectTransform OverheadBar => healthFillImage != null ? healthFillImage.transform.parent as RectTransform : null;
 
     private PhotonView photonView;
     private PlayerLifecycle lifecycle; // the replicated alive state, read by IsAlive
@@ -193,6 +199,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         overheadBarRoot = healthFillImage != null ? healthFillImage.transform.parent?.gameObject : null;
 
         ApplyTheme();
+        nameplate = Overpower.UI.NameplateView.Ensure(this);
         UpdateOverheadBar();
     }
 
@@ -214,6 +221,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     {
         if (overheadBarRoot != null)
             overheadBarRoot.SetActive(visible);
+        if (nameplate != null)
+            nameplate.SetBarShown(visible);
 
         // The bar over a dead player hides with the body, so the immune frame must not survive either. On death, on
         // EVERY client, PlayerLifecycle.ApplyAliveState(false) raises AliveChanged, and AbilityRunner.HandleAliveChanged

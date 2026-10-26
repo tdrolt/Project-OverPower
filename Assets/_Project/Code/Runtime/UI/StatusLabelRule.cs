@@ -24,6 +24,27 @@ namespace Overpower.UI
             return StatusLabel.None;
         }
 
+        /// <summary>Whether a label shows and, when it does, its text and colour: STUNNED in the stun colour, SLOWED in the slow colour.</summary>
+        public static bool Look(StatusLabel label, string stunnedText, Color stunnedColour, string slowedText, Color slowedColour,
+                                out string text, out Color colour)
+        {
+            switch (label)
+            {
+                case StatusLabel.Stunned:
+                    text = stunnedText;
+                    colour = stunnedColour;
+                    return true;
+                case StatusLabel.Slowed:
+                    text = slowedText;
+                    colour = slowedColour;
+                    return true;
+                default:
+                    text = null;
+                    colour = default;
+                    return false;
+            }
+        }
+
         /// <summary>The bar's fill: remaining over the duration the status started with, clamped 0..1.
         /// No known duration reads as empty rather than dividing by zero.</summary>
         public static float Fill(float remaining, float duration)

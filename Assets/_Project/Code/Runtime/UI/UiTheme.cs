@@ -255,14 +255,47 @@ namespace Overpower.UI
         public float statusHudOffsetY = 170f;
         [Tooltip("Your own HUD bar: width and height, in canvas units. Sits directly under the label.")]
         public Vector2 statusHudBarSize = new Vector2(220f, 8f);
-        [Tooltip("Size of the label over a player's head (same units as the name above the health bar).")]
-        public float statusOverheadTextSize = 15f;
-        [Tooltip("How high above the health bar's centre the label sits, in overhead-canvas units (the name text sits at 5).")]
-        public float statusOverheadLabelY = 15.5f;
-        [Tooltip("How high above the health bar's centre the thin countdown bar sits, in overhead-canvas units - between the name and the label.")]
-        public float statusOverheadBarY = 11f;
-        [Tooltip("Overhead countdown bar: width and height, in overhead-canvas units (the health bar is 15 by 3).")]
-        public Vector2 statusOverheadBarSize = new Vector2(15f, 1f);
+        [Tooltip("Size of the STUNNED / SLOWED label over a player's plate, in overhead-canvas units (the name on the plate is Nameplate Name Size).")]
+        public float nameplateStatusTextSize = 3.2f;
+        [Tooltip("Gap between the top of a player's plate and the STUNNED / SLOWED countdown bar above it, in overhead-canvas units. " +
+                 "The shield's \"Wasted\" text keeps the same gap above the label.")]
+        public float nameplateStatusGap = 0.6f;
+        [Tooltip("The STUNNED / SLOWED countdown bar above a player's plate: width and height, in overhead-canvas units.")]
+        public Vector2 nameplateStatusBarSize = new Vector2(16f, 0.6f);
+        [Tooltip("Gap between that countdown bar and the STUNNED / SLOWED label sitting above it, in overhead-canvas units.")]
+        public float nameplateStatusLabelGap = 0.3f;
+
+        [Header("Nameplate (name, health and armour over every player)")]
+        [Tooltip("Font of the name on every player's plate, their STUNNED / SLOWED label and the shield's \"Wasted\" text. " +
+                 "Leave empty to use the UI font above.")]
+        public TMP_FontAsset nameplateFont;
+        [Tooltip("Size of the player's name on their plate, in overhead-canvas units (the units of the plate's bar, Nameplate Bar Size).")]
+        public float nameplateNameSize = 3.6f;
+        [Tooltip("Width and height of the health-and-armour bar on every plate, in overhead-canvas units. Every bar is this wide " +
+                 "whatever the player's name, so health compares at a glance.")]
+        public Vector2 nameplateBarSize = new Vector2(16f, 2.4f);
+        [Tooltip("Empty space between the plate's edge and the name and bar inside it, in overhead-canvas units: left and right, then top and bottom.")]
+        public Vector2 nameplatePadding = new Vector2(0.9f, 0.7f);
+        [Tooltip("Gap between the name and the bar under it, in overhead-canvas units.")]
+        public float nameplateRowGap = 0.5f;
+        [Tooltip("The widest a plate grows for a long name, in overhead-canvas units. A longer name is cut short with three dots; " +
+                 "the plate is never narrower than its bar.")]
+        public float nameplateMaxWidth = 30f;
+        [Tooltip("Height of the plate's bottom edge above the player's overhead point, in overhead-canvas units (negative is lower). " +
+                 "When a player dies their bar goes and the plate shrinks to the name, which stays where it was.")]
+        public float nameplateBottomY = -1.6f;
+        [Tooltip("Thickness of the team-coloured edge round every plate, in overhead-canvas units. 0 turns the edge off.")]
+        public float nameplateEdgeThickness = 0.35f;
+        [Tooltip("Colour of the plate behind the name and bar: dark and mostly opaque, so the name and bar read over every floor colour.")]
+        public Color nameplateBackingColor = new Color(0.04f, 0.05f, 0.07f, 0.78f);
+        [Tooltip("Colour of your own name on your plate.")]
+        public Color nameplateSelfNameColor = Color.white;
+        [Tooltip("Colour of a teammate's name on their plate.")]
+        public Color nameplateTeammateNameColor = Color.green;
+        [Tooltip("Colour of an enemy's name on their plate.")]
+        public Color nameplateEnemyNameColor = Color.red;
+        [Tooltip("Colour of a name while the teams are still arriving, for a moment after someone joins: grey rather than a guess.")]
+        public Color nameplateUnknownNameColor = Color.grey;
         [Header("Shield wasted text (Invulnerability ultimate)")]
         [Tooltip("Text that pops over a player's head when their armed shield window ran out and nobody hit them.")]
         public string shieldWastedText = "Wasted";
@@ -270,10 +303,9 @@ namespace Overpower.UI
         public Color shieldWastedColor = new Color(0.75f, 0.78f, 0.85f, 1f);
         [Tooltip("How long the shield's \"Wasted\" text stays over the player's head, in seconds.")]
         public float shieldWastedSeconds = 1.2f;
-        [Tooltip("Size of the \"Wasted\" text (same units as the name above the health bar).")]
-        public float shieldWastedTextSize = 15f;
-        [Tooltip("How high above the health bar's centre the \"Wasted\" text sits, in overhead-canvas units (the STUNNED label sits at 15.5, so this is clearly above it).")]
-        public float shieldWastedY = 27f;
+        [Tooltip("Size of the \"Wasted\" text, in overhead-canvas units (the name on the plate is Nameplate Name Size). " +
+                 "It sits above the STUNNED / SLOWED label's place, Nameplate Status Gap higher.")]
+        public float shieldWastedTextSize = 3.4f;
         [Tooltip("Colour of the weapon-icon placeholder in the silenced banner - a plain rectangle, since the " +
                  "project has no weapon-silhouette sprite yet.")]
         public Color silencedIconColor = new Color(0.85f, 0.85f, 0.85f, 0.9f);

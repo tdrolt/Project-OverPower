@@ -89,15 +89,27 @@ MonoBehaviour:
   statusSlowedColor: {r: 0.78, g: 0.62, b: 0.4, a: 1}
   statusHudOffsetY: 170
   statusHudBarSize: {x: 220, y: 8}
-  statusOverheadTextSize: 15
-  statusOverheadLabelY: 15.5
-  statusOverheadBarY: 11
-  statusOverheadBarSize: {x: 15, y: 1}
+  nameplateStatusTextSize: 3.2
+  nameplateStatusGap: 0.6
+  nameplateStatusBarSize: {x: 16, y: 0.6}
+  nameplateStatusLabelGap: 0.3
+  nameplateFont: {fileID: 0}
+  nameplateNameSize: 3.6
+  nameplateBarSize: {x: 16, y: 2.4}
+  nameplatePadding: {x: 0.9, y: 0.7}
+  nameplateRowGap: 0.5
+  nameplateMaxWidth: 30
+  nameplateBottomY: -1.6
+  nameplateEdgeThickness: 0.35
+  nameplateBackingColor: {r: 0.04, g: 0.05, b: 0.07, a: 0.78}
+  nameplateSelfNameColor: {r: 1, g: 1, b: 1, a: 1}
+  nameplateTeammateNameColor: {r: 0, g: 1, b: 0, a: 1}
+  nameplateEnemyNameColor: {r: 1, g: 0, b: 0, a: 1}
+  nameplateUnknownNameColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   shieldWastedText: Wasted
   shieldWastedColor: {r: 0.75, g: 0.78, b: 0.85, a: 1}
   shieldWastedSeconds: 1.2
-  shieldWastedTextSize: 15
-  shieldWastedY: 27
+  shieldWastedTextSize: 3.4
   silencedIconColor: {r: 0.85, g: 0.85, b: 0.85, a: 0.9}
   silencedWashAlpha: 0.35
   silencedIconSize: 28

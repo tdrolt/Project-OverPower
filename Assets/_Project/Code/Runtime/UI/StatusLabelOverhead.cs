@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -5,9 +6,9 @@ namespace Overpower.UI
 {
     /// <summary>
     /// The STUNNED / SLOWED label and its thin shrinking bar over ONE player's head (D18), built onto the overhead
-    /// canvas the health bar and name sit on, so everyone sees it. Owned and ticked by that player's
-    /// PlayerStatusEffects on every client's copy; it reads PlayerStatusEffects.TryGetStatusLabel (the real status
-    /// on the owner's copy, the published Player Property on everyone else's). Text and colour are written only
+    /// canvas above the player's plate (NameplateLayout), so everyone sees it and the fog hides it with the plate.
+    /// Owned and ticked by that player's PlayerStatusEffects on every client's copy; it reads PlayerStatusEffects.TryGetStatusLabel
+    /// (the real status on the owner's copy, the published Player Property on everyone else's). Text and colour are written only
     /// when the label changes and the bar only when its fill moves, so an idle player allocates nothing.
     /// </summary>
     public sealed class StatusLabelOverhead
@@ -15,13 +16,13 @@ namespace Overpower.UI
         private readonly PlayerStatusEffects source;
         private readonly UiTheme theme;
         private readonly GameObject root;
-        private readonly Text text;
+        private readonly TMP_Text text;
         private readonly Image fill;
 
         private StatusLabel lastLabel = (StatusLabel)(-1);
         private float lastFill = -1f;
 
-        private StatusLabelOverhead(PlayerStatusEffects source, UiTheme theme, GameObject root, Text text, Image fill)
+        private StatusLabelOverhead(PlayerStatusEffects source, UiTheme theme, GameObject root, TMP_Text text, Image fill)
         {
             this.source = source;
             this.theme = theme;
@@ -30,7 +31,7 @@ namespace Overpower.UI
             this.fill = fill;
         }
 
-        /// <summary>Builds the label under the overhead canvas, or returns null (with a warning) when the
+        /// <summary>Builds the label above the plate on the overhead canvas, or returns null (with a warning) when the
         /// player has no theme, canvas or bar sprite to build it from.</summary>
         public static StatusLabelOverhead TryCreate(PlayerStatusEffects source, UiTheme theme, Canvas canvas)
         {
@@ -40,8 +41,8 @@ namespace Overpower.UI
                 return null;
             }
 
-            // The name text is the size and font reference: the label reads as a sibling of the name.
-            Text nameText = canvas.GetComponentInChildren<Text>(true);
+            // Placed for a living player's plate: nobody wears a status while dead, and the plate's top never moves anyway.
+            NameplateLayout.Frame frame = NameplateLayout.Compute(NameplateLayout.From(theme), 0f, true);
 
             GameObject root = new GameObject("Status Label", typeof(RectTransform));
             root.transform.SetParent(canvas.transform, false);
@@ -50,32 +51,15 @@ namespace Overpower.UI
             rootRt.anchoredPosition = Vector2.zero;
             rootRt.sizeDelta = Vector2.zero;
 
-            GameObject textGo = new GameObject("Text", typeof(RectTransform));
-            textGo.transform.SetParent(root.transform, false);
-            RectTransform textRt = textGo.GetComponent<RectTransform>();
-            textRt.anchorMin = textRt.anchorMax = textRt.pivot = new Vector2(0.5f, 0.5f);
-            textRt.anchoredPosition = new Vector2(0f, theme.statusOverheadLabelY);
-            textRt.sizeDelta = new Vector2(200f, 40f);
-            if (nameText != null)
-                textRt.localScale = nameText.rectTransform.localScale;
-            Text text = textGo.AddComponent<Text>();
-            if (nameText != null)
-                text.font = nameText.font;
-            text.fontSize = Mathf.RoundToInt(theme.statusOverheadTextSize);
-            text.fontStyle = FontStyle.Bold;
-            text.alignment = TextAnchor.MiddleCenter;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.raycastTarget = false;
-            Outline outline = textGo.AddComponent<Outline>();
-            outline.effectColor = theme.textOutlineColor;
-            outline.effectDistance = new Vector2(1f, -1f);
+            TextMeshProUGUI text = NameplateView.BuildText(root.transform, "Text", theme, theme.nameplateStatusTextSize, frame.statusLabel);
+            text.fontStyle = FontStyles.Bold;
 
             GameObject trackGo = new GameObject("Bar", typeof(RectTransform));
             trackGo.transform.SetParent(root.transform, false);
             RectTransform trackRt = trackGo.GetComponent<RectTransform>();
             trackRt.anchorMin = trackRt.anchorMax = trackRt.pivot = new Vector2(0.5f, 0.5f);
-            trackRt.anchoredPosition = new Vector2(0f, theme.statusOverheadBarY);
-            trackRt.sizeDelta = theme.statusOverheadBarSize;
+            trackRt.anchoredPosition = frame.statusBar.center;
+            trackRt.sizeDelta = frame.statusBar.size;
             Image track = trackGo.AddComponent<Image>();
             track.color = theme.barTrackColor;
             track.raycastTarget = false;
@@ -107,21 +91,19 @@ namespace Overpower.UI
             {
                 lastLabel = label;
                 lastFill = -1f;
-                if (label == StatusLabel.None)
+                if (!StatusLabelRule.Look(label, theme.statusStunnedText, theme.statusStunnedColor,
+                                          theme.statusSlowedText, theme.statusSlowedColor, out string words, out Color colour))
                 {
                     root.SetActive(false);
                     return;
                 }
-
-                bool stunned = label == StatusLabel.Stunned;
-                Color colour = stunned ? theme.statusStunnedColor : theme.statusSlowedColor;
-                text.text = stunned ? theme.statusStunnedText : theme.statusSlowedText;
+                text.text = words;
                 text.color = colour;
                 fill.color = colour;
                 root.SetActive(true);
             }
 
-            if (label == StatusLabel.None)
+            if (!root.activeSelf)
                 return;
 
             float amount = StatusLabelRule.Fill(remaining, total);

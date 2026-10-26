@@ -6,10 +6,10 @@ namespace Overpower.Vision
 {
     /// <summary>
     /// On every player's prefab, remote copies only: while my team does not see this player, their body (every Renderer
-    /// under the character model) and the overhead canvas (name, bar, STUNNED/SLOWED label, immune frame) are switched off.
-    /// Teammates are always shown. Only Renderer.enabled and Canvas.enabled are touched - never active state, colliders or
-    /// networking - so PlayerLifecycle's hide-on-death (SetActive) stays independent and a hidden player still moves,
-    /// collides and takes damage. Effects parented outside the model (rings, glows) are not covered here.
+    /// under the character model) and the overhead canvas (the plate with name and bar, STUNNED/SLOWED label, immune
+    /// frame) are switched off. Teammates are always shown. Only Renderer.enabled and Canvas.enabled are touched - never
+    /// active state, colliders or networking - so PlayerLifecycle's hide-on-death (SetActive) stays independent and a
+    /// hidden player still moves, collides and takes damage. Effects parented outside the model (rings, glows) are not covered here.
     /// </summary>
     public sealed class EnemyVisibility : MonoBehaviourPun
     {
@@ -34,16 +34,18 @@ namespace Overpower.Vision
             lifecycle = GetComponent<PlayerLifecycle>();
             if (lifecycle != null && lifecycle.PlayerMesh != null)
                 lifecycle.PlayerMesh.GetComponentsInChildren(true, bodyRenderers);
-            // The world-space canvas is the overhead one (the other is the owner's screen-space win/lose panel); found here
-            // so it does not depend on the health bar's image.
-            foreach (Canvas canvas in GetComponentsInChildren<Canvas>(true))
-            {
+            // Found by its own lookup, not through the health bar's image, so the plate (NameplateView) can ask the same question.
+            overheadCanvas = FindOverheadCanvas(this);
+        }
+
+        /// <summary>The canvas over the player's head that this class hides in the fog: the world-space one (the other is the owner's
+        /// screen-space win/lose panel). Anything drawn over a player's head belongs on it, or the fog will not hide it.</summary>
+        public static Canvas FindOverheadCanvas(Component player)
+        {
+            foreach (Canvas canvas in player.GetComponentsInChildren<Canvas>(true))
                 if (canvas.renderMode == RenderMode.WorldSpace)
-                {
-                    overheadCanvas = canvas;
-                    break;
-                }
-            }
+                    return canvas;
+            return null;
         }
 
         private void OnEnable()
