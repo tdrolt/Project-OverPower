@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Overpower.Arena
@@ -56,6 +57,48 @@ namespace Overpower.Arena
             }
             return depth;
         }
+
+        /// <summary><see cref="OverlapDepth"/> for any two convex outlines listed in order round them (a box or a mitred wall):
+        /// separating axis theorem on every edge's normal of both.</summary>
+        public static float ConvexOverlapDepth(Vector2[] a, Vector2[] b)
+        {
+            float depth = float.MaxValue;
+            foreach (Vector2[] outline in new[] { a, b })
+                for (int i = 0; i < outline.Length; i++)
+                {
+                    Vector2 edge = outline[(i + 1) % outline.Length] - outline[i];
+                    if (edge.sqrMagnitude < 1e-12f) continue;
+                    Vector2 axis = new Vector2(-edge.y, edge.x).normalized;
+                    ProjectExtent(a, axis, out float aMin, out float aMax);
+                    ProjectExtent(b, axis, out float bMin, out float bMax);
+                    depth = Mathf.Min(depth, Mathf.Min(aMax, bMax) - Mathf.Max(aMin, bMin));
+                }
+            return depth;
+        }
+
+        /// <summary>The convex outline round the points, in order (monotone chain); points closer than a millimetre count once.</summary>
+        public static Vector2[] ConvexHull(IEnumerable<Vector2> points)
+        {
+            var sorted = new List<Vector2>(points);
+            sorted.Sort((p, q) => p.x != q.x ? p.x.CompareTo(q.x) : p.y.CompareTo(q.y));
+            var hull = new List<Vector2>();
+            for (int pass = 0; pass < 2; pass++)
+            {
+                int start = hull.Count;
+                foreach (Vector2 p in sorted)
+                {
+                    while (hull.Count >= start + 2 && Cross(hull[hull.Count - 2], hull[hull.Count - 1], p) <= 1e-6f)
+                        hull.RemoveAt(hull.Count - 1);
+                    if (hull.Count == start || (hull[hull.Count - 1] - p).sqrMagnitude > 1e-6f)
+                        hull.Add(p);
+                }
+                hull.RemoveAt(hull.Count - 1);
+                sorted.Reverse();
+            }
+            return hull.ToArray();
+        }
+
+        private static float Cross(Vector2 o, Vector2 a, Vector2 b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 
         private static void ProjectExtent(Vector2[] corners, Vector2 axis, out float min, out float max)
         {

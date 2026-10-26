@@ -139,6 +139,45 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void BuildDrawsTheMitredWallsThePlanAsksForAndKeepsTheirBoxColliders()
+        {
+            // A third of the real arena: two corners per third are 30 degrees.
+            ArenaSymmetry arena = MakeArena();
+            arena.centre = new Vector3(65.05f, 0f, 53.34f);
+            arena.sourceOutline = new List<Vector2>
+            {
+                new Vector2(96.184f, 60.034f), new Vector2(98.9985046f, 61.6590042f), new Vector2(89.22851f, 78.581f), new Vector2(86.414f, 76.956f),
+                new Vector2(75.451f, 95.944f), new Vector2(75.451f, 121.401f), new Vector2(54.649f, 121.401f), new Vector2(54.649f, 95.944f),
+            };
+            ArenaLayout layout = MakeLayout(new List<ArenaLayout.Piece>());
+            List<string> report = ArenaPrimitiveBuilder.BuildSource(arena, layout);
+            Assert.IsFalse(report.Any(l => l.Contains("PROBLEM")), string.Join("\n", report));
+
+            ArenaBounds whole = ArenaBounds.FromSourceOutline(arena.sourceOutline, arena.centre);
+            List<ArenaWallPlan.Run> runs = ArenaWallPlan.ForSource(whole.Polygon, arena.sourceOutline.Count, layout.WallThickness);
+            Transform boundry = arena.source.Find(ArenaPrimitiveBuilder.BoundryGroupName);
+            Assert.AreEqual(runs.Count, boundry.childCount);
+            int mitred = 0;
+            for (int i = 0; i < runs.Count; i++)
+            {
+                Transform wall = boundry.GetChild(i);
+                Mesh mesh = wall.GetComponent<MeshFilter>().sharedMesh;
+                Vector2[] plan = ArenaPieceShapes.ConvexHull(mesh.vertices.Select(v => { Vector3 w = wall.TransformPoint(v); return new Vector2(w.x, w.z); }));
+                foreach (Vector2 corner in runs[i].DrawnCorners(layout.WallThickness))
+                    Assert.That(plan.Min(p => Vector2.Distance(p, corner)), Is.LessThan(2e-3f), $"{wall.name} is drawn to the plan's corner {corner}");
+                if (runs[i].IsMitred)
+                {
+                    mitred++;
+                    Assert.AreEqual(MitredWallMesh.MeshName, mesh.name, wall.name);
+                }
+                BoxCollider box = wall.GetComponent<BoxCollider>();
+                Assert.AreEqual(Vector3.zero, box.center, wall.name + "'s collider is the whole box");
+                Assert.AreEqual(Vector3.one, box.size, wall.name + "'s collider is the whole box");
+            }
+            Assert.Greater(mitred, 0, "this outline has corners that are not right angles");
+        }
+
+        [Test]
         public void BuildMakesWallsFromTheOutlineBlocksOnBuildingAndBarriersOnTheirOwnLayer()
         {
             ArenaSymmetry arena = MakeArena();

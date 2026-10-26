@@ -184,23 +184,52 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheRealOutlinesWallsShareSpaceOnlyAtItsCornersThatAreNotRightAngles()
+        public void TheRealOutlinesDrawnWallsNeverShareSpace()
         {
-            // No pair of boxes closes a corner that isn't a right angle without overlapping or opening a notch, so those
-            // corners (two in each third, 30 degrees) are the only places two walls may still reach into each other.
+            // The boxes (the colliders) still share space behind the inner faces at the corners that are not right angles (two in
+            // each third, 30 degrees); the drawn walls, mitred there, only touch.
             ArenaBounds bounds = ArenaBounds.FromSourceOutline(RealSourceOutline, RealCentre);
             List<ArenaWallPlan.Run> runs = ArenaWallPlan.ForSource(bounds.Polygon, bounds.Polygon.Count, Thickness);
 
-            int overlapping = 0;
+            int mitred = 0;
             for (int i = 0; i < runs.Count; i++)
+            {
+                if (runs[i].IsMitred) mitred++;
                 for (int j = i + 1; j < runs.Count; j++)
                 {
-                    if (ArenaPieceShapes.OverlapDepth(FootprintOf(runs[i]), FootprintOf(runs[j])) < Hairline + 1e-3f) continue;
-                    overlapping++;
-                    float turn = Mathf.Abs(Mathf.DeltaAngle(runs[i].UnityYawDegrees, runs[j].UnityYawDegrees));
-                    Assert.That(Mathf.Abs(turn - 90f), Is.GreaterThan(1f), $"runs {i} and {j} meet at a right angle yet share space");
+                    float drawn = ArenaPieceShapes.ConvexOverlapDepth(runs[i].DrawnCorners(Thickness), runs[j].DrawnCorners(Thickness));
+                    Assert.That(drawn, Is.LessThan(Hairline + 1e-3f), $"drawn runs {i} and {j} share space");
+                    if (runs[i].IsMitred && runs[j].IsMitred && ArenaPieceShapes.OverlapDepth(FootprintOf(runs[i]), FootprintOf(runs[j])) > Hairline + 1e-3f)
+                        Assert.That(drawn, Is.GreaterThan(-1e-3f), $"mitred runs {i} and {j} share their slanted end, no gap");
                 }
-            Assert.Greater(overlapping, 0, "the outline's corners that are not right angles do share space, so this check can see an overlap");
+            }
+            Assert.Greater(mitred, 0, "the real outline has corners that are not right angles");
+        }
+
+        [Test]
+        public void ACornerThatIsNotARightAngleIsMitredSoTheDrawnWallsMeetAlongOneLine()
+        {
+            List<ArenaWallPlan.Run> runs = ArenaWallPlan.ForSource(Hexagon(), 6, Thickness);
+
+            Assert.AreEqual(0f, runs[0].EndMitre, "a right angle keeps square ends");
+            Assert.AreEqual(0f, runs[1].StartMitre, "a right angle keeps square ends");
+            Assert.AreEqual(0f, runs[1].EndMitre, "a straight run keeps square ends");
+
+            // P3: 30 degrees outward. The inner faces end at the corner, the outer faces where they meet.
+            AssertMeetAlongOneLine(runs[2], runs[3], P3, "the 30 degree outward corner");
+            Assert.That(runs[2].EndMitre, Is.GreaterThan(0f), "outward: the inner face is cut back");
+            // P4: 120 degrees reflex. The inner faces meet at the corner; the outer faces stop where they meet.
+            AssertMeetAlongOneLine(runs[3], runs[4], P4, "the reflex corner");
+            Assert.That(runs[3].EndMitre, Is.LessThan(0f), "reflex: the outer face is cut back");
+
+            void AssertMeetAlongOneLine(ArenaWallPlan.Run arriving, ArenaWallPlan.Run leaving, Vector2 corner, string label)
+            {
+                Vector2[] a = arriving.DrawnCorners(Thickness), b = leaving.DrawnCorners(Thickness);
+                Assert.That(Vector2.Distance(a[1], corner), Is.LessThan(1e-3f), label + ": the arriving wall's inner face ends at the corner");
+                Assert.That(Vector2.Distance(b[0], corner), Is.LessThan(1e-3f), label + ": the leaving wall's inner face starts there");
+                Assert.That(Vector2.Distance(a[2], b[3]), Is.LessThan(1e-3f), label + ": the outer faces meet at one point");
+                Assert.That(Mathf.Abs(ArenaPieceShapes.ConvexOverlapDepth(a, b)), Is.LessThan(1e-3f), label + ": the two only touch");
+            }
         }
 
         [Test]

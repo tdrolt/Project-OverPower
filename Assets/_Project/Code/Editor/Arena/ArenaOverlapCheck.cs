@@ -7,10 +7,10 @@ using UnityEngine.SceneManagement;
 namespace Overpower.EditorTools
 {
     /// <summary>
-    /// Finds arena pieces (the boundary walls, blocks and barriers the builders make) that reach into each other. The arena
-    /// shader draws a line round every piece's top and paints coplanar faces twice, so two pieces sharing space show crossed
-    /// lines and flicker; pieces must meet face to face instead. Two overlaps no pair of boxes can avoid are let through, each
-    /// only as deep as it needs: boundary walls closing a corner that is not a right angle, and a barrier end buried in
+    /// Finds arena pieces (the boundary walls, blocks and barriers the builders make) whose drawn shapes reach into each other.
+    /// The arena shader draws a line round every piece's top and paints coplanar faces twice, so two pieces sharing space show
+    /// crossed lines and flicker; pieces must meet face to face instead. A wall's drawn shape is its mesh (a mitred wall's
+    /// slanted end included), not its collider. One overlap is let through, only as deep as it needs: a barrier end buried in
     /// taller cover (on purpose, so nobody slips past the end).
     /// </summary>
     public static class ArenaOverlapCheck
@@ -28,17 +28,23 @@ namespace Overpower.EditorTools
             public readonly string Name;
             public readonly string Group;
             public readonly Vector2[] Footprint;
-            public readonly float Bottom, Top, Yaw, Thickness;
+            public readonly float Bottom, Top;
 
-            public Piece(Transform t)
+            public Piece(Transform t, Mesh mesh)
             {
                 Name = t.parent != null && t.parent.parent != null ? $"{t.parent.parent.name}/{t.parent.name}/{t.name}" : t.name;
                 Group = t.parent != null ? t.parent.name : "";
-                Footprint = ArenaPieceShapes.FootprintCorners(t.position, t.rotation, t.lossyScale);
-                Bottom = t.position.y - t.lossyScale.y * 0.5f;
-                Top = t.position.y + t.lossyScale.y * 0.5f;
-                Yaw = t.eulerAngles.y;
-                Thickness = Mathf.Min(t.lossyScale.x, t.lossyScale.z);
+                var plan = new List<Vector2>();
+                Bottom = float.MaxValue;
+                Top = float.MinValue;
+                foreach (Vector3 vertex in mesh.vertices)
+                {
+                    Vector3 world = t.TransformPoint(vertex);
+                    plan.Add(new Vector2(world.x, world.z));
+                    Bottom = Mathf.Min(Bottom, world.y);
+                    Top = Mathf.Max(Top, world.y);
+                }
+                Footprint = ArenaPieceShapes.ConvexHull(plan);
             }
         }
 
@@ -54,8 +60,8 @@ namespace Overpower.EditorTools
             {
                 if (third == null) continue;
                 foreach (MeshFilter filter in third.GetComponentsInChildren<MeshFilter>(false))
-                    if (filter.sharedMesh != null && filter.sharedMesh.name == "Cube")
-                        pieces.Add(new Piece(filter.transform));
+                    if (filter.sharedMesh != null && (filter.sharedMesh.name == "Cube" || filter.sharedMesh.name == MitredWallMesh.MeshName))
+                        pieces.Add(new Piece(filter.transform, filter.sharedMesh));
             }
             piecesChecked = pieces.Count;
 
@@ -65,17 +71,15 @@ namespace Overpower.EditorTools
                 {
                     Piece a = pieces[i], b = pieces[j];
                     if (Mathf.Min(a.Top, b.Top) - Mathf.Max(a.Bottom, b.Bottom) <= TouchToleranceMetres) continue;
-                    float depth = ArenaPieceShapes.OverlapDepth(a.Footprint, b.Footprint);
-                    if (depth <= TouchToleranceMetres || IsAllowed(a, b, depth)) continue;
+                    float depth = ArenaPieceShapes.ConvexOverlapDepth(a.Footprint, b.Footprint);
+                    if (depth <= TouchToleranceMetres || IsAllowed(a, b)) continue;
                     findings.Add($"{a.Name} and {b.Name} reach {depth:0.000} m into each other");
                 }
             return findings;
         }
 
-        private static bool IsAllowed(Piece a, Piece b, float depth)
+        private static bool IsAllowed(Piece a, Piece b)
         {
-            if (a.Group == ArenaSymmetry.BoundaryGroupName && b.Group == ArenaSymmetry.BoundaryGroupName)
-                return ClosesACornerThatIsNotARightAngle(a, b, depth);
             if (a.Group == ArenaSymmetry.BarriersGroupName && b.Group == ArenaSymmetry.BlocksGroupName)
                 return IsABuriedBarrierEnd(a, b);
             if (b.Group == ArenaSymmetry.BarriersGroupName && a.Group == ArenaSymmetry.BlocksGroupName)
@@ -83,25 +87,10 @@ namespace Overpower.EditorTools
             return false;
         }
 
-        // ArenaWallPlan runs both walls on by thickness * tan(turn / 2), so their outer edges meet at one shared point and
-        // one wall's end reaches thickness * sin(turn) into the other: anything deeper, or apart from a shared corner, is not
-        // that corner.
-        private static bool ClosesACornerThatIsNotARightAngle(Piece a, Piece b, float depth)
-        {
-            float turn = Mathf.Abs(Mathf.DeltaAngle(a.Yaw, b.Yaw)) % 180f;
-            if (turn > 90f) turn = 180f - turn;
-            if (90f - turn < ArenaWallPlan.RightAngleToleranceRadians * Mathf.Rad2Deg) return false;
-            if (depth > Mathf.Min(a.Thickness, b.Thickness) * Mathf.Sin(turn * Mathf.Deg2Rad) + TouchToleranceMetres) return false;
-            foreach (Vector2 p in a.Footprint)
-                foreach (Vector2 q in b.Footprint)
-                    if (Vector2.Distance(p, q) <= TouchToleranceMetres) return true;
-            return false;
-        }
-
         private static bool IsABuriedBarrierEnd(Piece barrier, Piece cover)
         {
             if (cover.Top <= barrier.Top) return false;
-            Vector2 side1 = barrier.Footprint[0] - barrier.Footprint[1], side2 = barrier.Footprint[0] - barrier.Footprint[2];
+            Vector2 side1 = barrier.Footprint[0] - barrier.Footprint[1], side2 = barrier.Footprint[1] - barrier.Footprint[2];
             Vector2 along = (side1.sqrMagnitude > side2.sqrMagnitude ? side1 : side2).normalized;
             Extent(barrier.Footprint, along, out float barrierMin, out float barrierMax);
             Extent(cover.Footprint, along, out float coverMin, out float coverMax);

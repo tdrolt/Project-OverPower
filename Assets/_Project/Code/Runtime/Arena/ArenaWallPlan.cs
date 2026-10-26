@@ -11,10 +11,12 @@ namespace Overpower.Arena
     ///   square show crossed lines. Outward, the longer runs on by one thickness; inward (reflex), the shorter stops
     ///   one thickness (less the hairline) short.
     /// - Any other OUTWARD (convex) corner gets each of its two walls extended past the corner by
-    ///   thickness * tan(turn / 2), exactly enough for their outer edges to meet. No pair of boxes closes such a corner
-    ///   without sharing space, so these two do, behind the inner faces.
+    ///   thickness * tan(turn / 2), exactly enough for their outer edges to meet.
     /// - Any other INWARD (reflex) corner needs no extension: the walls already overlap behind it, so extending would
     ///   poke a wedge into the play space instead of closing a gap.
+    /// - At both of those the boxes (the colliders) share space behind the inner faces, so the drawn wall is mitred: its
+    ///   end is cut on the line from the corner to where the outer faces meet (StartMitre / EndMitre, MitredWallMesh),
+    ///   and the two drawn walls touch along that line with no crossed top lines.
     /// - A straight run (no turn) still gets a hairline 1 cm overlap, so floating-point rounding never leaves a crack
     ///   between two collinear pieces meant to butt together as one wall.
     ///
@@ -29,8 +31,7 @@ namespace Overpower.Arena
         /// turn - float noise from three-fold rotation must never be read as a real (if tiny) corner.</summary>
         private const float StraightToleranceRadians = 1e-4f;
 
-        /// <summary>How far off 90 degrees a corner may be and still be closed by one wall alone; ArenaOverlapCheck reads it
-        /// too, so the builder and its check agree on what a right angle is.</summary>
+        /// <summary>How far off 90 degrees a corner may be and still be closed by one wall alone, square-ended.</summary>
         public const float RightAngleToleranceRadians = 1e-3f;
 
         public readonly struct Run
@@ -49,14 +50,25 @@ namespace Overpower.Arena
             /// <summary>A Unity Y-Euler yaw whose local +Z is Inward and local +X runs InnerStart -> InnerEnd.</summary>
             public readonly float UnityYawDegrees;
 
-            public Run(Vector2 innerStart, Vector2 innerEnd, Vector2 inward)
+            /// <summary>How far the drawn wall's start is cut back from the box's: positive cuts the inner face (an outward
+            /// corner), negative the outer face (a reflex one); 0 is a square end.</summary>
+            public readonly float StartMitre;
+
+            /// <summary>The same at the end.</summary>
+            public readonly float EndMitre;
+
+            public Run(Vector2 innerStart, Vector2 innerEnd, Vector2 inward, float startMitre = 0f, float endMitre = 0f)
             {
                 InnerStart = innerStart;
                 InnerEnd = innerEnd;
                 Inward = inward;
                 Length = Vector2.Distance(innerStart, innerEnd);
                 UnityYawDegrees = Quaternion.LookRotation(new Vector3(inward.x, 0f, inward.y), Vector3.up).eulerAngles.y;
+                StartMitre = startMitre;
+                EndMitre = endMitre;
             }
+
+            public bool IsMitred => StartMitre != 0f || EndMitre != 0f;
 
             /// <summary>The box's world XZ centre: thickness/2 outside the inner face, along the midpoint.</summary>
             public Vector2 Centre(float thickness) => (InnerStart + InnerEnd) * 0.5f - Inward * (thickness * 0.5f);
@@ -65,6 +77,21 @@ namespace Overpower.Arena
             {
                 Vector2 along = Length > 0.0001f ? (InnerEnd - InnerStart) / Length : new Vector2(-Inward.y, Inward.x);
                 return new BoxFootprint(Centre(thickness), along, Length * 0.5f, thickness * 0.5f);
+            }
+
+            /// <summary>The drawn wall's plan, in order round it: inner start, inner end, outer end, outer start. The box's own
+            /// corners where an end is square, cut back by the mitre where it is not.</summary>
+            public Vector2[] DrawnCorners(float thickness)
+            {
+                Vector2 along = Length > 0.0001f ? (InnerEnd - InnerStart) / Length : new Vector2(-Inward.y, Inward.x);
+                Vector2 outward = -Inward * thickness;
+                return new[]
+                {
+                    InnerStart + along * Mathf.Max(StartMitre, 0f),
+                    InnerEnd - along * Mathf.Max(EndMitre, 0f),
+                    InnerEnd + outward - along * Mathf.Max(-EndMitre, 0f),
+                    InnerStart + outward + along * Mathf.Max(-StartMitre, 0f),
+                };
             }
         }
 
@@ -103,7 +130,7 @@ namespace Overpower.Arena
 
                 Vector2 innerStart = a - dir * startExtension;
                 Vector2 innerEnd = b + dir * endExtension;
-                runs.Add(new Run(innerStart, innerEnd, inward));
+                runs.Add(new Run(innerStart, innerEnd, inward, CornerMitre(prev, a, b, leftSign, thickness), CornerMitre(a, b, next, leftSign, thickness)));
             }
 
             return runs;
@@ -114,15 +141,9 @@ namespace Overpower.Arena
         /// arriving one); at any other corner both walls get the same extension.</summary>
         private static float CornerExtension(Vector2 prev, Vector2 corner, Vector2 next, bool forArriving, float leftSign, float thickness)
         {
-            Vector2 inDir = (corner - prev).normalized;
-            Vector2 outDir = (next - corner).normalized;
+            float turnRadians = Turn(prev, corner, next, leftSign);
 
-            // atan2(cross, dot) is the raw CCW turn; leftSign makes it "positive = outward" whatever the winding.
-            float cross = inDir.x * outDir.y - inDir.y * outDir.x;
-            float dot = inDir.x * outDir.x + inDir.y * outDir.y;
-            float turnRadians = leftSign * Mathf.Atan2(cross, dot);
-
-            if (Mathf.Abs(Mathf.Abs(turnRadians) - Mathf.PI * 0.5f) < RightAngleToleranceRadians)
+            if (IsRightAngle(turnRadians))
             {
                 float arriving = Vector2.Distance(prev, corner), leaving = Vector2.Distance(corner, next);
                 bool owns = forArriving ? arriving >= leaving : leaving > arriving;
@@ -139,6 +160,28 @@ namespace Overpower.Arena
                 return 0f;
             return StraightOverlapMetres;
         }
+
+        /// <summary>The mitre (Run.StartMitre / EndMitre) of either wall at this corner: the outer faces meet thickness * tan(turn / 2)
+        /// past the corner (outward) or short of it (reflex), measured along each wall. None at a right angle or a straight run.</summary>
+        private static float CornerMitre(Vector2 prev, Vector2 corner, Vector2 next, float leftSign, float thickness)
+        {
+            float turnRadians = Turn(prev, corner, next, leftSign);
+            if (IsRightAngle(turnRadians) || Mathf.Abs(turnRadians) <= StraightToleranceRadians)
+                return 0f;
+            return Mathf.Sign(turnRadians) * thickness * Mathf.Tan(Mathf.Abs(turnRadians) * 0.5f);
+        }
+
+        // atan2(cross, dot) is the raw CCW turn; leftSign makes it "positive = outward" whatever the winding.
+        private static float Turn(Vector2 prev, Vector2 corner, Vector2 next, float leftSign)
+        {
+            Vector2 inDir = (corner - prev).normalized;
+            Vector2 outDir = (next - corner).normalized;
+            float cross = inDir.x * outDir.y - inDir.y * outDir.x;
+            float dot = inDir.x * outDir.x + inDir.y * outDir.y;
+            return leftSign * Mathf.Atan2(cross, dot);
+        }
+
+        private static bool IsRightAngle(float turnRadians) => Mathf.Abs(Mathf.Abs(turnRadians) - Mathf.PI * 0.5f) < RightAngleToleranceRadians;
 
         private static float SignedArea(IReadOnlyList<Vector2> polygon)
         {

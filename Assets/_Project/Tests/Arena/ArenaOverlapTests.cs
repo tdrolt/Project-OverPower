@@ -13,7 +13,7 @@ namespace Overpower.Tests
 {
     /// <summary>
     /// The arena shader draws a line round every piece's top, so two pieces sharing space show crossed lines and flicker:
-    /// no two arena pieces may reach into each other in either saved scene, beyond the two kinds ArenaOverlapCheck allows;
+    /// no two arena pieces may reach into each other in either saved scene, beyond the buried barrier end ArenaOverlapCheck allows;
     /// the check itself must catch a real overlap; and the corner block by the centre tower is a mirror image of itself
     /// across the arena's own mirror line. The saved scenes are opened additively and closed again (Game Scene stays open).
     /// </summary>
@@ -109,7 +109,7 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheCheckFindsPiecesSharingSpaceButNotTheTwoAllowedKinds()
+        public void TheCheckFindsPiecesSharingSpaceButNotMitredWallsOrABuriedBarrierEnd()
         {
             var wall = new Vector3(10f, 7f, 0.7f);
             Assert.AreEqual(1, FindingsFor((boundry, blocks, barriers) =>
@@ -124,27 +124,38 @@ namespace Overpower.Tests
                 Box(boundry, "B", new Vector3(9.65f, 2.5f, 5.35f), 90f, new Vector3(10f, 7f, 0.7f)); // starts at A's face
             }).Count, "two right-angle walls meeting face to face");
 
-            // A 30 degree outward corner as the wall plan builds it: the two walls' outer edges meet at one point.
+            // A 30 degree outward corner as the wall plan builds it: the two boxes' outer edges meet at one point.
             const float thickness = 0.7f;
             var outline = new List<Vector2> { new Vector2(0f, 0f), new Vector2(10f, 0f), new Vector2(18.660254f, 5f), new Vector2(0f, 15f) };
             List<ArenaWallPlan.Run> runs = ArenaWallPlan.ForSource(outline, outline.Count, thickness);
-            void Wall(Transform group, string name, ArenaWallPlan.Run run, Vector2 shift)
+            var meshes = new List<Mesh>();
+            void Wall(Transform group, string name, ArenaWallPlan.Run run, Vector2 shift, bool mitred)
             {
                 Vector2 c = run.Centre(thickness) + shift;
-                Box(group, name, new Vector3(c.x, 2.5f, c.y), run.UnityYawDegrees, new Vector3(run.Length, 7f, thickness));
+                GameObject wallObject = Box(group, name, new Vector3(c.x, 2.5f, c.y), run.UnityYawDegrees, new Vector3(run.Length, 7f, thickness));
+                if (!mitred) return;
+                meshes.Add(MitredWallMesh.Create(run.Length, run.StartMitre, run.EndMitre));
+                wallObject.GetComponent<MeshFilter>().sharedMesh = meshes[meshes.Count - 1];
             }
             Vector2 along1 = (runs[1].InnerEnd - runs[1].InnerStart).normalized;
+            Assert.AreEqual(1, FindingsFor((boundry, blocks, barriers) =>
+            {
+                Wall(boundry, "A", runs[0], Vector2.zero, false);
+                Wall(boundry, "B", runs[1], Vector2.zero, false);
+            }).Count, "two plain boxes closing a corner that is not a right angle share space behind it");
+
             Assert.AreEqual(0, FindingsFor((boundry, blocks, barriers) =>
             {
-                Wall(boundry, "A", runs[0], Vector2.zero);
-                Wall(boundry, "B", runs[1], Vector2.zero);
-            }).Count, "boundary walls closing a corner that is not a right angle may share that corner");
+                Wall(boundry, "A", runs[0], Vector2.zero, true);
+                Wall(boundry, "B", runs[1], Vector2.zero, true);
+            }).Count, "mitred walls closing that corner only touch");
 
             Assert.AreEqual(1, FindingsFor((boundry, blocks, barriers) =>
             {
-                Wall(boundry, "A", runs[0], Vector2.zero);
-                Wall(boundry, "B", runs[1], -along1 * 0.5f);
-            }).Count, "a wall pushed past the corner reaches deeper than the corner needs");
+                Wall(boundry, "A", runs[0], Vector2.zero, true);
+                Wall(boundry, "B", runs[1], -along1 * 0.5f, true);
+            }).Count, "a mitred wall pushed past the corner reaches into the other");
+            foreach (Mesh mesh in meshes) Object.DestroyImmediate(mesh);
 
             Assert.AreEqual(1, FindingsFor((boundry, blocks, barriers) =>
             {

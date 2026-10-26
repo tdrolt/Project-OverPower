@@ -294,6 +294,9 @@ namespace Overpower.EditorTools
                     wall.transform.SetPositionAndRotation(new Vector3(centreXZ.x, wallCentreY, centreXZ.y),
                         Quaternion.Euler(0f, run.UnityYawDegrees, 0f));
                     wall.transform.localScale = new Vector3(run.Length, wallHeight, layout.WallThickness);
+                    // The BoxCollider was sized from the cube, so it stays the whole box when the drawn mesh is mitred.
+                    if (run.IsMitred)
+                        wall.GetComponent<MeshFilter>().sharedMesh = MitredWallMesh.Create(run.Length, run.StartMitre, run.EndMitre);
                     wallCount++;
                 }
             }
