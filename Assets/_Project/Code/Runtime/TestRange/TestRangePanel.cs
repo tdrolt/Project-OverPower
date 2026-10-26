@@ -431,7 +431,7 @@ namespace Overpower.TestRange
                 return;
 
             health.ResetForRespawn();                                          // Full health, clears burn/slow/etc.
-            health.SetArmorLevels(health.AbsorbLevel, health.RechargeLevel);   // Refills armor at whatever levels are already owned.
+            health.RefillArmor();                                              // Refills armor at whatever levels are already owned.
         }
 
         /// <summary>Instantly fills UltimateCharge so Space can be tested without farming a dummy.</summary>

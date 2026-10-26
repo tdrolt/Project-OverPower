@@ -368,10 +368,14 @@ namespace Overpower.UI
         public string loadoutArmorMaxFormat = "{0} of {0} (max)";
         [Tooltip("Armour row wording in Dominion once this round's allowance is used up (the shop's own maximum is higher; later rounds open more). {0} = this round's allowance.")]
         public string loadoutArmorRoundMaxFormat = "{0} of {0} this round";
-        [Tooltip("The shop header's note in a Dominion match: picks are free, no gold involved, and you can make them anywhere, in the break and at any time during a round.")]
-        public string loadoutDominionFreeText = "Free (any time)";
+        [Tooltip("The shop header's note in a Dominion break: picks are free, no gold involved, and anything can be changed until the round starts.")]
+        public string loadoutDominionFreeText = "Free (break)";
         [Tooltip("What the shop says when it is asked to open (P, or the Loadout button) in a Dominion match while no round or break is on (the moment before the first break, or once the match is over), and what its header says if it is somehow open then. Shown as a short toast over the game when the shop stays shut.")]
         public string loadoutShopClosedText = "The shop is closed";
+        [Tooltip("In a Dominion round, what a locked shop item says and the reason shown when one is clicked: the gun, an ability slot already filled, and Reset Armor stay as they are until the next break.")]
+        public string loadoutLockedUntilBreakText = "Locked until the break";
+        [Tooltip("The shop header's note while a Dominion round is being played: what you already have stays until the next break, and only empty ability slots can still be filled.")]
+        public string loadoutDominionRoundText = "Round on: only empty slots can be filled";
         [Tooltip("Armour row wording for a row that is at its own top level with upgrades still left in the shared limit.")]
         public string loadoutArmorTopLevelText = "top level";
         [Tooltip("The Absorb armour row. {0} = its level, {1} = the status text (which upgrade is next, or max).")]

@@ -67,6 +67,53 @@ namespace Overpower.Tests
             Assert.IsTrue(ShopRules.IsFree(freeLoadout: false, matchLive: false, dominionMatch: true));
         }
 
+        // ---- Dominion, while a round is on: the gun, filled ability slots and Reset Armor are locked until the break
+
+        private static ShopContext Round(bool lateJoinGunPickLeft = false, PurchaseBlock closed = PurchaseBlock.None) =>
+            new ShopContext(true, false, false, 0f, 4f, 0, closed, Round2, "Free (break)", "The shop opens in the break",
+                roundLocked: true, lateJoinGunPickLeft: lateJoinGunPickLeft, lockedText: "Locked till break", roundText: "Empty slots only");
+
+        [Test] public void MidRoundTheGunIsLockedAndTheItemAndTheClickSaySo()
+        {
+            ShopContext ctx = Round();
+            Assert.AreEqual(PurchaseBlock.LockedUntilBreak, ctx.GunBlock());
+            Assert.AreEqual(PurchaseBlock.LockedUntilBreak, ctx.Check(0, ctx.GunBlock()));
+            Assert.AreEqual("Locked till break", ctx.PriceLine(0, PurchaseBlock.LockedUntilBreak), "the node's second line");
+            Assert.AreEqual("Locked till break", ctx.ReasonText(PurchaseBlock.LockedUntilBreak, 0), "the header after a refused click");
+        }
+
+        [Test] public void MidRoundAFilledSlotIsLockedAnEmptyOneIsFreeAndResetArmorIsClosed()
+        {
+            ShopContext ctx = Round();
+            Assert.AreEqual(PurchaseBlock.LockedUntilBreak, ctx.Check(0, ctx.AbilityBlock(true)));
+            Assert.AreEqual(PurchaseBlock.None, ctx.Check(0, ctx.AbilityBlock(false)));
+            Assert.AreEqual("Free", ctx.PriceLine(0, ctx.Check(0, ctx.AbilityBlock(false))));
+            Assert.AreEqual(PurchaseBlock.LockedUntilBreak, ctx.ArmorResetBlock());
+        }
+
+        [Test] public void ALateJoinersGunStaysOpenUntilTheyUseTheirPick()
+        {
+            ShopContext ctx = Round(lateJoinGunPickLeft: true);
+            Assert.AreEqual(PurchaseBlock.None, ctx.Check(0, ctx.GunBlock()));
+        }
+
+        [Test] public void AShutShopIsStillSaidBeforeTheLock() =>
+            Assert.AreEqual(PurchaseBlock.NotInBreak, Round(closed: PurchaseBlock.NotInBreak).Check(0, PurchaseBlock.LockedUntilBreak));
+
+        [Test] public void TheHeaderSaysOnlyEmptySlotsCanBeFilledWhileTheRoundIsOn()
+        {
+            Assert.AreEqual("Empty slots only", Round().StatusText());
+            Assert.AreEqual("Free (break)", Dominion(PurchaseBlock.None).StatusText());
+        }
+
+        [Test] public void InTheBreakNothingIsLocked()
+        {
+            ShopContext ctx = Dominion(PurchaseBlock.None);
+            Assert.AreEqual(PurchaseBlock.None, ctx.GunBlock());
+            Assert.AreEqual(PurchaseBlock.None, ctx.AbilityBlock(true));
+            Assert.AreEqual(PurchaseBlock.None, ctx.ArmorResetBlock());
+        }
+
         // ---- Conquest: unchanged
 
         [Test] public void ConquestStillChargesAndStillHasItsThreeGates()

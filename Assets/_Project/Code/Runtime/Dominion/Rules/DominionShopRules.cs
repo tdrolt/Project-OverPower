@@ -24,8 +24,9 @@ namespace Overpower.Dominion
             return table[index];
         }
 
-        /// <summary>The shop takes picks anywhere, in the break and at any time during a round (its play, overtime and sudden death), with
-        /// the round's limits either way. Only while no round or break is on (before the first break, after the match) is it shut.</summary>
+        /// <summary>The shop takes picks anywhere, in the break and during a round (its play, overtime and sudden death), with the round's
+        /// limits either way; during a round RoundLocksPicks says what is still open. Only while no round or break is on (before the first
+        /// break, after the match) is it shut.</summary>
         public static bool MayPick(DominionStage stage) => stage == DominionStage.Break || LateJoinerWindowOpen(stage);
 
         /// <summary>NotInBreak while a live Dominion match has no round or break on, else None. Conquest and the warm-up are never blocked by this.</summary>
@@ -36,6 +37,33 @@ namespace Overpower.Dominion
         /// card points everyone to it).</summary>
         public static bool LateJoinerWindowOpen(DominionStage stage) =>
             DominionRules.IsRoundPlay(stage) || stage == DominionStage.SuddenDeath;
+
+        // ---- the lock while a round is on: what a player already has stays until the next break
+
+        /// <summary>True while a live Dominion match is playing a round (round play, overtime, sudden death): the shop still takes picks, but what a
+        /// player already has is set until the next break. The shop is local UI, so each client asks this of its own loadout; no snapshot is
+        /// needed because nothing empties an ability slot mid-round (only the match-start reset does).</summary>
+        public static bool RoundLocksPicks(bool dominionLive, DominionStage stage) => dominionLive && LateJoinerWindowOpen(stage);
+
+        /// <summary>The gun is set when the round starts (the Baseline too). Mid-round it changes only for a player who joined during this round
+        /// and has not used their one gun pick yet.</summary>
+        public static PurchaseBlock GunBlock(bool roundLocked, bool lateJoinGunPickLeft) =>
+            roundLocked && !lateJoinGunPickLeft ? PurchaseBlock.LockedUntilBreak : PurchaseBlock.None;
+
+        /// <summary>An ability slot already filled is set until the next break; an empty one can still be filled mid-round, and is then set too
+        /// (so a late joiner fills each slot once).</summary>
+        public static PurchaseBlock AbilityBlock(bool roundLocked, bool slotFilled) =>
+            roundLocked && slotFilled ? PurchaseBlock.LockedUntilBreak : PurchaseBlock.None;
+
+        /// <summary>Reset Armor is closed mid-round: it could only lower the armour, and re-picking must never refill it.</summary>
+        public static PurchaseBlock ArmorResetBlock(bool roundLocked) => roundLocked ? PurchaseBlock.LockedUntilBreak : PurchaseBlock.None;
+
+        /// <summary>Whether a new armour level fills the pool. Not mid-round in Dominion: an unused upgrade added then raises the cap and the armour
+        /// you have stays as it is (it climbs with the normal out-of-combat refill). Everywhere else (the break, Conquest, the warm-up) it fills.</summary>
+        public static bool ArmorPickTopsUp(bool roundLocked) => !roundLocked;
+
+        /// <summary>Whether a late joiner still holds their one mid-round gun pick: only during the round they joined in, and only until they use it.</summary>
+        public static bool LateJoinGunPickKept(bool hadOne, bool roundLocked, bool pickedGun) => hadOne && roundLocked && !pickedGun;
 
         /// <summary>The most armour upgrades the + buttons offer: the smaller of the shop's own maximum and the round's allowance.</summary>
         public static int ArmorCap(int shopMax, int round, int[] table) => Math.Min(shopMax, ArmorUpgradesAllowed(round, table));

@@ -110,16 +110,106 @@ namespace Overpower.Tests
 
         // ---- Task 5: the shop in a live Dominion match
 
-        // The shop takes picks anywhere, any time in a round, as well as in the break, with the same limits.
+        // The shop is open in the break and during a round, with the same limits; during a round what is already chosen is locked (below).
 
         [TestCase(DominionStage.Break)]
         [TestCase(DominionStage.Round)]
         [TestCase(DominionStage.Overtime)]
         [TestCase(DominionStage.SuddenDeath)]
-        public void PicksAreTakenInTheBreakAndAnyTimeDuringARound(DominionStage stage)
+        public void TheShopStaysOpenInTheBreakAndDuringARoundButLocksWhatIsChosenOnlyInTheRound(DominionStage stage)
         {
             Assert.IsTrue(DominionShopRules.MayPick(stage), stage.ToString());
             Assert.AreEqual(PurchaseBlock.None, DominionShopRules.PickBlock(true, stage), stage.ToString());
+            Assert.AreEqual(stage != DominionStage.Break, DominionShopRules.RoundLocksPicks(true, stage), stage.ToString());
+        }
+
+        // ---- the lock while a round is on
+
+        [Test] public void OnlyAPlayedRoundOfALiveDominionMatchLocksPicks()
+        {
+            Assert.IsTrue(DominionShopRules.RoundLocksPicks(true, DominionStage.Round));
+            Assert.IsTrue(DominionShopRules.RoundLocksPicks(true, DominionStage.Overtime));
+            Assert.IsTrue(DominionShopRules.RoundLocksPicks(true, DominionStage.SuddenDeath));
+            Assert.IsFalse(DominionShopRules.RoundLocksPicks(true, DominionStage.Break), "in the break everything can change");
+            Assert.IsFalse(DominionShopRules.RoundLocksPicks(true, DominionStage.None));
+            Assert.IsFalse(DominionShopRules.RoundLocksPicks(true, DominionStage.Over));
+            foreach (DominionStage stage in System.Enum.GetValues(typeof(DominionStage)))
+                Assert.IsFalse(DominionShopRules.RoundLocksPicks(false, stage), "Conquest and the warm-up never lock: " + stage);
+        }
+
+        [Test] public void InTheBreakTheGunEveryAbilitySlotAndResetArmorAreFree()
+        {
+            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.GunBlock(false, false));
+            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.AbilityBlock(false, true));
+            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.AbilityBlock(false, false));
+            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.ArmorResetBlock(false));
+        }
+
+        [Test] public void MidRoundTheGunIsLockedWhateverItIs() =>
+            Assert.AreEqual(PurchaseBlock.LockedUntilBreak, DominionShopRules.GunBlock(true, false));
+
+        [Test] public void MidRoundAFilledAbilitySlotIsLockedAndAnEmptyOneCanStillBeFilled()
+        {
+            Assert.AreEqual(PurchaseBlock.LockedUntilBreak, DominionShopRules.AbilityBlock(true, true));
+            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.AbilityBlock(true, false));
+        }
+
+        [Test] public void ALateJoinerPicksTheirGunOnceThenItLocksLikeEveryonesAndTheBreakEndsTheirPick()
+        {
+            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.GunBlock(true, true), "the late joiner's one pick");
+            Assert.IsTrue(DominionShopRules.LateJoinGunPickKept(true, true, false), "kept while unused in their round");
+            bool left = DominionShopRules.LateJoinGunPickKept(true, true, true);
+            Assert.IsFalse(left, "used up by the pick");
+            Assert.AreEqual(PurchaseBlock.LockedUntilBreak, DominionShopRules.GunBlock(true, left));
+            Assert.IsFalse(DominionShopRules.LateJoinGunPickKept(true, false, false), "the break ends it: the next round starts locked like everyone's");
+            Assert.IsFalse(DominionShopRules.LateJoinGunPickKept(false, true, false), "a player who was there at the round start never had one");
+        }
+
+        [Test] public void MidRoundResetArmorIsClosedAndANewArmourLevelDoesNotTopUp()
+        {
+            Assert.AreEqual(PurchaseBlock.LockedUntilBreak, DominionShopRules.ArmorResetBlock(true));
+            Assert.IsFalse(DominionShopRules.ArmorPickTopsUp(true), "mid-round: the cap rises, the armour held stays");
+            Assert.IsTrue(DominionShopRules.ArmorPickTopsUp(false), "the break, Conquest and the warm-up: a purchase fills");
+        }
+
+        private static System.Reflection.MethodInfo Rule(string name) => typeof(DominionShopRules).GetMethod(name);
+        private static System.Reflection.MethodInfo Ctx(string name) => typeof(Overpower.UI.ShopContext).GetMethod(name);
+
+        [Test] public void TheShopAsksTheRoundLockForEveryPickResetAndLook()
+        {
+            System.Type screen = typeof(Overpower.UI.LoadoutScreen), pricing = typeof(Overpower.UI.ShopPricing), context = typeof(Overpower.UI.ShopContext);
+            System.Reflection.MethodInfo roundLocked = pricing.GetMethod(nameof(Overpower.UI.ShopPricing.DominionRoundLocked));
+            Assert.IsTrue(IlWiring.Uses(pricing, nameof(Overpower.UI.ShopPricing.DominionRoundLocked), Rule(nameof(DominionShopRules.RoundLocksPicks))), "the stage goes through the rule");
+            Assert.IsTrue(IlWiring.Uses(pricing, nameof(Overpower.UI.ShopPricing.Build), roundLocked), "every shop context carries it");
+            Assert.IsTrue(IlWiring.Uses(context, nameof(Overpower.UI.ShopContext.GunBlock), Rule(nameof(DominionShopRules.GunBlock))));
+            Assert.IsTrue(IlWiring.Uses(context, nameof(Overpower.UI.ShopContext.AbilityBlock), Rule(nameof(DominionShopRules.AbilityBlock))));
+            Assert.IsTrue(IlWiring.Uses(context, nameof(Overpower.UI.ShopContext.ArmorResetBlock), Rule(nameof(DominionShopRules.ArmorResetBlock))));
+            Assert.IsTrue(IlWiring.Uses(screen, "OnWeaponNodeClicked", Ctx(nameof(Overpower.UI.ShopContext.GunBlock))), "a gun pick");
+            Assert.IsTrue(IlWiring.Uses(screen, "OnResetWeaponClicked", Ctx(nameof(Overpower.UI.ShopContext.GunBlock))), "Reset Weapon");
+            Assert.IsTrue(IlWiring.Uses(screen, "OnAbilityCardClicked", Ctx(nameof(Overpower.UI.ShopContext.AbilityBlock))), "an ability pick");
+            Assert.IsTrue(IlWiring.Uses(screen, "OnResetArmorClicked", Ctx(nameof(Overpower.UI.ShopContext.ArmorResetBlock))), "Reset Armor");
+            Assert.IsTrue(IlWiring.Uses(screen, "StyleNode", Ctx(nameof(Overpower.UI.ShopContext.GunBlock))), "a weapon node's look");
+            Assert.IsTrue(IlWiring.Uses(screen, "RefreshAbilities", Ctx(nameof(Overpower.UI.ShopContext.AbilityBlock))), "an ability card's look");
+            Assert.IsTrue(IlWiring.Uses(screen, "Update", context.GetField(nameof(Overpower.UI.ShopContext.RoundLocked))),
+                "an open shop redraws when the round starts or ends");
+        }
+
+        [Test] public void TheLateJoinersGunPickIsGivenAtTheirStartUsedByAGunPickAndEndedByTheBreak()
+        {
+            System.Type screen = typeof(Overpower.UI.LoadoutScreen);
+            System.Reflection.FieldInfo left = screen.GetField("lateJoinGunPickLeft", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.IsNotNull(left);
+            Assert.IsTrue(IlWiring.StoresBool(screen, "Start", left, true), "given where the fresh joiner's shop opens by itself");
+            Assert.IsTrue(IlWiring.Uses(screen, "OnWeaponNodeClicked", Rule(nameof(DominionShopRules.LateJoinGunPickKept))), "used by a gun pick");
+            Assert.IsTrue(IlWiring.Uses(screen, "Update", Rule(nameof(DominionShopRules.LateJoinGunPickKept))), "ended when the round is over");
+            Assert.IsTrue(IlWiring.Uses(screen, "CurrentShopContext", left), "and handed to the shop context");
+        }
+
+        [Test] public void ArmourAskedForMidRoundGoesThroughTheTopUpRule()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(PlayerHealth), nameof(PlayerHealth.SetArmorLevels), Rule(nameof(DominionShopRules.ArmorPickTopsUp))));
+            Assert.IsTrue(IlWiring.Uses(typeof(PlayerHealth), nameof(PlayerHealth.SetArmorLevels),
+                typeof(Overpower.UI.ShopPricing).GetMethod(nameof(Overpower.UI.ShopPricing.DominionRoundLocked))));
         }
 
         [TestCase(DominionStage.None)]

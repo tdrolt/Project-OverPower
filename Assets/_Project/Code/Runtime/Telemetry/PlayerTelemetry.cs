@@ -410,6 +410,7 @@ namespace Overpower.Telemetry
                 case PurchaseBlock.InCombat: return "combat";
                 case PurchaseBlock.CannotAfford: return "gold";
                 case PurchaseBlock.NotInBreak: return "not in break";
+                case PurchaseBlock.LockedUntilBreak: return "locked until break";
                 default: return "unknown";
             }
         }

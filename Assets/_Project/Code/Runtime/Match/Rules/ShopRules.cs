@@ -14,6 +14,8 @@ namespace Overpower.Match
         /// <summary>Dominion: no round or break is on (before the first break, after the match), so no picks (telemetry writes it
         /// "not in break").</summary>
         NotInBreak,
+        /// <summary>Dominion, while a round is on: this gun, filled ability slot or armour reset is set until the next break.</summary>
+        LockedUntilBreak,
     }
 
     /// <summary>Which shop section a purchase/refund/refusal belongs to. LoadoutScreen's Purchased/Refunded/PurchaseRefused

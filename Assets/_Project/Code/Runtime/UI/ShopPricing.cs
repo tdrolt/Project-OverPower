@@ -33,14 +33,25 @@ namespace Overpower.UI
         /// <summary>What this round opens; null in Conquest and in the warm-up.</summary>
         public readonly DominionShopLimits Limits;
         public bool IsDominion => Limits != null;
+        /// <summary>Dominion, while a round is on: what this player already has is set until the next break (DominionShopRules.RoundLocksPicks).</summary>
+        public readonly bool RoundLocked;
+        /// <summary>A player who joined during this round and has not used their one gun pick yet.</summary>
+        public readonly bool LateJoinGunPickLeft;
         private readonly string dominionFreeText;
         private readonly string closedText;
+        private readonly string lockedText;
+        private readonly string roundText;
 
         public ShopContext(bool isFree, bool isWarmupSandbox, bool inOwnTerritory, float secondsSinceCombat,
                             float requiredOutOfCombatSeconds, int balance,
                             PurchaseBlock closed = PurchaseBlock.None, DominionShopLimits limits = null,
-                            string dominionFreeText = "", string closedText = "")
+                            string dominionFreeText = "", string closedText = "",
+                            bool roundLocked = false, bool lateJoinGunPickLeft = false, string lockedText = "", string roundText = "")
         {
+            RoundLocked = roundLocked;
+            LateJoinGunPickLeft = lateJoinGunPickLeft;
+            this.lockedText = lockedText;
+            this.roundText = roundText;
             Closed = closed;
             Limits = limits;
             this.dominionFreeText = dominionFreeText;
@@ -60,9 +71,20 @@ namespace Overpower.UI
             : IsFree ? PurchaseBlock.None
                      : ShopRules.Check(InOwnTerritory, SecondsSinceCombat, RequiredOutOfCombatSeconds, Balance, price);
 
-        /// <summary>What a node/card's price line reads under this gate: "Free" for everything in Dominion (there is no gold), else the usual line.</summary>
+        /// <summary>Check(price) with one of the round's locks (GunBlock, AbilityBlock, ArmorResetBlock) in front of it: a shut shop is still
+        /// said first, then the lock, then the usual gate.</summary>
+        public PurchaseBlock Check(int price, PurchaseBlock locked) =>
+            Closed != PurchaseBlock.None ? Closed : locked != PurchaseBlock.None ? locked : Check(price);
+
+        public PurchaseBlock GunBlock() => DominionShopRules.GunBlock(RoundLocked, LateJoinGunPickLeft);
+        public PurchaseBlock AbilityBlock(bool slotFilled) => DominionShopRules.AbilityBlock(RoundLocked, slotFilled);
+        public PurchaseBlock ArmorResetBlock() => DominionShopRules.ArmorResetBlock(RoundLocked);
+
+        /// <summary>What a node/card's price line reads under this gate: the lock's text for an item locked until the break, "Free" for everything
+        /// else in Dominion (there is no gold), else the usual line.</summary>
         public string PriceLine(int price, PurchaseBlock block = PurchaseBlock.None) =>
-            IsDominion ? ShopPricing.PriceLabel(0) : ShopPricing.PriceLine(price, block, Balance);
+            block == PurchaseBlock.LockedUntilBreak ? ReasonText(block, price)
+            : IsDominion ? ShopPricing.PriceLabel(0) : ShopPricing.PriceLine(price, block, Balance);
 
         public float SecondsUntilOutOfCombat => ShopRules.SecondsUntilOutOfCombat(SecondsSinceCombat, RequiredOutOfCombatSeconds);
 
@@ -78,6 +100,7 @@ namespace Overpower.UI
                 case PurchaseBlock.InCombat: return $"Out of combat in {SecondsUntilOutOfCombat.ToString("0.0", CultureInfo.InvariantCulture)}s";
                 case PurchaseBlock.CannotAfford: return $"Need {price - Balance} more gold";
                 case PurchaseBlock.NotInBreak: return string.IsNullOrEmpty(closedText) ? "The shop is closed" : closedText;
+                case PurchaseBlock.LockedUntilBreak: return string.IsNullOrEmpty(lockedText) ? "Locked until the break" : lockedText;
                 default: return "";
             }
         }
@@ -87,6 +110,7 @@ namespace Overpower.UI
         /// instead of a block reason, split between the warm-up sandbox and Free Loadout's test mode.</summary>
         public string StatusText() =>
             Closed != PurchaseBlock.None ? ReasonText(Closed, 0)
+            : IsDominion && RoundLocked && !string.IsNullOrEmpty(roundText) ? roundText
             : IsDominion ? (string.IsNullOrEmpty(dominionFreeText) ? "Free" : dominionFreeText)
             : IsFree ? (IsWarmupSandbox ? "Free (warm-up)" : "Free (test mode)") : ReasonText(Check(0), 0);
     }
@@ -122,6 +146,13 @@ namespace Overpower.UI
 
         /// <summary>What the current round opens, or null outside a live Dominion match / without a DominionConfig. The round is the one
         /// coming up during a break (dRnd already names it), the one being played otherwise.</summary>
+        /// <summary>True while a live Dominion match is playing a round (DominionShopRules.RoundLocksPicks with the room's stage).</summary>
+        public static bool DominionRoundLocked()
+        {
+            DominionDirector director = DominionDirector.Instance;
+            return DominionShopRules.RoundLocksPicks(DominionLive(), director != null ? director.Stage : DominionStage.None);
+        }
+
         public static DominionShopLimits DominionLimits(DominionConfig dominion)
         {
             if (dominion == null || !DominionLive()) return null;
@@ -142,7 +173,8 @@ namespace Overpower.UI
         private static DominionConfig cachedLimitsConfig;
 
         public static ShopContext Build(GameplayConfig config, PlayerHealth health, GoldWallet wallet, Player owner, Vector3 position, bool isAlive,
-                                        DominionConfig dominion = null, string dominionFreeText = "", string closedText = "")
+                                        DominionConfig dominion = null, string dominionFreeText = "", string closedText = "",
+                                        bool lateJoinGunPickLeft = false, string lockedText = "", string roundText = "")
         {
             bool freeLoadout = config == null || config.FreeLoadout;
             bool isFree = IsFreeNow(config);
@@ -153,7 +185,8 @@ namespace Overpower.UI
             float required = config != null ? config.ShopOutOfCombatSeconds : 0f;
             int balance = wallet != null ? wallet.Balance : 0;
             return new ShopContext(isFree, isWarmupSandbox, inOwnTerritory, secondsSinceCombat, required, balance,
-                DominionClosed(), DominionLimits(dominion), dominionFreeText, closedText);
+                DominionClosed(), DominionLimits(dominion), dominionFreeText, closedText,
+                DominionRoundLocked(), lateJoinGunPickLeft, lockedText, roundText);
         }
 
         private static bool InOwnTerritory(Player owner, Vector3 position)

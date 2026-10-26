@@ -155,7 +155,7 @@ namespace Overpower.Tests
             var a = NewState();
             a.Absorb(20f); // 5 left of 25
 
-            a.SetTier(capacity: 50f, rechargeDelaySeconds: 4f);
+            a.SetTier(capacity: 50f, rechargeDelaySeconds: 4f, topUp: true);
 
             Assert.AreEqual(50f, a.Capacity, 0.001f);
             Assert.AreEqual(50f, a.Current, 0.001f);
@@ -166,7 +166,7 @@ namespace Overpower.Tests
         {
             var a = new ArmorState(capacity: 100f, rechargeDelaySeconds: 2f, refillSeconds: 2.5f);
 
-            a.SetTier(capacity: 10f, rechargeDelaySeconds: 6f);
+            a.SetTier(capacity: 10f, rechargeDelaySeconds: 6f, topUp: true);
 
             Assert.LessOrEqual(a.Current, 10f);
             Assert.AreEqual(10f, a.Current, 0.001f);
@@ -182,10 +182,32 @@ namespace Overpower.Tests
             a.Absorb(25f); // fully broken
             a.Tick(0.1f, secondsSinceCombat: 6f); // mid-refill: Current == 1, well short of 25
 
-            a.SetTier(capacity: 100f, rechargeDelaySeconds: 2f);
+            a.SetTier(capacity: 100f, rechargeDelaySeconds: 2f, topUp: true);
 
             Assert.AreEqual(100f, a.Current, 0.001f);
             Assert.AreEqual(100f, a.Capacity, 0.001f);
+        }
+
+        [Test]
+        public void SetTierWithoutTopUpRaisesTheCapAndKeepsTheArmourHeld()
+        {
+            var a = NewState();
+            a.Absorb(20f); // 5 left of 25
+
+            a.SetTier(capacity: 50f, rechargeDelaySeconds: 4f, topUp: false);
+
+            Assert.AreEqual(50f, a.Capacity, 0.001f);
+            Assert.AreEqual(5f, a.Current, 0.001f);
+        }
+
+        [Test]
+        public void SetTierWithoutTopUpStillClampsToASmallerCapacity()
+        {
+            var a = new ArmorState(capacity: 100f, rechargeDelaySeconds: 2f, refillSeconds: 2.5f);
+
+            a.SetTier(capacity: 10f, rechargeDelaySeconds: 6f, topUp: false);
+
+            Assert.AreEqual(10f, a.Current, 0.001f);
         }
 
         [Test]

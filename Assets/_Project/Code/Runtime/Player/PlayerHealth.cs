@@ -625,8 +625,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     /// <summary>
     /// Applies a new pair of armor upgrade levels: the sink every client calls when PlayerLoadout replicates a
-    /// purchase (or a late joiner reads one). Refills the pool to the new capacity immediately: a purchase, not a
-    /// recharge (ArmorState.SetTier).
+    /// purchase (or a late joiner reads one). Refills the pool to the new capacity immediately (a purchase, not a
+    /// recharge), except during a Dominion round, where only the cap moves (DominionShopRules.ArmorPickTopsUp). Only
+    /// the owner's fill counts: remote copies take the owner's synced value.
     /// </summary>
     public void SetArmorLevels(int newAbsorbLevel, int newRechargeLevel)
     {
@@ -643,7 +644,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         absorbLevel = newAbsorbLevel;
         rechargeLevel = newRechargeLevel;
         if (armorConfig != null)
-            armor.SetTier(armorConfig.AbsorbFor(absorbLevel), armorConfig.RechargeSecondsFor(rechargeLevel));
+            armor.SetTier(armorConfig.AbsorbFor(absorbLevel), armorConfig.RechargeSecondsFor(rechargeLevel),
+                Overpower.Dominion.DominionShopRules.ArmorPickTopsUp(ShopPricing.DominionRoundLocked()));
         UpdateOverheadBar(); // Capacity just changed - the shield fraction must recompute against it immediately, not wait for the next hit.
     }
 

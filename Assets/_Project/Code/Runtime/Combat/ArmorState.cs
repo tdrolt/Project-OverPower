@@ -40,15 +40,15 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Switches tier and fills the pool to the new capacity: buying an upgrade mid-match must not
-        /// leave the player on the old armor amount waiting through a gradual refill. A purchase, not
-        /// a recharge, so it is instant. Downgrading also guarantees Current never exceeds Capacity.
+        /// Switches tier. With topUp the pool fills to the new capacity (a purchase is instant, not a
+        /// gradual refill); without it the armour held stays and only the cap moves (a Dominion round,
+        /// DominionShopRules.ArmorPickTopsUp). Either way Current never exceeds the new Capacity.
         /// </summary>
-        public void SetTier(float capacity, float rechargeDelaySeconds)
+        public void SetTier(float capacity, float rechargeDelaySeconds, bool topUp)
         {
             this.capacity = capacity;
             this.rechargeDelaySeconds = rechargeDelaySeconds;
-            Current = capacity;
+            Current = topUp ? capacity : Mathf.Min(Current, capacity);
         }
 
         /// <summary>
