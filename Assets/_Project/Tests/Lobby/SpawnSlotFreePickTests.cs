@@ -52,6 +52,29 @@ namespace Overpower.Tests
                 typeof(GameplayConfig).GetProperty(nameof(GameplayConfig.SpawnSlotClearRadius)).GetGetMethod()), "the radius is the config's");
         }
 
+        // Everyone sent home at once checks teammates' positions from before the move: A on B's slot takes its own, B sees A there and takes the first free
+        // slot, A's, and lands inside A. Rank slots alone never collide, so only a player arriving on their own looks for a free slot.
+        private static readonly MethodInfo SpawnPointFor = typeof(RoomManager).GetMethod(nameof(RoomManager.SpawnPointFor));
+        private static readonly MethodInfo MoveToSpawnPoint = typeof(PlayerLifecycle).GetMethod("MoveToSpawnPoint", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        [Test] public void EveryoneSentHomeTogetherTakesTheirOwnSlotWithoutTheFreeCheck()
+        {
+            Assert.IsTrue(IlWiring.CallsEndingWithBool(typeof(PlayerLifecycle), nameof(PlayerLifecycle.ResetForMatchStart), SpawnPointFor, false), "match start");
+            Assert.IsTrue(IlWiring.CallsEndingWithBool(typeof(PlayerLifecycle), nameof(PlayerLifecycle.ResetForRoundStart), SpawnPointFor, false),
+                "round start (sudden death goes through it too)");
+            Assert.IsTrue(IlWiring.CallsEndingWithBool(typeof(PlayerLifecycle), nameof(PlayerLifecycle.ReturnToSpawnForPhaseChange), MoveToSpawnPoint, false),
+                "the three-to-two trip home");
+            Assert.IsTrue(IlWiring.CallsEndingWithOwnParameter(typeof(PlayerLifecycle), "MoveToSpawnPoint", SpawnPointFor, 1),
+                "MoveToSpawnPoint hands its caller's choice on");
+        }
+
+        [Test] public void APlayerArrivingAloneStillLooksForAFreeSlot()
+        {
+            Assert.IsTrue(IlWiring.CallsEndingWithBool(typeof(PlayerLifecycle), "ChooseSpawnPoint", SpawnPointFor, true), "respawn");
+            Assert.IsTrue(IlWiring.CallsEndingWithBool(typeof(PlayerLifecycle), nameof(PlayerLifecycle.ReturnToSpawn), MoveToSpawnPoint, true), "fall return");
+            Assert.IsTrue(IlWiring.CallsEndingWithBool(typeof(RoomManager), nameof(RoomManager.SpawnPlayerOnTeam), SpawnPointFor, true), "first spawn and late join");
+        }
+
         // ---------------------------------------------------------------- the builder
 
         [Test] public void PlaceSlotsMakesOneChildPerRowFacingLikeThePointAndRunsAgainCleanly()

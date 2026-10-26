@@ -482,8 +482,9 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// <summary>Where THIS player stands when they appear for a team: the team's spawn point, or - when that point has child points (a map where a team's
     /// players should not pile onto one spot, e.g. the Dominion lane) - the child that is theirs. Teammates take different children (SpawnSlotRules: the order
     /// of their actor numbers), the same one every time they come back, unless another living player stands on it (SpawnSlotRules.FreeSlotFor: then the
-    /// first free child). Null when the team has no spawn point.</summary>
-    public Transform SpawnPointFor(int spawnIndex, int ownTeam = -1)
+    /// first free child). Null when the team has no spawn point. avoidOccupied is false for a move that sends everyone home in the same moment: each
+    /// client would check teammates' positions from before the move and two of them could pick the same free child, where rank children never collide.</summary>
+    public Transform SpawnPointFor(int spawnIndex, int ownTeam = -1, bool avoidOccupied = true)
     {
         if (teamSpawnPoints == null || spawnIndex < 0 || spawnIndex >= teamSpawnPoints.Length || teamSpawnPoints[spawnIndex] == null)
             return null;
@@ -510,6 +511,8 @@ public class RoomManager : MonoBehaviourPunCallbacks
         if (!teammates.Contains(PhotonNetwork.LocalPlayer.ActorNumber))
             teammates.Add(PhotonNetwork.LocalPlayer.ActorNumber);
         int ownSlot = SpawnSlotRules.SlotFor(teammates, PhotonNetwork.LocalPlayer.ActorNumber, home.childCount);
+        if (!avoidOccupied)
+            return home.GetChild(ownSlot);
         var slots = new System.Collections.Generic.List<Vector3>(home.childCount);
         foreach (Transform slot in home) slots.Add(slot.position);
         float clearRadius = gameplayConfig != null ? gameplayConfig.SpawnSlotClearRadius : 0f;

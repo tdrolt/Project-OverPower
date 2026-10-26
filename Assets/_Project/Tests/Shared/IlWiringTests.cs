@@ -26,6 +26,24 @@ namespace Overpower.Tests
             public void StoresTheField() { field = 3; }
             public int ReadsTheField() => field;
             public void HandsTheTargetOverAsADelegate() { System.Action later = Target; later(); }
+            public static void Takes(int n, bool b = true) { }
+            public void PassesFalse() => Takes(field, false);
+            public void LeavesTheDefault() => Takes(field);
+            public void PassesTrueThenFalse() { Takes(1, true); Takes(2, false); }
+            public void PassesItsOwn(string s, bool b) => Takes(field, b);
+            public void PassesAField(bool b) => Takes(field, flagField);
+        }
+
+        [Test] public void TheLastBoolArgumentOfEveryCallIsRead()
+        {
+            MethodInfo takes = typeof(Probe).GetMethod(nameof(Probe.Takes));
+            Assert.IsTrue(IlWiring.CallsEndingWithBool(typeof(Probe), nameof(Probe.PassesFalse), takes, false));
+            Assert.IsFalse(IlWiring.CallsEndingWithBool(typeof(Probe), nameof(Probe.PassesFalse), takes, true));
+            Assert.IsTrue(IlWiring.CallsEndingWithBool(typeof(Probe), nameof(Probe.LeavesTheDefault), takes, true), "a left-out default is written by the compiler");
+            Assert.IsFalse(IlWiring.CallsEndingWithBool(typeof(Probe), nameof(Probe.PassesTrueThenFalse), takes, true), "every call must match, not just one");
+            Assert.IsFalse(IlWiring.CallsEndingWithBool(typeof(Probe), nameof(Probe.DoesNotCallTheTarget), takes, true), "no call is not a pass");
+            Assert.IsTrue(IlWiring.CallsEndingWithOwnParameter(typeof(Probe), nameof(Probe.PassesItsOwn), takes, 1));
+            Assert.IsFalse(IlWiring.CallsEndingWithOwnParameter(typeof(Probe), nameof(Probe.PassesAField), takes, 0), "a field is not the parameter");
         }
 
         private static readonly MethodInfo Target = typeof(Probe).GetMethod(nameof(Probe.Target));

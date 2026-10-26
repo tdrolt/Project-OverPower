@@ -124,6 +124,88 @@ namespace Overpower.Tests
             return false;
         }
 
+        /// <summary>True when the named method (or its lambdas and state machine) calls the target at least once and every such call's LAST argument is the
+        /// bool constant <paramref name="value"/> (ldc.i4.0 / ldc.i4.1 right before the call). An optional parameter left out counts: the compiler writes its default.</summary>
+        public static bool CallsEndingWithBool(System.Type owner, string methodName, MethodBase target, bool value) =>
+            EveryCallEndsWith(owner, methodName, target, new[] { value ? (byte)0x17 : (byte)0x16 });
+
+        /// <summary>True when the named instance method calls the target at least once and every such call's LAST argument is the named method's own parameter at
+        /// <paramref name="parameterPosition"/> (0 = first), passed straight through.</summary>
+        public static bool CallsEndingWithOwnParameter(System.Type owner, string methodName, MethodBase target, int parameterPosition)
+        {
+            int arg = parameterPosition + 1; // arg 0 is "this"
+            return EveryCallEndsWith(owner, methodName, target, arg <= 3 ? new[] { (byte)(0x02 + arg) } : new byte[] { 0x0E, (byte)arg });
+        }
+
+        private static bool EveryCallEndsWith(System.Type owner, string methodName, MethodBase target, byte[] lastLoad)
+        {
+            string generated = "<" + methodName + ">";
+            var types = new List<System.Type> { owner };
+            types.AddRange(owner.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic));
+            int calls = 0;
+            bool found = false;
+            foreach (System.Type type in types)
+            {
+                bool wholeTypeIsTheMethod = type != owner && type.Name.StartsWith(generated);
+                foreach (MethodBase method in type.GetMethods(All).Cast<MethodBase>().Concat(type.GetConstructors(All)))
+                {
+                    if (!wholeTypeIsTheMethod && method.Name != methodName && !method.Name.StartsWith(generated)) continue;
+                    found = true;
+                    byte[] il = method.GetMethodBody()?.GetILAsByteArray();
+                    if (il == null) continue;
+                    Dictionary<int, int> previous = InstructionStarts(il);
+                    foreach (int at in CallOffsets(method, target))
+                    {
+                        // A token's last byte can look like a load (a FieldDef token ends in 0x04 = ldarg.2), so only a whole instruction counts.
+                        if (!previous.TryGetValue(at, out int start)) continue;
+                        calls++;
+                        if (start < 0 || at - start != lastLoad.Length) return false;
+                        for (int k = 0; k < lastLoad.Length; k++)
+                            if (il[start + k] != lastLoad[k]) return false;
+                    }
+                }
+            }
+            if (!found)
+                throw new System.ArgumentException(owner + " has no method " + methodName);
+            return calls > 0;
+        }
+
+        private static Dictionary<short, System.Reflection.Emit.OpCode> opCodes;
+
+        // Every instruction's offset, mapped to the offset of the instruction before it (-1 for the first).
+        private static Dictionary<int, int> InstructionStarts(byte[] il)
+        {
+            if (opCodes == null)
+            {
+                opCodes = new Dictionary<short, System.Reflection.Emit.OpCode>();
+                foreach (FieldInfo f in typeof(System.Reflection.Emit.OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static))
+                    if (f.GetValue(null) is System.Reflection.Emit.OpCode code) opCodes[code.Value] = code;
+            }
+            var starts = new Dictionary<int, int>();
+            int prev = -1;
+            for (int i = 0; i < il.Length;)
+            {
+                starts[i] = prev;
+                prev = i;
+                short value = il[i] == 0xFE && i + 1 < il.Length ? (short)(0xFE00 | il[i + 1]) : il[i];
+                if (!opCodes.TryGetValue(value, out System.Reflection.Emit.OpCode code)) break;
+                i += code.Size;
+                switch (code.OperandType)
+                {
+                    case System.Reflection.Emit.OperandType.InlineNone: break;
+                    case System.Reflection.Emit.OperandType.ShortInlineBrTarget:
+                    case System.Reflection.Emit.OperandType.ShortInlineI:
+                    case System.Reflection.Emit.OperandType.ShortInlineVar: i += 1; break;
+                    case System.Reflection.Emit.OperandType.InlineVar: i += 2; break;
+                    case System.Reflection.Emit.OperandType.InlineI8:
+                    case System.Reflection.Emit.OperandType.InlineR: i += 8; break;
+                    case System.Reflection.Emit.OperandType.InlineSwitch: i += 4 + 4 * System.BitConverter.ToInt32(il, i); break;
+                    default: i += 4; break;
+                }
+            }
+            return starts;
+        }
+
         /// <summary>The IL offsets of every call, callvirt or newobj of the target in one method body (empty when it is not called there). A method of
         /// ANOTHER assembly (Photon) is referenced by a token of this assembly's own, so every call's token is resolved and compared as a method, not as bytes.</summary>
         public static List<int> CallOffsets(MethodBase method, MethodBase target)

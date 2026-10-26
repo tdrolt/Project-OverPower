@@ -124,6 +124,10 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(WeaponFiring), nameof(WeaponFiring.MayFire))));
             Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(WeaponFiring), nameof(WeaponFiring.LastShotTime))));
             Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(GameplayConfig), nameof(GameplayConfig.ShootPoseMinimumSeconds))));
+            // Without the weapon's own charge flag the Charge gun would hold the shoot pose all the time its trigger is held to charge.
+            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(WeaponFiring), nameof(WeaponFiring.Weapon))));
+            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(WeaponDefinition), nameof(WeaponDefinition.CanCharge))),
+                "a charge weapon must not show the shoot pose while charging");
         }
 
         [Test]

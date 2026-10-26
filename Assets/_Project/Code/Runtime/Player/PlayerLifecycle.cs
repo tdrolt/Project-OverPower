@@ -570,9 +570,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         GetComponent<LoadoutScreen>()?.ResetForMatchStart();
         playerHealth.ResetForRespawn();
 
-        // 4. Back to your own team's spawn - guarded like MoveToSpawnPoint.
+        // 4. Back to your own team's spawn - guarded like MoveToSpawnPoint. Everyone moves at once, so the own slot, never the free-slot pick.
         RoomManager roomManager = FindObjectOfType<RoomManager>();
-        Transform teamSpawn = roomManager != null ? roomManager.SpawnPointFor(team, team) : null;
+        Transform teamSpawn = roomManager != null ? roomManager.SpawnPointFor(team, team, false) : null;
         if (teamSpawn != null)
             TeleportToSpawnPoint(teamSpawn.position, teamSpawn.rotation);
 
@@ -624,7 +624,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         playerHealth.ResetForRespawn();
 
         RoomManager roomManager = FindObjectOfType<RoomManager>();
-        Transform teamSpawn = roomManager != null ? roomManager.SpawnPointFor(team, team) : null;
+        Transform teamSpawn = roomManager != null ? roomManager.SpawnPointFor(team, team, false) : null; // everyone moves at once: own slot
         if (teamSpawn != null)
             TeleportToSpawnPoint(teamSpawn.position, teamSpawn.rotation);
 
@@ -878,16 +878,17 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// death: falling is a level problem, not a play outcome, so it must not feed the respawn timer
     /// or the elimination count.
     public void ReturnToSpawn() =>
-        MoveToSpawnPoint($"fell below y={playerMotor.KillHeight}");
+        MoveToSpawnPoint($"fell below y={playerMotor.KillHeight}", true);
 
     /// <summary>MatchDirector's caller: on the three-to-two team transition, every living player's own client sends
     /// them home to their team's spawn point (which today is also where "return to your capital" lands,
     /// RoomManager.teamSpawnPoints) - the same move as ReturnToSpawn, with a log line that does not claim they
     /// fell.</summary>
     public void ReturnToSpawnForPhaseChange() =>
-        MoveToSpawnPoint("sent home for the two-team phase change");
+        MoveToSpawnPoint("sent home for the two-team phase change", false);
 
-    private void MoveToSpawnPoint(string logReason)
+    // avoidOccupied: RoomManager.SpawnPointFor's, true only for a player arriving on their own.
+    private void MoveToSpawnPoint(string logReason, bool avoidOccupied)
     {
         PlayerTeam pt = GetComponent<PlayerTeam>();
         RoomManager roomManager = FindObjectOfType<RoomManager>();
@@ -911,7 +912,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
                 spawnIndex = buildings.Map.CapitalTeamOf(spawnCapital);
         }
 
-        Transform home = roomManager.SpawnPointFor(spawnIndex);
+        Transform home = roomManager.SpawnPointFor(spawnIndex, -1, avoidOccupied);
         if (home == null)
             return;
 
