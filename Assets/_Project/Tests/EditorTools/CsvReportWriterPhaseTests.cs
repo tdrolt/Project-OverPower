@@ -19,8 +19,8 @@ namespace Overpower.Tests
             "abilities.csv", "players.csv", "deaths.csv",
         };
 
-        private static string PhasesFixturePath => Path.Combine(Application.dataPath, "Tests/TelemetryFixtures/match_phases");
-        private static string NoPhaseFixturePath => Path.Combine(Application.dataPath, "Tests/TelemetryFixtures/match_a");
+        private static string PhasesFixturePath => Path.Combine(Application.dataPath, "_Project/Tests/Telemetry/Fixtures/match_phases");
+        private static string NoPhaseFixturePath => Path.Combine(Application.dataPath, "_Project/Tests/Telemetry/Fixtures/match_a");
 
         private static string NewTempFolder() =>
             Path.Combine(Path.GetTempPath(), "CsvReportWriterPhaseTests_" + System.Guid.NewGuid().ToString("N"));

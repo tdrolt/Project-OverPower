@@ -15,9 +15,9 @@ namespace Overpower.Tests
     /// surrounding &lt;script&gt; tag.</summary>
     public class HtmlReportWriterTests
     {
-        private static string FixturePath => Path.Combine(Application.dataPath, "Tests/TelemetryFixtures/match_a");
-        private static string EscapingFixturePath => Path.Combine(Application.dataPath, "Tests/TelemetryFixtures/html_escaping");
-        private static string LineSeparatorFixturePath => Path.Combine(Application.dataPath, "Tests/TelemetryFixtures/line_separator");
+        private static string FixturePath => Path.Combine(Application.dataPath, "_Project/Tests/Telemetry/Fixtures/match_a");
+        private static string EscapingFixturePath => Path.Combine(Application.dataPath, "_Project/Tests/Telemetry/Fixtures/html_escaping");
+        private static string LineSeparatorFixturePath => Path.Combine(Application.dataPath, "_Project/Tests/Telemetry/Fixtures/line_separator");
 
         [Test]
         public void WritesNonEmptyReportWithEmbeddedDataAndEverySectionId()

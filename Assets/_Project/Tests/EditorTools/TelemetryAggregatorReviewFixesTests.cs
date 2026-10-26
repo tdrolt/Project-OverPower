@@ -589,7 +589,7 @@ namespace Overpower.Tests
             string temp = NewTempFolder();
             try
             {
-                // Death-line shape matches the fixtures (e.g. TelemetryFixtures/match_phases/1_Editor.jsonl):
+                // Death-line shape matches the fixtures (e.g. Telemetry/Fixtures/match_phases/1_Editor.jsonl):
                 // "a"/"at" are the KILLER's own actor/team (TelemetryKeys.Killer aliases Actor); the victim is
                 // the file owner (actor 1, from Session below).
                 string lines = Session(1, 0, true, "{}") +

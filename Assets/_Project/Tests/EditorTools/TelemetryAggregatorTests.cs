@@ -7,13 +7,13 @@ using Overpower.EditorTools.Telemetry;
 
 namespace Overpower.Tests
 {
-    /// <summary>Task T5: aggregator totals against a hand-written fixture (Assets/Tests/TelemetryFixtures/match_a),
+    /// <summary>Task T5: aggregator totals against a hand-written fixture (Assets/_Project/Tests/Telemetry/Fixtures/match_a),
     /// two files/players over a 3-minute match, with every expected number computed by hand in the
     /// comment next to its assertion - see the fixture files themselves for the raw lines these
     /// numbers come from.</summary>
     public class TelemetryAggregatorTests
     {
-        private static string FixturePath => Path.Combine(Application.dataPath, "Tests/TelemetryFixtures/match_a");
+        private static string FixturePath => Path.Combine(Application.dataPath, "_Project/Tests/Telemetry/Fixtures/match_a");
 
         private static ReportTables BuildFixtureTables() => TelemetryAggregator.Build(TelemetryLog.Load(FixturePath));
 

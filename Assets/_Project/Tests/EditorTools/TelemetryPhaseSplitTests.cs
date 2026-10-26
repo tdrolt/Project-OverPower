@@ -6,13 +6,13 @@ using Overpower.EditorTools.Telemetry;
 
 namespace Overpower.Tests
 {
-    /// <summary>Task T7: the phases fixture (Assets/Tests/TelemetryFixtures/match_phases, two files)
+    /// <summary>Task T7: the phases fixture (Assets/_Project/Tests/Telemetry/Fixtures/match_phases, two files)
     /// has a `phase` 2 event at t=90, an ownership stint (zone 5) spanning 60-&gt;120 across the
     /// boundary, a weapon-1 sample interval (actor 2, t=80-&gt;100) spanning it too, and a third actor
     /// (3) who only ever appears as a `hit` attacker - no file of their own.</summary>
     public class TelemetryPhaseSplitTests
     {
-        private static string FixturePath => Path.Combine(Application.dataPath, "Tests/TelemetryFixtures/match_phases");
+        private static string FixturePath => Path.Combine(Application.dataPath, "_Project/Tests/Telemetry/Fixtures/match_phases");
 
         private static ReportSet BuildFixtureSet() => TelemetryAggregator.BuildSet(TelemetryLog.Load(FixturePath));
 

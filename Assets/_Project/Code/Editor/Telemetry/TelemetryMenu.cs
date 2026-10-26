@@ -13,7 +13,7 @@ namespace Overpower.EditorTools.Telemetry
     public static class TelemetryMenu
     {
         private const string BalanceTargetsAssetPath = "Assets/Gameplay/Config/BalanceTargets.asset";
-        private const string FixtureFolder = "Tests/TelemetryFixtures/match_a"; // relative to Application.dataPath
+        private const string FixtureFolder = "_Project/Tests/Telemetry/Fixtures/match_a"; // relative to Application.dataPath
 
         [MenuItem("OverPower/Telemetry/Build Report…")]
         public static void BuildReportFromDialog()
