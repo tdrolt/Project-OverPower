@@ -152,11 +152,6 @@ namespace Overpower.Tests
                     Assert.AreEqual(0f, Vector3.Distance((a + b) * 0.5f, home.position), 0.01f, "the pair is centred on the spawn point");
                 }
             });
-            WithScene(GamePath, scene =>
-            {
-                foreach (Transform home in All<RoomManager>(scene).Single().teamSpawnPoints)
-                    Assert.AreEqual(0, home.childCount, "the triangle arena keeps one spawn point per team");
-            });
         }
 
         [Test] public void OnlyTheLaneAsksForTheStraightCamera()

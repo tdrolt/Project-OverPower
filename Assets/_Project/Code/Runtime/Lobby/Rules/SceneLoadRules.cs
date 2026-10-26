@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Overpower.Lobby
 {
@@ -111,6 +112,29 @@ namespace Overpower.Lobby
                 else if (actor < myActor) below++;
             }
             return found ? below % slotCount : 0;
+        }
+
+        /// <summary>The slot a player appears on: their own (rankSlot, from SlotFor) when nobody stands within clearRadius of it, else the first slot
+        /// nobody stands near, else their own after all. Own slot first: at the start every teammate spawns at the same moment on their own client,
+        /// before the others' bodies exist there, so "first free" alone would put the whole team on slot 0. Distances are flat (x and z).</summary>
+        public static int FreeSlotFor(IReadOnlyList<Vector3> slots, IReadOnlyList<Vector3> standing, float clearRadius, int rankSlot)
+        {
+            if (slots == null) return rankSlot;
+            if (rankSlot >= 0 && rankSlot < slots.Count && IsFree(slots[rankSlot], standing, clearRadius)) return rankSlot;
+            for (int i = 0; i < slots.Count; i++)
+                if (IsFree(slots[i], standing, clearRadius)) return i;
+            return rankSlot;
+        }
+
+        private static bool IsFree(Vector3 slot, IReadOnlyList<Vector3> standing, float clearRadius)
+        {
+            if (standing == null) return true;
+            foreach (Vector3 body in standing)
+            {
+                float dx = body.x - slot.x, dz = body.z - slot.z;
+                if (dx * dx + dz * dz < clearRadius * clearRadius) return false;
+            }
+            return true;
         }
     }
 }

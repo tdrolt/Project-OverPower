@@ -48,6 +48,13 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float rejoinRespawnSeconds = 5f;
         public float RejoinRespawnSeconds => rejoinRespawnSeconds;
 
+        [Tooltip("How close another living player has to stand to a spawn slot for that slot to count as taken, in metres. A player " +
+                 "who appears (at the start, after a death, at a new round or joining late) takes their own slot if nobody stands " +
+                 "there, else the first free slot of their team's spawn, so two bodies never appear inside each other. A player is " +
+                 "1.4 m wide. 0 = slots are never checked and everyone takes their own.")]
+        [SerializeField, Min(0f)] private float spawnSlotClearRadius = 1.5f;
+        public float SpawnSlotClearRadius => spawnSlotClearRadius;
+
         [Tooltip("Fall below this Y height and you are returned to spawn, counted as a death. " +
                  "Set it a few metres under the lowest floor a player can legitimately stand " +
                  "on, so falling off the map ends quickly instead of falling forever.")]

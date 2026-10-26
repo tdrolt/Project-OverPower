@@ -481,7 +481,8 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     /// <summary>Where THIS player stands when they appear for a team: the team's spawn point, or - when that point has child points (a map where a team's
     /// players should not pile onto one spot, e.g. the Dominion lane) - the child that is theirs. Teammates take different children (SpawnSlotRules: the order
-    /// of their actor numbers), the same one every time they come back. Null when the team has no spawn point.</summary>
+    /// of their actor numbers), the same one every time they come back, unless another living player stands on it (SpawnSlotRules.FreeSlotFor: then the
+    /// first free child). Null when the team has no spawn point.</summary>
     public Transform SpawnPointFor(int spawnIndex, int ownTeam = -1)
     {
         if (teamSpawnPoints == null || spawnIndex < 0 || spawnIndex >= teamSpawnPoints.Length || teamSpawnPoints[spawnIndex] == null)
@@ -508,7 +509,25 @@ public class RoomManager : MonoBehaviourPunCallbacks
         }
         if (!teammates.Contains(PhotonNetwork.LocalPlayer.ActorNumber))
             teammates.Add(PhotonNetwork.LocalPlayer.ActorNumber);
-        return home.GetChild(SpawnSlotRules.SlotFor(teammates, PhotonNetwork.LocalPlayer.ActorNumber, home.childCount));
+        int ownSlot = SpawnSlotRules.SlotFor(teammates, PhotonNetwork.LocalPlayer.ActorNumber, home.childCount);
+        var slots = new System.Collections.Generic.List<Vector3>(home.childCount);
+        foreach (Transform slot in home) slots.Add(slot.position);
+        float clearRadius = gameplayConfig != null ? gameplayConfig.SpawnSlotClearRadius : 0f;
+        return home.GetChild(SpawnSlotRules.FreeSlotFor(slots, OtherLivingBodies(), clearRadius, ownSlot));
+    }
+
+    // Every other living body, whatever its team: two capsules inside each other are pushed apart by physics whoever owns them.
+    // This client's own body is left out, since it is the one being placed.
+    private static System.Collections.Generic.List<Vector3> OtherLivingBodies()
+    {
+        var standing = new System.Collections.Generic.List<Vector3>();
+        foreach (PlayerLifecycle body in FindObjectsByType<PlayerLifecycle>(FindObjectsSortMode.None))
+        {
+            PhotonView view = body.GetComponent<PhotonView>();
+            if (body.IsAlive && (view == null || !view.IsMine))
+                standing.Add(body.transform.position);
+        }
+        return standing;
     }
 
     bool ValidateTeamResources(int teamID)

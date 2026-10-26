@@ -136,7 +136,15 @@ namespace Overpower.Data
                  "else at this point's own height.")]
         [SerializeField] private Vector3 healthPackPoint = new Vector3(92.67f, 0f, 69.84f);
 
+        [Header("Spawn slots")]
+        [Tooltip("Where a team's players appear around their team's spawn point, one row per player, in metres from the point: " +
+                 "x = to its right, z = in front of it (the way it faces); y stays 0. Every slot faces the same way as its point. " +
+                 "Keep at least as many rows as a team has seats (3), keep the slots at least 1.6 m apart (a player is 1.4 m wide) " +
+                 "and clear of walls. Applied to all three spawns by Build primitive arena, or alone by OverPower > Arena > Place spawn slots.")]
+        [SerializeField] private List<Vector3> spawnSlotOffsets = new List<Vector3> { new Vector3(-2f, 0f, 0f), Vector3.zero, new Vector3(2f, 0f, 0f) };
+
         public IReadOnlyList<Piece> Pieces => pieces;
+        public IReadOnlyList<Vector3> SpawnSlotOffsets => spawnSlotOffsets;
 
         public Vector3 HealthPackPoint => healthPackPoint;
 

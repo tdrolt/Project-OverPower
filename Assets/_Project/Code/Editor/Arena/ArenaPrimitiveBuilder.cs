@@ -391,7 +391,7 @@ namespace Overpower.EditorTools
 
         /// <summary>
         /// Runs every phase, in order, on the one ArenaSymmetry found in <paramref name="scene"/>: BuildTowerLooks,
-        /// MoveOldArtAside, BuildSource, BuildFloor, ArenaSymmetryBuilder.Rebuild, MinimapBaker.Bake, then the report and a
+        /// MoveOldArtAside, BuildSource, BuildFloor, ArenaSymmetryBuilder.Rebuild, ArenaSpawnSlotBuilder.PlaceAll, MinimapBaker.Bake, then a
         /// final Validate. NOT atomic: the first two phases have already run, and stay run, by the time BuildSource can refuse
         /// (Source held something it doesn't own); only the floor and the generated-thirds copies are skipped from there, to
         /// stop the damage compounding. Never runs in Play Mode; never saves the scene.
@@ -453,15 +453,18 @@ namespace Overpower.EditorTools
             report.Add("--- 5. ArenaSymmetryBuilder.Rebuild ---");
             report.AddRange(ArenaSymmetryBuilder.Rebuild(arena, recordUndo: false));
 
-            report.Add("--- 6. MinimapBaker.Bake ---");
+            report.Add("--- 6. Spawn slots ---");
+            report.AddRange(ArenaSpawnSlotBuilder.PlaceAll(scene, layout));
+
+            report.Add("--- 7. MinimapBaker.Bake ---");
             string bakeResult = MinimapBaker.Bake(arena);
             MinimapBaker.LogResult(bakeResult);
             report.Add(bakeResult);
 
-            report.Add("--- 7. Final Validate ---");
+            report.Add("--- 8. Final Validate ---");
             report.AddRange(ArenaSymmetryBuilder.Validate(arena));
 
-            report.Add("--- 8. Overlapping pieces ---");
+            report.Add("--- 9. Overlapping pieces ---");
             report.AddRange(ArenaOverlapCheck.FindOverlaps(arena).Select(f => "PROBLEM: " + f));
 
             return report;
