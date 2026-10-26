@@ -960,7 +960,7 @@ namespace Overpower.UI
                 path.CanUpgradeRecharge ? $"{limit} ({priceLine})" : ArmorRowFull(path.TotalUpgrades, cap, limit)));
         }
 
-        /// <summary>An armour card reads refused (Loadout Shop Blocked Colour, muted text, faded picture) only while it has an upgrade left that the
+        /// <summary>An armour card reads refused (Loadout Shop Blocked Colour, muted text, darkened picture) only while it has an upgrade left that the
         /// gate refuses; a card with none left keeps the normal look, its + disabled.</summary>
         private void StyleArmorCard(ArmorCardUi card, bool canUpgrade, bool gateBlocked, string text)
         {

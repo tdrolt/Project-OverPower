@@ -1127,8 +1127,8 @@ namespace Overpower.UI
         [Tooltip("What a round says when it opens nothing new in the shop.")]
         public string dominionOpensNothing = "nothing new";
 
-        [Header("Under the minimap")]
-        [Tooltip("Gap between the bottom of the corner minimap's triangle and the line under it (the scan countdown in Conquest, the centre " +
+        [Header("Under the minimap: all lines")]
+        [Tooltip("Gap between the bottom of the corner minimap's frame (the triangle, or the lane map's rectangle) and the line under it (the scan countdown in Conquest, the centre " +
                  "countdown and the circle countdown in Dominion), in canvas units. Smaller tucks the line closer to the map.")]
         public float minimapLinesGap = 6f;
         [Tooltip("Font of the lines under the corner minimap. Leave it empty to use the HUD font (Text > Font), the one the minimap's own " +
@@ -1136,7 +1136,7 @@ namespace Overpower.UI
         public TMP_FontAsset minimapLinesFont;
 
         [Header("Dominion HUD: under the minimap")]
-        [Tooltip("Size of the centre countdown line (CENTRE +200 IN 12).")]
+        [Tooltip("Size of the centre countdown line (CENTRE +200 IN 12). The gap under the map and the font of these lines are set above, under 'Under the minimap: all lines'.")]
         public float dominionCentreSize = 30f;
         [Tooltip("Size of the line saying who holds the centre.")]
         public float dominionCentreHolderSize = 21f;

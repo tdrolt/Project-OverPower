@@ -177,8 +177,8 @@ namespace Overpower.Abilities
                 EndWindup(step);
         }
 
-        /// <summary>Died and Unequipped reach every client, Stunned and Silenced only the owner: the owner's cancel phase hides the
-        /// hexagon everywhere else.</summary>
+        /// <summary>A death, a stun or an unequip ends the wind-up; a silence does not (RaybeamWindup.InterruptCancels). Died and Unequipped
+        /// reach every client, Stunned only the owner, whose cancel phase hides the hexagon everywhere else.</summary>
         public override void Interrupt(InterruptReason reason)
         {
             if (!RaybeamWindup.InterruptCancels(reason))

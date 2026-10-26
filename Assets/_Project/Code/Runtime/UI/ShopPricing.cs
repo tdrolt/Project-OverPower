@@ -149,8 +149,6 @@ namespace Overpower.UI
             return DominionShopRules.PickBlock(DominionLive(), stage);
         }
 
-        /// <summary>What the current round opens, or null outside a live Dominion match / without a DominionConfig. The round is the one
-        /// coming up during a break (dRnd already names it), the one being played otherwise.</summary>
         /// <summary>True while a live Dominion match is playing a round (DominionShopRules.RoundLocksPicks with the room's stage).</summary>
         public static bool DominionRoundLocked()
         {
@@ -158,6 +156,8 @@ namespace Overpower.UI
             return DominionShopRules.RoundLocksPicks(DominionLive(), director != null ? director.Stage : DominionStage.None);
         }
 
+        /// <summary>What the current round opens, or null outside a live Dominion match / without a DominionConfig. The round is the one
+        /// coming up during a break (dRnd already names it), the one being played otherwise.</summary>
         public static DominionShopLimits DominionLimits(DominionConfig dominion)
         {
             if (dominion == null || !DominionLive()) return null;

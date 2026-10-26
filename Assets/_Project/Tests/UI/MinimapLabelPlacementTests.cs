@@ -32,9 +32,22 @@ namespace Overpower.Tests
         public void TheLabelHangsCentredUnderTheShapesLowestPointByTheGap()
         {
             var box = new Rect(-364f, -364f, 340f, 340f); // centre (-194, -194)
-            Vector2 top = MinimapLabelPlacement.LabelTop(box, 50f, 8f);
+            Vector2 top = MinimapLabelPlacement.LabelTop(box, box.size, 50f, 8f);
             Assert.AreEqual(-194f, top.x, 1e-3f);
             Assert.AreEqual(-252f, top.y, 1e-3f);
+        }
+
+        [Test]
+        public void UnderAWideLaneMapTheLabelHangsFromTheRectanglePinnedToTheBoxsTopRight()
+        {
+            var box = new Rect(-364f, -364f, 340f, 340f); // top right corner (-24, -24)
+            var frame = new Vector2(340f, 100f);           // drawn from y -24 down to -124, x -364 to -24
+            Vector2 top = MinimapLabelPlacement.LabelTop(box, frame, 50f, 8f);
+            Assert.AreEqual(-194f, top.x, 1e-3f);
+            Assert.AreEqual(-132f, top.y, 1e-3f, "8 under the rectangle's lower edge, not under the empty square below it");
+
+            Vector2 underTall = MinimapLabelPlacement.LabelTop(box, new Vector2(100f, 340f), 170f, 8f);
+            Assert.AreEqual(-74f, underTall.x, 1e-3f, "a tall rectangle sits at the right of the box: the line centres on it");
         }
 
         [Test]
@@ -42,7 +55,7 @@ namespace Overpower.Tests
         {
             var box = new Rect(-364f, -364f, 340f, 340f);
             float bottom = MinimapLabelPlacement.ShapeBottomBelowCentre(false, box.size, 169f, 0f);
-            Assert.Greater(MinimapLabelPlacement.LabelTop(box, bottom, 8f).y, box.yMin);
+            Assert.Greater(MinimapLabelPlacement.LabelTop(box, box.size, bottom, 8f).y, box.yMin);
         }
 
         [Test]
@@ -71,7 +84,7 @@ namespace Overpower.Tests
                 Assert.AreEqual(new Vector2(250f, 40f), rect.sizeDelta);
                 Rect box = HudScreenLayout.CornerMinimapRect(20f, 4f, 300f);
                 float expectedBottom = MinimapView.CornerShapeBottomBelowCentre(theme);
-                Vector2 expected = MinimapLabelPlacement.LabelTop(box, expectedBottom, 6f);
+                Vector2 expected = MinimapLabelPlacement.LabelTop(box, MinimapView.CornerFrameSize(theme), expectedBottom, 6f);
                 Assert.AreEqual(expected.x, rect.anchoredPosition.x, 1e-3f);
                 Assert.AreEqual(expected.y, rect.anchoredPosition.y, 1e-3f);
             }
@@ -91,6 +104,7 @@ namespace Overpower.Tests
                 theme.minimapCornerSize = 300f;
                 Assert.IsNull(MinimapView.Local);
                 Assert.AreEqual(150f, MinimapView.CornerShapeBottomBelowCentre(theme), 1e-3f);
+                Assert.AreEqual(new Vector2(300f, 300f), MinimapView.CornerFrameSize(theme));
             }
             finally
             {

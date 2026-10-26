@@ -687,6 +687,15 @@ namespace Overpower.UI
                 theme.minimapCornerSize * GeneratedSprites.CentredTriangleRadiusFraction, view.viewport.localEulerAngles.z);
         }
 
+        /// <summary>The corner map's drawn frame (a rectangle on the lane map, pinned to the box's top right), or the whole box with no map built.</summary>
+        public static Vector2 CornerFrameSize(UiTheme theme)
+        {
+            MinimapView view = Local;
+            if (view == null || !view.built || view.config == null)
+                return new Vector2(theme.minimapCornerSize, theme.minimapCornerSize);
+            return view.frameSize;
+        }
+
         private void ApplyYawIfChanged()
         {
             float yaw = CameraTracking.Instance != null ? CameraTracking.Instance.Yaw : 0f;

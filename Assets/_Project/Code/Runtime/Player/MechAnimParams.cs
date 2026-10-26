@@ -3,7 +3,7 @@ using UnityEngine;
 namespace Overpower.Arena
 {
     /// <summary>The mech Animator's three bools for this frame, worked out from scratch every frame so nothing (a death, a stun, a shop
-    /// click, chat) can leave one stuck the way the old press/release edges did. A charge weapon never holds the shoot pose while it
+    /// click, chat) can leave one stuck, as press/release edges can. A charge weapon never holds the shoot pose while it
     /// charges; every shot that leaves the gun holds it for at least the minimum, so a quick tap still reaches the other screens.</summary>
     public readonly struct MechAnimParams
     {

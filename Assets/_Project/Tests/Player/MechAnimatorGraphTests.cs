@@ -8,8 +8,7 @@ using UnityEngine;
 namespace Overpower.Tests
 {
     /// <summary>The mech's Animator graph against the bools animScript sets (idle is always !run): from any state, the graph settles on Shoot
-    /// while shoot is on, else Run while running, else Idle, and never has two exits true at once (the Idle/Shoot ping-pong and the
-    /// Shoot-while-running loop both came from that).</summary>
+    /// while shoot is on, else Run while running, else Idle, and never has two exits true at once (two at once makes the states loop).</summary>
     public class MechAnimatorGraphTests
     {
         private const string ControllerPath = "Assets/ThirdParty/SciFiWarriorPBRHPPolyart/Animators/SciFiWarrior.controller";

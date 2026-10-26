@@ -33,6 +33,8 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(MinimapLabelPlacement), "PlaceUnder", Helper(nameof(MinimapLabelPlacement.LabelTop))));
             Assert.IsTrue(IlWiring.Uses(typeof(MinimapLabelPlacement), "PlaceUnder", typeof(MinimapView).GetMethod(nameof(MinimapView.CornerShapeBottomBelowCentre))));
             Assert.IsTrue(IlWiring.Uses(typeof(MinimapLabelPlacement), "PlaceUnder", typeof(HudScreenLayout).GetMethod(nameof(HudScreenLayout.CornerMinimapRect))));
+            Assert.IsTrue(IlWiring.Uses(typeof(MinimapLabelPlacement), "PlaceUnder", typeof(MinimapView).GetMethod(nameof(MinimapView.CornerFrameSize))),
+                "the lane map's rectangle is not the square box");
             Assert.IsTrue(IlWiring.Uses(typeof(MinimapView), "CornerShapeBottomBelowCentre", Helper(nameof(MinimapLabelPlacement.ShapeBottomBelowCentre))));
             Assert.IsTrue(IlWiring.Uses(typeof(MinimapView), "CornerShapeBottomBelowCentre",
                 typeof(GeneratedSprites).GetProperty(nameof(GeneratedSprites.CentredTriangleRadiusFraction)).GetGetMethod()));
