@@ -504,6 +504,10 @@ MonoBehaviour:
   markIndicatorAnchorHeight: 3.6
   markIndicatorPulseSpeed: 2.5
   markIndicatorMinAlpha: 0.35
+  raybeamMarkSpikeCount: 8
+  raybeamMarkSpikeLength: 15
+  raybeamMarkSpikeWidth: 0.75
+  raybeamMarkGap: 2
   towerNeutralColor: {r: 0.42, g: 0.42, b: 0.42, a: 1}
   towerBodyShade: 0.8
   towerOwnerGlow: 1.5

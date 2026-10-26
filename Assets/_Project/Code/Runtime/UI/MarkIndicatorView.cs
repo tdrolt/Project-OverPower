@@ -5,13 +5,15 @@ using Overpower.Combat;
 
 namespace Overpower.UI
 {
+    /// <summary>Which mark a MarkIndicatorView draws: the Mark gun's pink diamond or the Raybeam's red spikes.</summary>
+    public enum MarkSource { MarkGun, Raybeam }
+
     /// <summary>
-    /// Draws a diamond over every enemy the LOCAL player has marked. Shooter-only by construction: it subscribes to
-    /// CombatEvents.LocalMarkReported, which fires only on the machine holding the mark (PlayerCombatCredit.
-    /// RPC_DamageCredit is a TARGETED RPC), and PlayerHud disables itself on a non-owner. The state is the victim's
-    /// truth (markSecondsLeft in every credit message), never a guess from the beam: it appears with a fresh mark and
-    /// hides on a cash-in, expiry or death report (markSecondsLeft 0). One slot per target keyed by Transform, from
-    /// a pool of PoolSize.
+    /// Draws a mark over every enemy the LOCAL player has marked (MarkGun) or left vulnerable with the Raybeam (Raybeam); PlayerHud
+    /// builds one view of each, on the same canvas and anchor so the spikes ring the diamond. Shooter-only: MarkGun hears
+    /// CombatEvents.LocalMarkReported (the victim's truth in a TARGETED credit RPC; 0 = cash-in, expiry or death), Raybeam hears
+    /// LocalVulnerabilitySeen (this client's own beam on its copy of the enemy), and PlayerHud disables itself on a non-owner.
+    /// One slot per target keyed by Transform, from a pool of PoolSize.
     /// </summary>
     [DefaultExecutionOrder(1000)]
     public class MarkIndicatorView : MonoBehaviour
@@ -22,7 +24,8 @@ namespace Overpower.UI
 
         private struct Slot
         {
-            public Image image;
+            public Graphic image;
+            public PlayerHealth health; // null for a test dummy, which never reads as dead
             public RectTransform rect;
             public bool active;
             public Transform target;
@@ -31,6 +34,7 @@ namespace Overpower.UI
         }
 
         private UiTheme theme;
+        private MarkSource source;
         private RectTransform canvasRect;
         private Slot[] slots;
 
@@ -38,13 +42,15 @@ namespace Overpower.UI
         // active slot's target is the one activeByTarget points at: no aliasing to guard against on eviction.
         private readonly Dictionary<Transform, int> activeByTarget = new Dictionary<Transform, int>();
 
-        public static MarkIndicatorView Create(Transform owner, UiTheme theme, RectTransform canvasRect, Image[] diamonds)
+        public static MarkIndicatorView Create(Transform owner, UiTheme theme, RectTransform canvasRect, Graphic[] diamonds, MarkSource source)
         {
-            var go = new GameObject("Mark Indicator View", typeof(RectTransform));
+            var go = new GameObject(source + " Mark Indicator View", typeof(RectTransform));
             go.transform.SetParent(owner, false);
+            go.SetActive(false); // source must be set before OnEnable subscribes
 
             var view = go.AddComponent<MarkIndicatorView>();
             view.theme = theme;
+            view.source = source;
             view.canvasRect = canvasRect;
             view.slots = new Slot[diamonds.Length];
             for (int i = 0; i < diamonds.Length; i++)
@@ -52,11 +58,21 @@ namespace Overpower.UI
                 view.slots[i].image = diamonds[i];
                 view.slots[i].rect = diamonds[i].rectTransform;
             }
+            go.SetActive(true);
             return view;
         }
 
-        private void OnEnable() => CombatEvents.LocalMarkReported += HandleMarkReported;
-        private void OnDisable() => CombatEvents.LocalMarkReported -= HandleMarkReported;
+        private void OnEnable()
+        {
+            if (source == MarkSource.Raybeam) CombatEvents.LocalVulnerabilitySeen += HandleMarkReported;
+            else CombatEvents.LocalMarkReported += HandleMarkReported;
+        }
+
+        private void OnDisable()
+        {
+            CombatEvents.LocalVulnerabilitySeen -= HandleMarkReported;
+            CombatEvents.LocalMarkReported -= HandleMarkReported;
+        }
 
         private void HandleMarkReported(Transform victim, float secondsLeft)
         {
@@ -75,6 +91,7 @@ namespace Overpower.UI
             int slot = activeByTarget.TryGetValue(victim, out int found) ? found : ClaimSlot(victim);
             slots[slot].active = true;
             slots[slot].target = victim;
+            slots[slot].health = victim.GetComponentInParent<PlayerHealth>();
             slots[slot].expiresAt = Time.time + secondsLeft;
             slots[slot].total = secondsLeft;
             slots[slot].image.gameObject.SetActive(true);
@@ -111,6 +128,7 @@ namespace Overpower.UI
             activeByTarget.Remove(slots[i].target);
             slots[i].active = false;
             slots[i].target = null;
+            slots[i].health = null;
             slots[i].image.gameObject.SetActive(false);
         }
 
@@ -125,7 +143,8 @@ namespace Overpower.UI
                 // Unity's == reads a destroyed-but-not-yet-collected Transform (a victim who left the room) as
                 // null; Slot.active, not this check, tells "already free" from "just went stale" (see
                 // DamageNumberView.Slot.active).
-                if (slots[i].target == null || Time.time >= slots[i].expiresAt)
+                bool dead = slots[i].health != null && !slots[i].health.IsAlive;
+                if (MarkIndicatorRule.Drops(slots[i].target == null, dead, slots[i].expiresAt - Time.time))
                 {
                     FreeSlot(i);
                     continue;

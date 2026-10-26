@@ -234,7 +234,10 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         {
             // This client simulates its own effect on its copy of someone else; if it hits a living enemy,
             // our respawn shield hears of it (A25). Nothing is applied here, only the victim's client does.
-            Overpower.Dominion.RespawnShield.NoteMyEffectOnCopy(photonView, sourceActorNumber, spec.effectPlacedMs);
+            Overpower.Dominion.RespawnShieldRules.EffectReportDecision mine =
+                Overpower.Dominion.RespawnShield.NoteMyEffectOnCopy(photonView, sourceActorNumber, spec.effectPlacedMs);
+            if (RaybeamMarkRule.ShowsOnEnemy(spec.kind, mine.Report, mine.VictimShielded))
+                CombatEvents.RaiseVulnerabilitySeen(transform, spec.duration);
             return;
         }
 

@@ -182,17 +182,18 @@ namespace Overpower.Dominion
         /// <summary>The attacker's side of A25, called by a status or push this client simulates on its copy of a player it does not own. When the
         /// effect is this client's own player's and the target is a living enemy, the attacker's shield hears of it (no message: the attacker's client
         /// simulates the effect anyway, and the victim's own shield is read from dShd). effectPlacedMs is when the mine or fence behind the effect was
-        /// set up (0 = a direct effect), so an old one does not end the new bubble (A26).</summary>
-        public static void NoteMyEffectOnCopy(PhotonView victim, int sourceActor, int effectPlacedMs = 0)
+        /// set up (0 = a direct effect), so an old one does not end the new bubble (A26). Returns that judgement for the caller's own marks.</summary>
+        public static RespawnShieldRules.EffectReportDecision NoteMyEffectOnCopy(PhotonView victim, int sourceActor, int effectPlacedMs = 0)
         {
-            if (victim == null || victim.Owner == null || !PhotonNetwork.InRoom) return;
+            if (victim == null || victim.Owner == null || !PhotonNetwork.InRoom) return default;
             Player me = PhotonNetwork.LocalPlayer;
-            if (me == null) return;
+            if (me == null) return default;
             PlayerLifecycle victimLife = victim.GetComponent<PlayerLifecycle>();
             RespawnShieldRules.EffectReportDecision decision = RespawnShieldRules.EffectReport(
                 victim.IsMine, sourceActor == me.ActorNumber, victimLife == null || victimLife.IsAlive, Teams.AreSameTeam(me, victim.Owner),
                 IsUpFor(victim.Owner), effectPlacedMs, ShieldStartOf(me));
             if (decision.Report) CombatEvents.RaiseEnemyAffected(decision.VictimShielded, decision.FromBeforeRespawn);
+            return decision;
         }
 
         /// <summary>The server ms that player's shield ends (0 = none). Read from dShd.</summary>

@@ -86,6 +86,12 @@ namespace Overpower.Combat
 
         public static void RaiseBlockedSeen(Transform victim) => LocalBlockedSeen?.Invoke(victim);
 
+        /// <summary>This client's own player left an enemy vulnerable (the Raybeam), judged on this client's copy of the enemy, for how many
+        /// seconds. Raised only on the attacker's machine; the enemy's own client holds the real status.</summary>
+        public static event Action<Transform, float> LocalVulnerabilitySeen;
+
+        public static void RaiseVulnerabilitySeen(Transform victim, float seconds) => LocalVulnerabilitySeen?.Invoke(victim, seconds);
+
         /// <summary>Dominion respawn shield: a hit on the shielded player was stopped (read from their dBlk stamp, so every client that can see
         /// them raises it, not only the shooter). The seconds are how long BLOCKED stays up. Distinct from LocalBlockedSeen, the shooter's own
         /// guess at the Invulnerability ultimate, so one hit can never pop twice.</summary>

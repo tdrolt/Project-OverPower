@@ -44,5 +44,9 @@ namespace Overpower.UI
         /// </summary>
         public static float TrackedTotal(float previousTotal, float secondsLeft) =>
             secondsLeft > previousTotal ? secondsLeft : previousTotal;
+
+        /// <summary>A mark over an enemy goes once they leave, die (death clears marks and statuses alike) or its time runs out.</summary>
+        public static bool Drops(bool targetGone, bool targetDead, float secondsLeft) =>
+            targetGone || targetDead || secondsLeft <= 0f;
     }
 }

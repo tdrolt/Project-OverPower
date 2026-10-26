@@ -1320,6 +1320,20 @@ namespace Overpower.UI
         [Tooltip("How faint the diamond gets as the mark runs low, or at the pulse's own dimmest point; 1 turns " +
                  "off the fade and the pulse both (always full strength while the mark is live at all).")]
         public float markIndicatorMinAlpha = 0.35f;
+        [Tooltip("How many sharp red spikes ring an enemy your Raybeam has left vulnerable. The ring sits at the same spot as the Mark gun's " +
+                 "pink diamond and leaves a hole for it, so an enemy carrying both shows the diamond inside the spikes. Its colour is Danger " +
+                 "Colour, the Raybeam's own red; it fades and pulses like the diamond.")]
+        [Min(3)]
+        public int raybeamMarkSpikeCount = 8;
+        [Tooltip("Canvas units, how far each red Raybeam spike reaches out from the ring it stands on. Longer reads spikier and bigger.")]
+        public float raybeamMarkSpikeLength = 15f;
+        [Range(0.1f, 1f)]
+        [Tooltip("How broad each Raybeam spike's base is, as a share of its slice of the ring: 1 makes the bases touch in a closed star, " +
+                 "lower makes thinner, sharper spikes with gaps between them.")]
+        public float raybeamMarkSpikeWidth = 0.75f;
+        [Tooltip("Canvas units of clear space between the points of the pink mark diamond and the bases of the red Raybeam spikes, so " +
+                 "on an enemy carrying both marks the two never touch. The ring's hole grows with Mark Indicator Size by itself.")]
+        public float raybeamMarkGap = 2f;
 
         [Header("Towers (arena rebuild)")]
         [Tooltip("Colour of a tower's crown, base ring and column caps while nobody owns its zone. Owned towers use their team's " +
@@ -2208,7 +2222,7 @@ namespace Overpower.UI
             ramp.SetKeys(colours, alphas);
             return ramp;
         }
-        [Tooltip("The red of damage: the Raybeam and the Electric Fence's arcs. Red, because green reads as healing.")]
+        [Tooltip("The red of damage: the Raybeam, the spikes of its mark over an enemy it left vulnerable, and the Electric Fence's arcs. Red, because green reads as healing; keep it clearly redder than the orange team and away from the Mark gun's hot pink.")]
         public Color dangerColor = new Color(1f, 0.18f, 0.15f, 1f);
         [Tooltip("The white of a hit or a shot leaving: every gun's impact flash, the rocket's shockwave ring and a mine's blast, the muzzle flash, the Bounce ricochet chevron (all drawn brighter by the Arena Look's Gun Flash Glow) and the white-hot core of a bullet.")]
         public Color flashWhiteColor = new Color(1f, 1f, 1f, 1f);

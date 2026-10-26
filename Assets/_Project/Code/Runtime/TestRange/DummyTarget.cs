@@ -225,6 +225,11 @@ namespace Overpower.TestRange
 
             statusState.Apply(spec);
             LogStatusApplied(spec);
+
+            // A dummy is everyone's enemy and has no respawn shield.
+            bool mine = PhotonNetwork.LocalPlayer != null && sourceActor == PhotonNetwork.LocalPlayer.ActorNumber;
+            if (Overpower.UI.RaybeamMarkRule.ShowsOnEnemy(spec.kind, mine, false))
+                CombatEvents.RaiseVulnerabilitySeen(transform, spec.duration);
         }
 
         [System.Diagnostics.Conditional("UNITY_EDITOR")]

@@ -67,5 +67,14 @@ namespace Overpower.Tests
             Assert.AreEqual(2f, MarkIndicatorRule.TrackedTotal(2f, 1.2f));
             Assert.AreEqual(2f, MarkIndicatorRule.TrackedTotal(2f, 0f), "even at zero - the view itself decides whether to hide, not this");
         }
+
+        [Test]
+        public void AMarkOverAnEnemyGoesWhenTheyLeaveDieOrItRunsOut()
+        {
+            Assert.IsFalse(MarkIndicatorRule.Drops(false, false, 1.5f), "a live mark on a living enemy stays");
+            Assert.IsTrue(MarkIndicatorRule.Drops(true, false, 1.5f), "the enemy left the room");
+            Assert.IsTrue(MarkIndicatorRule.Drops(false, true, 1.5f), "the enemy died: death clears every mark and status");
+            Assert.IsTrue(MarkIndicatorRule.Drops(false, false, 0f), "the time ran out");
+        }
     }
 }

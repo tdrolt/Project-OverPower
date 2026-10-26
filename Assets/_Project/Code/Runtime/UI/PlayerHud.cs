@@ -936,11 +936,11 @@ namespace Overpower.UI
             BuildHitFeedbackCanvas();
         }
 
-        /// <summary>A SEPARATE overlay canvas for damage numbers and mark diamonds, below the HUD (-20 vs -10, so a number
+        /// <summary>A SEPARATE overlay canvas for damage numbers and marks, below the HUD (-20 vs -10, so a number
         /// never draws over a slot or bar), with no GraphicRaycaster (a raycaster trap has bitten before, see ApplyTheme
-        /// on HealthBarCanvas). Pools DamageNumberView.PoolSize labels, MarkIndicatorView.PoolSize diamonds and ONE for
-        /// SelfMarkIndicatorView (the marked player's own diamond) up front, so popping one never Instantiates; all
-        /// diamonds share the theme values so a retune moves every one.</summary>
+        /// on HealthBarCanvas). Pools DamageNumberView.PoolSize labels, MarkIndicatorView.PoolSize Raybeam spike rings and
+        /// diamonds, and ONE diamond for SelfMarkIndicatorView (the marked player's own) up front, so popping one never
+        /// Instantiates; all marks share the theme values so a retune moves every one.</summary>
         private void BuildHitFeedbackCanvas()
         {
             GameObject canvasGo = new GameObject("Hit Feedback Canvas", typeof(RectTransform));
@@ -972,10 +972,16 @@ namespace Overpower.UI
 
             DamageNumberView.Create(transform, theme, hitFeedbackCanvasRect, labels);
 
-            var markDiamonds = new Image[MarkIndicatorView.PoolSize];
+            // The spikes first, so they draw under the diamonds; their hole keeps them clear of a diamond anyway.
+            var raybeamMarks = new Graphic[MarkIndicatorView.PoolSize];
+            for (int i = 0; i < raybeamMarks.Length; i++)
+                raybeamMarks[i] = BuildRaybeamMark(canvasGo.transform, "Raybeam Mark " + i);
+            MarkIndicatorView.Create(transform, theme, hitFeedbackCanvasRect, raybeamMarks, MarkSource.Raybeam);
+
+            var markDiamonds = new Graphic[MarkIndicatorView.PoolSize];
             for (int i = 0; i < markDiamonds.Length; i++)
                 markDiamonds[i] = BuildMarkDiamond(canvasGo.transform, "Mark Diamond " + i);
-            MarkIndicatorView.Create(transform, theme, hitFeedbackCanvasRect, markDiamonds);
+            MarkIndicatorView.Create(transform, theme, hitFeedbackCanvasRect, markDiamonds, MarkSource.MarkGun);
 
             Image selfDiamond = BuildMarkDiamond(canvasGo.transform, "Self Mark Diamond");
             SelfMarkIndicatorView.Create(transform, playerHealth, theme, hitFeedbackCanvasRect, selfDiamond);
@@ -1000,6 +1006,25 @@ namespace Overpower.UI
             image.raycastTarget = false;
             go.SetActive(false);
             return image;
+        }
+
+        /// <summary>One Raybeam mark: red spikes round a hole sized from Mark Indicator Size, so on an enemy with both marks the
+        /// diamond sits inside the ring and both show whole. Built inactive and centre-anchored like a diamond.</summary>
+        private Graphic BuildRaybeamMark(Transform parent, string name)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            RectTransform rect = go.GetComponent<RectTransform>();
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+
+            SpikeRingGraphic ring = go.AddComponent<SpikeRingGraphic>();
+            float inner = RaybeamMarkRule.InnerRadius(theme.markIndicatorSize, theme.raybeamMarkGap, theme.raybeamMarkSpikeCount, theme.raybeamMarkSpikeWidth);
+            ring.Configure(theme.raybeamMarkSpikeCount, inner, theme.raybeamMarkSpikeLength, theme.raybeamMarkSpikeWidth);
+            ring.color = theme.dangerColor;
+            ring.raycastTarget = false;
+            go.SetActive(false);
+            return ring;
         }
 
         /// <summary>The gold readout, bottom-right, directly above the "Loadout (P)" button (gold and shop are tied). It
