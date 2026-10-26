@@ -1,7 +1,7 @@
 """PreToolUse guard (workflow F40): refuse to edit Unity scripts/assets while the Editor is in Play Mode.
 
 Reads the hook payload on stdin. For Edit/Write/MultiEdit on .cs/.shader/.prefab/.asset/.unity files, asks the
-running Editor (`unity command editor_status`) for its play mode; "playing" or "paused" blocks the edit (exit 2,
+running Editor (`unity command editor status`) for its play mode; "playing" or "paused" blocks the edit (exit 2,
 message on stderr). If the CLI fails or no Editor answers, the edit is allowed.
 """
 import json
@@ -21,7 +21,7 @@ if not path.endswith(GUARDED):
     sys.exit(0)
 
 try:
-    out = subprocess.run("unity command editor_status", shell=True, capture_output=True, text=True, timeout=15).stdout
+    out = subprocess.run("unity command editor status", shell=True, capture_output=True, text=True, timeout=15).stdout
 except Exception:
     sys.exit(0)
 
