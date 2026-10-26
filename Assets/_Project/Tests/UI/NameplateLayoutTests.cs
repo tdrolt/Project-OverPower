@@ -194,6 +194,24 @@ namespace Overpower.Tests
             Assert.AreEqual(Enemy, NameplateRules.NameColour(false, 0, 2, Self, Mate, Enemy, Unknown));
         }
 
+        [Test]
+        public void ThePlatesEdgeIsThePlayersTeamColour()
+        {
+            var theme = ScriptableObject.CreateInstance<UiTheme>();
+            try
+            {
+                theme.teamShotColors = new[] { new Color(0.9f, 0.4f, 0.1f, 1f), new Color(0.5f, 0.2f, 0.9f, 1f) };
+                theme.unknownTeamShotColor = new Color(0.4f, 0.4f, 0.4f, 0.5f);
+                Assert.AreEqual(new Color(0.5f, 0.2f, 0.9f, 1f), NameplateRules.EdgeColour(1, theme), "the team's own colour, whoever looks at it");
+                Assert.AreEqual(new Color(0.9f, 0.4f, 0.1f, 1f), NameplateRules.EdgeColour(0, theme));
+                Assert.AreEqual(new Color(0.4f, 0.4f, 0.4f, 0.5f), NameplateRules.EdgeColour(-1, theme), "the no-team grey while the team is still arriving");
+            }
+            finally
+            {
+                Object.DestroyImmediate(theme);
+            }
+        }
+
         private static readonly Color Stun = new Color(0.2f, 0.4f, 1f, 1f);
         private static readonly Color Slow = new Color(0.7f, 0.6f, 0.4f, 1f);
 

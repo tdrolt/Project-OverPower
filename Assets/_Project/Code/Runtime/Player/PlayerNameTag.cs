@@ -1,7 +1,6 @@
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
-using Overpower.Arena;
 using Overpower.UI;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
@@ -82,6 +81,6 @@ public class PlayerNameTag : MonoBehaviourPunCallbacks
         UiTheme theme = health.Theme;
         Color nameColour = NameplateRules.NameColour(photonView.IsMine, localTeam, theirTeam, theme.nameplateSelfNameColor,
             theme.nameplateTeammateNameColor, theme.nameplateEnemyNameColor, theme.nameplateUnknownNameColor);
-        plate.SetColours(nameColour, LookColours.For(LookFamily.Team, theirTeam, theme));
+        plate.SetColours(nameColour, NameplateRules.EdgeColour(theirTeam, theme));
     }
 }

@@ -30,6 +30,10 @@ namespace Overpower.Abilities
         /// spread counts this much of each (TheShippedFireShapeNeverDrawsOutsideItsCircle holds the sheet to it).</summary>
         public const float FireDrawnWidth = 0.15f;
 
+        /// <summary>The most of a flame's size that either fire sheet draws across, tongues and the gaps between them together, in any frame:
+        /// the burning ground keeps half this much of its biggest flame in from its edge (TheShippedFireShapeNeverDrawsOutsideItsCircle holds both sheets to it).</summary>
+        public const float FireFrameWidth = 0.72f;
+
         /// <summary>The child of the flames that draws their hot heart: the same flames from the same seed, smaller, with light added.</summary>
         public const string CoreChildName = "Flame Core";
 
@@ -392,12 +396,12 @@ namespace Overpower.Abilities
                 main.startSpeed = speed;
                 ParticleSystem.VelocityOverLifetimeModule lift = systems[i].velocityOverLifetime;
                 lift.y = JetLift(look.flameJetRise, life, JetPace(look.flameJetSlowdown));
-                SizeJet(systems[i], from, travel, speed, life, range, coneAngle, look, i == 0 ? 1f : look.flameCoreSize);
+                SizeJet(systems[i], from, travel, speed, life, range, coneAngle, look, i == 0 ? 1f : look.flameCoreSize, i > 0);
             }
         }
 
         // A heart (scale: Flame Core Size) is thrown exactly as its flames are, only drawn smaller.
-        private static void SizeJet(ParticleSystem flames, Vector3 from, float travel, float speed, float life, float range, float coneAngle, ArenaLook look, float scale)
+        private static void SizeJet(ParticleSystem flames, Vector3 from, float travel, float speed, float life, float range, float coneAngle, ArenaLook look, float scale, bool heart)
         {
             float widest = JetWidest(from, range, coneAngle, look, JetOvershoot(life, look.flameJetSlowdown));
             ParticleSystem.EmissionModule emission = flames.emission;
@@ -418,6 +422,8 @@ namespace Overpower.Abilities
             // The gun is where the flames are smallest and fastest, so the heads are farthest apart for their size there.
             float rate = JetRate(speed, smallest * look.flameJetStartSize, look.flameJetOverlap * across, life, look.flameJetMostFlames);
             emission.rateOverTime = rate;
+            if (heart)
+                main.startColor = new Color(1f, 1f, 1f, HeartStrength(rate, look.flameCoreFullRate));
             paths.arcSpeed = JetSweep(rate, paths.arc);
             int most = Mathf.Max(1, look.flameJetMostFlames) + 1;
             // Grows to what is alive but never past the limit, and is never shrunk below that: resizing the buffer every step would
@@ -426,6 +432,11 @@ namespace Overpower.Abilities
             if (room != main.maxParticles)
                 main.maxParticles = room;
         }
+
+        /// <summary>How solid each heart is in a jet throwing <paramref name="rate"/> flames a second: whole up to <paramref name="fullRate"/>,
+        /// then fainter in step, so the hearts' added light stays what that many would give (0: never faded).</summary>
+        public static float HeartStrength(float rate, float fullRate) =>
+            fullRate <= 0f || rate <= fullRate ? 1f : fullRate / rate;
 
         /// <summary>How wide the biggest of these flames grows: its biggest start size times the peak of its size over life.</summary>
         public static float BiggestFlame(ParticleSystem flames)
@@ -441,15 +452,17 @@ namespace Overpower.Abilities
         }
 
         /// <summary>The Rocket's burning ground: flames standing up, their hearts and embers rising from the whole flat circle of
-        /// <paramref name="radius"/>, the flames' middles kept half the biggest one's width in from its edge so none draws outside it and as
-        /// high above the floor so none sinks into it, as many as its area calls for. Each flame catches over Fire Field Flame Catch of its
-        /// life, is never more solid than Fire Field Flame Opacity, and burns through the fire's colours over life; nothing is lit at once.</summary>
+        /// <paramref name="radius"/>, the flames' middles kept half the biggest one's drawn width (Fire Frame Width) in from its edge so none
+        /// draws outside it, and half its square above the floor so none sinks into it; as many as the circle they rise from calls for.
+        /// Each flame catches over Fire Field Flame Catch of its life, is never more solid than Fire Field Flame Opacity, and burns through
+        /// the fire's colours over life; nothing is lit at once.</summary>
         public static void ApplyFloor(ParticleSystem flames, float radius, FireColours colours, ArenaLook look)
         {
             float area = Mathf.PI * radius * radius;
             ParticleSystem core = CoreOf(flames);
             Follow(flames, core, look.flameCoreSize);
             float half = 0.5f * BiggestFlame(flames);
+            float inset = half * FireFrameWidth;
             foreach (ParticleSystem system in flames.GetComponentsInChildren<ParticleSystem>(true))
             {
                 bool flame = system == flames || system == core;
@@ -461,7 +474,8 @@ namespace Overpower.Abilities
                 shape.enabled = true;
                 shape.shapeType = ParticleSystemShapeType.Circle;
                 float lifted = flame ? half : 0f;
-                shape.radius = Mathf.Max(0f, radius - lifted);
+                float from = Mathf.Max(0f, radius - (flame ? inset : 0f));
+                shape.radius = from;
                 shape.radiusThickness = 1f;
                 shape.arc = 360f;
                 shape.arcMode = ParticleSystemShapeMultiModeValue.Random;
@@ -474,7 +488,8 @@ namespace Overpower.Abilities
                 shape.randomPositionAmount = 0f;
                 ParticleSystem.EmissionModule emission = system.emission;
                 emission.SetBursts(System.Array.Empty<ParticleSystem.Burst>());
-                emission.rateOverTime = area * (flame ? look.fireFieldFlamesPerSquareMetre : look.fireFieldEmbersPerSquareMetre);
+                // Over the circle the flames rise from, so Flames Per Square Metre is the density seen.
+                emission.rateOverTime = flame ? Mathf.PI * from * from * look.fireFieldFlamesPerSquareMetre : area * look.fireFieldEmbersPerSquareMetre;
                 if (flame)
                 {
                     bool heart = system == core;

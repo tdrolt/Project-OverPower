@@ -43,6 +43,8 @@ namespace Overpower.Arena
             float peak = colour.maxColorComponent;
             if (peak <= 0f)
                 return colour;
+            if (glow <= 0f)
+                return new Color(0f, 0f, 0f, colour.a); // the shares below would be 0/0, and a NaN glow spreads as blocks under the Bloom
             float whole = Math.Min(glow, Math.Max(1f, 1f / peak));
             float past = Math.Min(glow / whole, Math.Max(1f, ScreenWhite / (peak * whole)));
             float weak = whole * Mathf.Pow(past, WeakChannelGrowth);

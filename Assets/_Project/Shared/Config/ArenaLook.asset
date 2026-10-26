@@ -131,6 +131,7 @@ MonoBehaviour:
   flameJetMaterial: {fileID: 2100000, guid: c1c06d0c6fb850742956c70ef59ba743, type: 2}
   flameCoreMaterial: {fileID: 2100000, guid: f832f8e15618add48955243b90bb15fa, type: 2}
   flameCoreSize: 0.9
+  flameCoreFullRate: 95
   flameFlickerFps: 32
   flameLean: 10
   flameJetOverlap: 1

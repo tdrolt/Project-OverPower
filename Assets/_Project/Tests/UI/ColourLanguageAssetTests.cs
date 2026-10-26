@@ -138,6 +138,61 @@ namespace Overpower.Tests
             Assert.Less(Sat(t.fireCoreColor), Sat(t.fireEdgeColor), "the fire's heart is paler than its orange-red");
         }
 
+        // The colour a player sees is the ramp times the sheet's own colour, not the ramp alone: the Fire Body sheet is a warm orange-yellow,
+        // so the drawn flames sit yellower than Fire Body Over Life says (about 22 degrees at birth against the Orange team's 25).
+        [Test]
+        [Ignore("Fails on today's ramp: drawn flames are hue 22 at birth against the Orange team's 25. Waiting on Tudor: a redder ramp, or a looser rule.")]
+        public void TheFlamesAsDrawnAreOrangeRedApartFromTheTeamsAndTheShieldGold()
+        {
+            UiTheme t = Theme();
+            ArenaLook look = Look();
+            foreach ((string name, Gradient ramp, Material material) in new[] { ("Fire Body Over Life", t.fireBodyOverLife, look.flameJetMaterial), ("Fire Core Over Life", t.fireCoreOverLife, look.flameCoreMaterial) })
+            {
+                Color sheet = MeanOpaqueColour(material);
+                int samples = 0;
+                for (int i = 0; i <= 50; i++)
+                {
+                    Color at = ramp.Evaluate(i / 50f);
+                    if (at.a < 0.5f)
+                        continue;
+                    samples++;
+                    Color linear = at.linear, under = sheet.linear;
+                    Color fire = new Color(linear.r * under.r, linear.g * under.g, linear.b * under.b, 1f).gamma;
+                    for (int team = 0; team < t.teamShotColors.Length; team++)
+                        Assert.IsTrue(ReadApart(fire, t.teamShotColors[team]) || RedSideOf(fire, t.teamShotColors[team]),
+                            $"{name} at {i / 50f:F2} of its life is drawn {fire} (hue {Hue(fire):F1}, saturation {Sat(fire):F2}) and reads as team {team} (hue {Hue(t.teamShotColors[team]):F1})");
+                    Assert.IsTrue(ReadApart(fire, t.immuneBarColor) && RedSideOf(fire, t.immuneBarColor), $"{name} at {i / 50f:F2} is drawn {fire}: not clearly on the red side of the Shield's gold");
+                }
+                Assert.Greater(samples, 0, name + " is solid for part of its life");
+            }
+        }
+
+        // The sheet's mean colour over its solid pixels, read from the file the way TheShippedFireShapeNeverDrawsOutsideItsCircle reads it.
+        private static Color MeanOpaqueColour(Material material)
+        {
+            Assert.IsNotNull(material, "the fire material");
+            Texture sheet = material.GetTexture("_BaseMap");
+            var pixels = new Texture2D(2, 2);
+            try
+            {
+                Assert.IsTrue(pixels.LoadImage(System.IO.File.ReadAllBytes(AssetDatabase.GetAssetPath(sheet))));
+                double r = 0, g = 0, b = 0;
+                int n = 0;
+                foreach (Color32 p in pixels.GetPixels32())
+                {
+                    if (p.a < 128)
+                        continue;
+                    r += p.r; g += p.g; b += p.b; n++;
+                }
+                Assert.Greater(n, 0, sheet.name + " draws something solid");
+                return new Color((float)(r / n / 255), (float)(g / n / 255), (float)(b / n / 255), 1f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(pixels);
+            }
+        }
+
         // Fire read as bright smoke while all of it was pushed past white (bake-off, 26 October): the flames stay at or under plain colour in
         // light and only their heart, drawn with light added, glows past white to bloom.
         [Test]

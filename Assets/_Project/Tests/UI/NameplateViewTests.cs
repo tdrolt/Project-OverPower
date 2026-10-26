@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using Overpower.Abilities;
@@ -258,6 +259,16 @@ namespace Overpower.Tests
         [Test]
         public void TheNamesColourComesFromTheRule() =>
             Assert.IsTrue(IlWiring.Uses(typeof(PlayerNameTag), "UpdateNameTagColour", M(typeof(NameplateRules), nameof(NameplateRules.NameColour))));
+
+        // A bare "it calls the rule" would still pass with the name colour or a constant handed to the edge.
+        [Test]
+        public void TheTeamColourGoesToThePlatesEdge()
+        {
+            MethodInfo update = typeof(PlayerNameTag).GetMethod("UpdateNameTagColour", BindingFlags.Instance | BindingFlags.NonPublic);
+            var edgeAt = IlWiring.CallOffsets(update, M(typeof(NameplateRules), nameof(NameplateRules.EdgeColour)));
+            var setAt = IlWiring.CallOffsets(update, M(typeof(NameplateView), nameof(NameplateView.SetColours)));
+            Assert.IsTrue(edgeAt.Any(at => setAt.Contains(at + 5)), "the rule's answer is SetColours' last argument, the edge (a call is 5 bytes)");
+        }
 
         [Test]
         public void TheColoursReachThePlate() =>

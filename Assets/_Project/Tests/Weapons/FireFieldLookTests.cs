@@ -52,12 +52,15 @@ namespace Overpower.Tests
                 FlameLook.ApplyFloor(flames, 2.5f, new FlameLook.FireColours(body, body, Color.yellow, Color.red), look);
 
                 float area = Mathf.PI * 2.5f * 2.5f;
-                Assert.AreEqual(9f * area, flames.emission.rateOverTime.constant, 1e-3f, "Flames Per Square Metre over the whole burning area");
+                float inner = 2.5f - 0.4f * FlameLook.FireFrameWidth;
+                float burning = Mathf.PI * inner * inner;
+                Assert.AreEqual(inner, flames.shape.radius, 1e-4f, "the flames' middles keep half the biggest flame's drawn width in from the edge, so the fire reaches it");
+                Assert.AreEqual(9f * burning, flames.emission.rateOverTime.constant, 1e-3f, "Flames Per Square Metre over the circle they rise from, so that is the density seen");
                 Assert.AreEqual(3f * area, embers.emission.rateOverTime.constant, 1e-3f, "Embers Per Square Metre");
-                Assert.AreEqual(2.5f - 0.4f, flames.shape.radius, 1e-4f, "the flames' middles keep half the biggest flame's width in from the edge");
                 Assert.AreEqual(flames.shape.radius, hearts.shape.radius, 1e-4f, "their hearts burn on them");
                 Assert.AreEqual(flames.shape.position, hearts.shape.position);
-                Assert.AreEqual(9f * area, hearts.emission.rateOverTime.constant, 1e-3f, "one heart for every flame");
+                Assert.AreEqual(9f * burning, hearts.emission.rateOverTime.constant, 1e-3f, "one heart for every flame");
+                Assert.AreEqual(0.4f, flames.shape.position.y, 1e-4f, "lifted half the biggest flame's square, so the floor never cuts it");
                 Assert.AreEqual(2.5f, embers.shape.radius, 1e-4f, "the embers rise from all of it");
                 Assert.AreEqual(new Color(1f, 1f, 1f, 0.6f), flames.main.startColor.color,
                     "every flame starts plain white (its colour is its age) and at most Flame Opacity solid, so whoever stands in the fire still shows through it");
@@ -79,14 +82,14 @@ namespace Overpower.Tests
                     ParticleSystem.Particle[] particles = Simulated(system, 1f);
                     Assert.Greater(particles.Length, 20, system.name + " burned");
                     float farthest = 0f;
-                    float half = system == flames ? 0.4f : 0f;
+                    float half = system == flames ? 0.4f : 0f, side = half * FlameLook.FireFrameWidth;
                     foreach (ParticleSystem.Particle particle in particles)
                     {
                         float flat = new Vector2(particle.position.x, particle.position.z).magnitude;
-                        Assert.LessOrEqual(flat + half, 2.5f + 1e-3f, $"{system.name} at {particle.position:F3} draws outside the burning ground");
+                        Assert.LessOrEqual(flat + side, 2.5f + 1e-3f, $"{system.name} at {particle.position:F3} draws outside the burning ground");
                         Assert.GreaterOrEqual(particle.position.y, half - 1e-3f,
                             $"{system.name} at {particle.position:F3} sinks into the floor: facing the camera, the floor cuts it flat");
-                        farthest = Mathf.Max(farthest, flat + half);
+                        farthest = Mathf.Max(farthest, flat + side);
                     }
                     Assert.Greater(farthest, 2.5f * 0.85f, system.name + " covers the ground out to its edge");
                     Assert.Greater(particles.Count(p => p.position.x < -0.5f), 0, "all round, not a fan");
@@ -223,10 +226,11 @@ namespace Overpower.Tests
                 ParticleSystem flames = field.transform.Find(FireField.FlamesChildName).GetComponent<ParticleSystem>();
                 foreach (ParticleSystem system in flames.GetComponentsInChildren<ParticleSystem>(true))
                 {
-                    float half = system.textureSheetAnimation.enabled ? 0.5f * FlameLook.BiggestFlame(flames) : 0f;
+                    float lifted = system.textureSheetAnimation.enabled ? 0.5f * FlameLook.BiggestFlame(flames) : 0f;
+                    float half = lifted * FlameLook.FireFrameWidth;
                     Assert.Greater(3.25f - half, 3.25f * 0.5f, system.name + ": its flames are small next to the ground they burn");
-                    Assert.AreEqual(3.25f - half, system.shape.radius, 1e-4f, system.name + ": the radius the field was sent, less half its biggest flame");
-                    Assert.AreEqual(half, system.shape.position.y, 1e-4f, system.name + ": lifted half its biggest flame off the floor");
+                    Assert.AreEqual(3.25f - half, system.shape.radius, 1e-4f, system.name + ": the radius the field was sent, less half its biggest flame's drawn width");
+                    Assert.AreEqual(lifted, system.shape.position.y, 1e-4f, system.name + ": lifted half its biggest flame off the floor");
                     Assert.AreEqual(360f, system.shape.arc, 1e-4f, system.name + ": the whole circle burns");
                     ParticleSystem.Particle[] particles = Simulated(system, 1.5f);
                     Assert.Greater(particles.Length, 0, system.name + " burned");

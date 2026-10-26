@@ -4,7 +4,7 @@ using Overpower.Combat;
 namespace Overpower.Tests
 {
     /// <summary>When a mech flashes white for a hit: a hit that lands on a living enemy, never one the victim's client turns away, never
-    /// damage over time; the flash is brightest at the hit, fades out over the flash's length, and never shows on a dead player.</summary>
+    /// damage over time; the flash is full white from the hit to the end of its length, then gone, and never shows on a dead player.</summary>
     public class HitFlashRuleTests
     {
         private static bool Flashes(DamageSource source = DamageSource.Projectile, float amount = 10f, bool alive = true, bool self = false,
@@ -41,13 +41,12 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheFlashIsFullAtTheHitAndFadesOutOverItsLength()
+        public void TheFlashHoldsFullForItsLengthThenEnds()
         {
+            // A dimming white over the plain white glow map is an even grey with the team's glow lines gone, so the flash never dims.
             Assert.AreEqual(1f, HitFlashRule.Strength(0f, 0.1f), 1e-5f, "full at the hit");
-            float early = HitFlashRule.Strength(0.03f, 0.1f);
-            float late = HitFlashRule.Strength(0.07f, 0.1f);
-            Assert.That(early, Is.GreaterThan(late).And.LessThan(1f), "it fades");
-            Assert.That(late, Is.GreaterThan(0f), "still showing before the end");
+            Assert.AreEqual(1f, HitFlashRule.Strength(0.05f, 0.1f), 1e-5f, "still full half-way");
+            Assert.AreEqual(1f, HitFlashRule.Strength(0.099f, 0.1f), 1e-5f, "and just before the end");
             Assert.AreEqual(0f, HitFlashRule.Strength(0.1f, 0.1f), "gone at the end");
             Assert.AreEqual(0f, HitFlashRule.Strength(5f, 0.1f), "and stays gone");
         }
@@ -64,7 +63,7 @@ namespace Overpower.Tests
         {
             Assert.IsTrue(HitFlashRule.Shows(true, 0.5f));
             Assert.IsFalse(HitFlashRule.Shows(false, 1f), "dying mid-flash ends it");
-            Assert.IsFalse(HitFlashRule.Shows(true, 0f), "faded out");
+            Assert.IsFalse(HitFlashRule.Shows(true, 0f), "over");
         }
     }
 }

@@ -118,15 +118,18 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheFlashFadesWhileItShows()
+        public void TheFlashStaysFullWhileItShows()
         {
             HitFlashView view = Make();
             view.Flash();
             view.Step(true, Frame);
-            float first = view.CurrentStrength;
             view.Step(true, Frame);
             view.Step(true, Frame);
-            Assert.That(view.CurrentStrength, Is.LessThan(first).And.GreaterThan(0f));
+            Assert.IsTrue(view.Flashing, "still showing");
+            Assert.AreEqual(1f, view.CurrentStrength, 1e-5f, "never a dimmed grey that hides the team's glow lines");
+            var block = new MaterialPropertyBlock();
+            parts[0].GetPropertyBlock(block);
+            Assert.AreEqual(1.5f, block.GetColor(EmissionColorId).r, 1e-4f, "the white at its full Hit Flash Glow");
         }
 
         [Test]

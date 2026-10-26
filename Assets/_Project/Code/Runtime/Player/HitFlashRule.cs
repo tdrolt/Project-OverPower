@@ -13,13 +13,10 @@ namespace Overpower.Combat
         private static bool IsAHit(DamageSource source) =>
             source == DamageSource.Projectile || source == DamageSource.Splash || source == DamageSource.Contact;
 
-        /// <summary>1 at the hit, falling straight to 0 at <paramref name="flashSeconds"/>; 0 when the flash has no length.</summary>
-        public static float Strength(float secondsSinceHit, float flashSeconds)
-        {
-            if (flashSeconds <= 0f || secondsSinceHit < 0f || secondsSinceHit >= flashSeconds)
-                return 0f;
-            return 1f - secondsSinceHit / flashSeconds;
-        }
+        /// <summary>1 from the hit until <paramref name="flashSeconds"/>, then 0; 0 when the flash has no length. Held, never faded: the flash
+        /// swaps the glow-line map for plain white, so a dimming white would be an even grey with the team's glow lines gone.</summary>
+        public static float Strength(float secondsSinceHit, float flashSeconds) =>
+            flashSeconds <= 0f || secondsSinceHit < 0f || secondsSinceHit >= flashSeconds ? 0f : 1f;
 
         public static bool Shows(bool victimAlive, float strength) => victimAlive && strength > 0f;
     }

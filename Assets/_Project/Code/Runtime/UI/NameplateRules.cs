@@ -1,8 +1,10 @@
+using Overpower.Arena;
 using UnityEngine;
 
 namespace Overpower.UI
 {
-    /// <summary>The name's colour on a player's plate: yours, a teammate's, an enemy's, or grey while either team is still arriving.</summary>
+    /// <summary>The colours of a player's plate: the name's (yours, a teammate's, an enemy's, or grey while either team is still arriving)
+    /// and the edge's.</summary>
     public static class NameplateRules
     {
         /// <summary>A team below 0 is not known yet. Both teams arrive as Player Properties after the player spawns, so two missing
@@ -15,5 +17,8 @@ namespace Overpower.UI
                 return unknown;
             return myTeam == theirTeam ? teammate : enemy;
         }
+
+        /// <summary>The plate's edge: the player's own team colour, the same for every viewer (grey while their team is still arriving).</summary>
+        public static Color EdgeColour(int theirTeam, UiTheme theme) => LookColours.For(LookFamily.Team, theirTeam, theme);
     }
 }

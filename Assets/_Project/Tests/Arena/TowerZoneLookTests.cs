@@ -223,6 +223,19 @@ namespace Overpower.Tests
             Assert.AreEqual(0.8f, TowerLookRules.GlowKeepingHue(Red, 2f).a, "the glow never touches alpha");
             Assert.AreEqual(Color.black, TowerLookRules.GlowKeepingHue(Color.black, 2f));
         }
+
+        // Every glow field is [Min(0)], so a designer can set one to 0 to switch that glow off; a NaN glow would spread as blocks under the Bloom.
+        [Test]
+        public void AGlowOfZeroSwitchesTheGlowOff()
+        {
+            Assert.AreEqual(new Color(0f, 0f, 0f, 0.8f), TowerLookRules.GlowKeepingHue(Red, 0f), "no glow is black, alpha kept");
+            Assert.AreEqual(new Color(0f, 0f, 0f, 1f), TowerLookRules.GlowKeepingHue(Orange, 0f));
+            foreach (float glow in new[] { 0f, 0.001f })
+            {
+                Color lit = TowerLookRules.GlowKeepingHue(Orange, glow);
+                Assert.IsFalse(float.IsNaN(lit.r) || float.IsNaN(lit.g) || float.IsNaN(lit.b), $"glow {glow} gives {lit}");
+            }
+        }
     }
 
     /// <summary>A capture tower (every zone a team can take) is an eight-sided tower: a dark arena-wall body and dark columns,

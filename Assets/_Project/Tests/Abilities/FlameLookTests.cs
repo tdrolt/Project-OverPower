@@ -563,6 +563,15 @@ namespace Overpower.Tests
                                     Assert.LessOrEqual(Mathf.Sqrt(u * u + v * v), 0.5f + 1f / cell, $"{shape.name} frame {cx},{cy} pixel {x},{y} draws outside its circle");
                                 }
                             Assert.Greater(drawn, cell * cell / 20, $"{shape.name} frame {cx},{cy} draws something");
+                            int extent = 0;
+                            for (int y = 0; y < cell; y++)
+                            {
+                                int left = -1, right = -1;
+                                for (int x = 0; x < cell; x++)
+                                    if (A(cx * cell + x, cy * cell + y) >= 0.15f) { if (left < 0) left = x; right = x; }
+                                if (left >= 0) extent = Mathf.Max(extent, right - left + 1);
+                            }
+                            Assert.LessOrEqual(extent, FlameLook.FireFrameWidth * cell, $"{shape.name} frame {cx},{cy} draws across no more than Fire Frame Width of its size");
                             if (!body)
                                 continue;
                             Assert.Greater(soft, drawn / 20, $"{shape.name} frame {cx},{cy} has an anti-aliased edge, not a hard cut-out");
@@ -586,6 +595,18 @@ namespace Overpower.Tests
                     Object.DestroyImmediate(pixels);
                 }
             }
+        }
+
+        // The hearts add light, so a jet thrown faster than the bake-off's piles them up into a pale yellow wash near the gun.
+        [Test]
+        public void TheHeartsFadeAsTheJetThickens()
+        {
+            Assert.AreEqual(1f, FlameLook.HeartStrength(60f, 95f), 1e-5f, "a jet no denser than Flame Core Full Rate: whole hearts");
+            Assert.AreEqual(1f, FlameLook.HeartStrength(95f, 95f), 1e-5f);
+            Assert.AreEqual(0.5f, FlameLook.HeartStrength(190f, 95f), 1e-5f, "twice as many hearts, each half as strong: the same light");
+            Assert.Less(FlameLook.HeartStrength(300f, 95f), FlameLook.HeartStrength(190f, 95f), "fainter still as it thickens");
+            Assert.AreEqual(1f, FlameLook.HeartStrength(300f, 0f), 1e-5f, "0 never fades them");
+            Assert.AreEqual(1f, FlameLook.HeartStrength(0f, 95f), 1e-5f, "a jet throwing nothing");
         }
 
         [Test]
@@ -973,6 +994,7 @@ namespace Overpower.Tests
                 look.flameJetOverlap = 2.5f;
                 look.flameJetSlowdown = 0.3f;
                 look.flameJetRise = 0.25f;
+                look.flameCoreFullRate = 30f;
                 var visual = cone.GetComponent<FlameConeVisual>();
                 ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
                 float shareOfWidest = tongues.main.startSize.constantMin / tongues.main.startSize.constantMax;
@@ -1020,6 +1042,9 @@ namespace Overpower.Tests
                 Assert.AreEqual(tongues.shape.arcSpeed.constant, core.shape.arcSpeed.constant, 1e-4f, "on its path");
                 Assert.AreEqual(look.flameCoreSize * widest, core.main.startSize.constantMax, 1e-4f, "Flame Core Size of it");
                 Assert.AreEqual(main.maxParticles, core.main.maxParticles, "with room for every heart");
+                Assert.Greater(rate, 30f, "a jet denser than the literal Flame Core Full Rate");
+                Assert.AreEqual(FlameLook.HeartStrength(rate, 30f), core.main.startColor.color.a, 1e-4f, "each heart fainter as the jet thickens past Flame Core Full Rate");
+                Assert.AreEqual(1f, main.startColor.color.a, 1e-4f, "the flames themselves stay whole");
             }
             finally
             {
@@ -1039,6 +1064,7 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), "SizeJet", typeof(FlameLook).GetMethod(nameof(FlameLook.JetOvershoot))), "allowing for the frame steps' overshoot");
             Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), "SizeJet", typeof(FlameLook).GetMethod(nameof(FlameLook.JetRate))), "and throws them as often as the no-gap rule asks");
             Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), "SizeJet", typeof(FlameLook).GetMethod(nameof(FlameLook.JetSweep))), "on paths spread evenly over the jet");
+            Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), "SizeJet", typeof(FlameLook).GetMethod(nameof(FlameLook.HeartStrength))), "its hearts as strong as the density rule says");
             Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), "SizeJet", typeof(FlameLook).GetMethod(nameof(FlameLook.JetAcross))), "enough to cover its width too");
             Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), nameof(FlameLook.AimJet), typeof(FlameLook).GetMethod(nameof(FlameLook.JetLaunchSpeed))), "and launches them to slow into their landing");
             Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), nameof(FlameLook.AimJet), typeof(FlameLook).GetMethod(nameof(FlameLook.JetLift))), "drifting up by their rise");

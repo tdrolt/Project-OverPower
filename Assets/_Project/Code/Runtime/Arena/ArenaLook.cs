@@ -168,6 +168,8 @@ namespace Overpower.Arena
         public Material flameCoreMaterial;
         [Tooltip("How big each flame's hot heart is next to its flame: 1 the same size, lower keeps it inside the flame's yellow inner tongue.")]
         [Range(0.3f, 1f)] public float flameCoreSize = 0.9f;
+        [Tooltip("Up to this many flames a second, every hot heart in the Flamethrower's jet is drawn at full strength; past it each heart is fainter in step, so a denser jet adds up to the same glow instead of washing out to pale yellow near the gun. 95 is the fire bake-off's jet; 0 never fades them.")]
+        [Min(0f)] public float flameCoreFullRate = 95f;
         [Tooltip("How fast the flames of the Flamethrower and the Rocket's burning ground flicker, in frames of the fire sheet a second: each flame starts on a frame of its own and plays on through the sheet's 64. Lower looks lazy and slow, much higher looks like a sped-up film.")]
         [Range(4f, 60f)] public float flameFlickerFps = 32f;
         [Tooltip("How far each flame leans at random off the way it points, in degrees: the Flamethrower's flames point along their flight and the burning ground's straight up. 0 lines every flame up exactly, so the fire looks combed.")]
@@ -422,7 +424,7 @@ namespace Overpower.Arena
         public Material mechTemplate;
 
         [Header("Hit flash")]
-        [Tooltip("How long a mech flashes white when a hit lands on it, in seconds: it is brightest at the hit and fades out over this time, and every new hit starts it over. Everyone who can see the mech sees it. 0 switches the flash off. Much above 0.15 a mech under steady fire stays white and its team colour stops reading.")]
+        [Tooltip("How long a mech flashes white when a hit lands on it, in seconds: it stays full white for this time and then the mech's own look comes straight back, and every new hit starts it over. Everyone who can see the mech sees it. 0 switches the flash off. Much above 0.15 a mech under steady fire stays white and its team colour stops reading.")]
         [Min(0f)] public float hitFlashSeconds = 0.1f;
         [Tooltip("How bright the white of a hit flash is at its peak: 1 lights the whole mech plain white, more makes it bloom. The white itself is the UiTheme's Flash White, the same as every gun's impact flash.")]
         [Min(0f)] public float hitFlashGlow = 1.2f;
