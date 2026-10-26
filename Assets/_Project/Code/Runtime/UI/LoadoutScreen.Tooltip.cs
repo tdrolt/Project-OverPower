@@ -7,7 +7,7 @@ using Overpower.Match;
 
 namespace Overpower.UI
 {
-    /// <summary>The shop's hover pop-up: rest the pointer on a weapon node, ability card or armour card for the UiTheme
+    /// <summary>The shop's hover pop-up: rest the pointer on a weapon node, ability card or armour path for the UiTheme
     /// delay (Loadout Tooltip Delay Seconds) and a box with name, one line and numbers appears beside the cursor, kept
     /// on screen; moving off hides it at once, moving to another item restarts the wait. Timing, placement and text
     /// are HoverTooltipTimer, ShopPopupPlacement and ShopPopupText (unit tested); this file is the view around them. (D5)</summary>
@@ -34,7 +34,7 @@ namespace Overpower.UI
 
         public string TooltipShownText => tooltipLabel != null ? tooltipLabel.text : "";
 
-        /// <summary>Wires an item (a weapon node, an ability card, an armour card) so resting the pointer on it opens the
+        /// <summary>Wires an item (a weapon node, an ability card, an armour path) so resting the pointer on it opens the
         /// pop-up. key names the item (moving to another key restarts the wait); text builds the pop-up's text when it opens.</summary>
         private void AddPopUp(GameObject item, string key, System.Func<string> text)
         {
@@ -53,7 +53,7 @@ namespace Overpower.UI
         private string AbilityPopUpText(AbilityDefinition def) =>
             PopUpText(def.DisplayName, def.Description, ShopItemNumbers.Ability(def));
 
-        /// <summary>An armour card's pop-up: what the path does, the level you have, what the next upgrade gives and what
+        /// <summary>An armour path's pop-up: what the path does, the level you have, what the next upgrade gives and what
         /// it costs (the same price line the row itself shows).</summary>
         private string ArmorPopUpText(bool absorbRow)
         {

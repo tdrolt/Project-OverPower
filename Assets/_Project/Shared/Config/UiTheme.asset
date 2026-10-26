@@ -121,12 +121,26 @@ MonoBehaviour:
   loadoutSectionGap: 16
   loadoutPanelTopMargin: 24
   loadoutPageWidth: 1700
-  loadoutPageHeight: 540
+  loadoutPageHeight: 560
   loadoutNodeWidth: 180
   loadoutNodeHeight: 96
   loadoutAbilityCardWidth: 240
   loadoutAbilityCardHeight: 88
-  loadoutArmorCardWidth: 500
+  loadoutArmorPathWidth: 780
+  loadoutArmorPathHeight: 64
+  loadoutArmorPathTextWidth: 340
+  loadoutArmorPathIconSize: 48
+  loadoutArmorHeadingText: "Armor — two upgrade paths"
+  loadoutArmorStepSize: 20
+  loadoutArmorStepSpacing: 90
+  loadoutArmorStepLineWidth: 4
+  loadoutArmorStepLabelSize: 15
+  loadoutArmorAbsorbStepFormat: '{0}'
+  loadoutArmorRechargeStepFormat: '{0}s'
+  loadoutArmorStepReachedColor: {r: 0.25, g: 0.6, b: 1, a: 1}
+  loadoutArmorStepNextColor: {r: 0.9, g: 0.93, b: 1, a: 1}
+  loadoutArmorStepLaterColor: {r: 0.42, g: 0.42, b: 0.47, a: 1}
+  loadoutArmorStepOutOfReachColor: {r: 0.24, g: 0.24, b: 0.27, a: 0.6}
   loadoutCardIconSize: 60
   loadoutNodeIconSize: 48
   loadoutCardIconGap: 8
@@ -136,7 +150,7 @@ MonoBehaviour:
   loadoutAbilityColumnGap: 60
   loadoutNodeSpacing: 20
   loadoutArmorPlusGap: 12
-  loadoutArmorRowGap: 20
+  loadoutArmorPathGap: 8
   loadoutEquippedBorderWidth: 4
   loadoutStepperButtonSize: 56
   loadoutStepperFontSize: 32

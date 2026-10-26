@@ -16,8 +16,8 @@ using Overpower.Weapons;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The shop screen (P or the bottom-right "Loadout (P)" button; closed by P, Esc or its X): weapon upgrade tree, armor
-    /// rows and ability cards on two tabs ("Weapons", "Abilities & Armor"), reopening on the page last used
+    /// The shop screen (P or the bottom-right "Loadout (P)" button; closed by P, Esc or its X): weapon upgrade tree, the two armor
+    /// paths and ability cards on two tabs ("Weapons", "Abilities & Armor"), reopening on the page last used
     /// (ShopPageMemory). OWNER ONLY, built in code like PlayerHud (every listener sits on its button's line), dormant on
     /// remote copies. SORT ORDER (UiLayers): modal canvas at Shop, above PlayerHud and the death card (a dead player sees and clicks the
     /// whole shop) but below the F1 panel and MatchUI's win/lose panels, which must show over an open shop; the "Loadout (P)" button has its
@@ -132,7 +132,7 @@ namespace Overpower.UI
 
         // ---- hover pop-up ---------------------------------------------------------------
 
-        /// <summary>Turns UI pointer enter/exit/move into plain callbacks on every weapon node, ability card and armour card
+        /// <summary>Turns UI pointer enter/exit/move into plain callbacks on every weapon node, ability card and armour path
         /// to drive the pop-up (LoadoutScreen.Tooltip.cs). A MonoBehaviour because the pointer handlers only work on one.</summary>
         private sealed class HoverRelay : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler
         {
@@ -200,17 +200,23 @@ namespace Overpower.UI
 
         // ---- armor --------------------------------------------------------------------------------
 
-        /// <summary>One armour card's pieces (BuildArmorCard): no border state, since an armour path is never "equipped".</summary>
-        private sealed class ArmorCardUi
+        /// <summary>One armour path's pieces (BuildArmorPath): no border state, since an armour path is never "equipped". The step arrays
+        /// hold one entry per level; stepLines[0] is null (nothing leads into the starting level).</summary>
+        private sealed class ArmorPathUi
         {
+            public RectTransform root;
             public Button plus;
             public Image inner;
             public TextMeshProUGUI label;
             public Image icon;
+            public Image[] stepRings;
+            public Image[] stepFills;
+            public Image[] stepLines;
+            public TextMeshProUGUI[] stepValues;
         }
 
-        private ArmorCardUi absorbCard;
-        private ArmorCardUi rechargeCard;
+        private ArmorPathUi absorbPath;
+        private ArmorPathUi rechargePath;
 
         // ---- screen state / built UI ---------------------------------------------------------------
 
@@ -935,7 +941,7 @@ namespace Overpower.UI
 
         /// <summary>A refused upgrade DISABLES the + button, computed up front from the ArmorUpgradePath rule TryUpgrade
         /// applies, so a click that would be refused is never offered. Shows the next purchase's price (ShopPricing.
-        /// PriceLine) on a buyable card, and gives that card the refused look while shop-blocked (StyleArmorCard), like the
+        /// PriceLine) on a buyable path, and gives that path the refused look while shop-blocked (StyleArmorPath), like the
         /// weapon tree's "visible but reads as unavailable".</summary>
         private void RefreshArmor(ShopContext ctx)
         {
@@ -954,25 +960,38 @@ namespace Overpower.UI
             bool roundLimited = cap < armorConfig.MaxArmorUpgrades;
             string limit = ArmorLimitLabel.Text(path.TotalUpgrades, cap,
                 theme.loadoutArmorUpgradeFormat, roundLimited ? theme.loadoutArmorRoundMaxFormat : theme.loadoutArmorMaxFormat);
-            StyleArmorCard(absorbCard, path.CanUpgradeAbsorb, gateBlocked, ArmorRow(theme.loadoutArmorAbsorbRowFormat, playerHealth.AbsorbLevel,
-                path.CanUpgradeAbsorb ? $"{limit} ({priceLine})" : ArmorRowFull(path.TotalUpgrades, cap, limit)));
-            StyleArmorCard(rechargeCard, path.CanUpgradeRecharge, gateBlocked, ArmorRow(theme.loadoutArmorRechargeRowFormat, playerHealth.RechargeLevel,
-                path.CanUpgradeRecharge ? $"{limit} ({priceLine})" : ArmorRowFull(path.TotalUpgrades, cap, limit)));
+            int upgradesLeft = path.UpgradeLimit - path.TotalUpgrades;
+            StyleArmorPath(absorbPath, path.CanUpgradeAbsorb, gateBlocked, ArmorRow(theme.loadoutArmorAbsorbRowFormat, playerHealth.AbsorbLevel,
+                    path.CanUpgradeAbsorb ? $"{limit} ({priceLine})" : ArmorRowFull(path.TotalUpgrades, cap, limit)),
+                ArmorPathSteps.For(path.AbsorbLevel, armorConfig.AbsorbLevelCount - 1, upgradesLeft));
+            StyleArmorPath(rechargePath, path.CanUpgradeRecharge, gateBlocked, ArmorRow(theme.loadoutArmorRechargeRowFormat, playerHealth.RechargeLevel,
+                    path.CanUpgradeRecharge ? $"{limit} ({priceLine})" : ArmorRowFull(path.TotalUpgrades, cap, limit)),
+                ArmorPathSteps.For(path.RechargeLevel, armorConfig.RechargeLevelCount - 1, upgradesLeft));
         }
 
-        /// <summary>An armour card reads refused (Loadout Shop Blocked Colour, muted text, darkened picture) only while it has an upgrade left that the
-        /// gate refuses; a card with none left keeps the normal look, its + disabled.</summary>
-        private void StyleArmorCard(ArmorCardUi card, bool canUpgrade, bool gateBlocked, string text)
+        /// <summary>An armour path reads refused (Loadout Shop Blocked Colour, muted text, darkened picture) only while it has an upgrade left that the
+        /// gate refuses; a path with none left keeps the normal look, its + disabled. Its steps take their colours from where each one stands.</summary>
+        private void StyleArmorPath(ArmorPathUi ui, bool canUpgrade, bool gateBlocked, string text, ArmorStep[] steps)
         {
             bool refused = canUpgrade && gateBlocked;
-            card.label.text = text;
-            card.label.color = refused ? theme.mutedTextColor : theme.textColor;
-            card.inner.color = refused ? theme.loadoutShopBlockedColor : theme.loadoutSelectableColor;
-            card.icon.color = ShopItemLook.IconTint(refused, theme);
-            card.plus.interactable = canUpgrade;
+            ui.label.text = text;
+            ui.label.color = refused ? theme.mutedTextColor : theme.textColor;
+            ui.inner.color = refused ? theme.loadoutShopBlockedColor : theme.loadoutSelectableColor;
+            ui.icon.color = ShopItemLook.IconTint(refused, theme);
+            ui.plus.interactable = canUpgrade;
+
+            // The path was built from the same ArmorConfig, so the counts match; Min guards a config edited while the shop exists.
+            int n = Mathf.Min(steps.Length, ui.stepRings.Length);
+            for (int i = 0; i < n; i++)
+            {
+                ui.stepRings[i].color = ArmorPathSteps.Border(steps[i], theme);
+                ui.stepFills[i].color = ArmorPathSteps.Fill(steps[i], theme);
+                if (ui.stepLines[i] != null)
+                    ui.stepLines[i].color = ArmorPathSteps.LineInto(steps[i], theme);
+            }
         }
 
-        /// <summary>One armour card's text from its UiTheme format: {0} = the level, {1} = the status, drawn at the price line's size.</summary>
+        /// <summary>One armour path's text from its UiTheme format: {0} = the level, {1} = the status, drawn at the price line's size.</summary>
         private string ArmorRow(string format, int level, string status) =>
             string.Format(System.Globalization.CultureInfo.InvariantCulture, format, level, $"<size={theme.loadoutPriceLineSizePercent}%>{status}</size>");
 

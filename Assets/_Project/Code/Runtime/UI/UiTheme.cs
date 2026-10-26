@@ -326,25 +326,54 @@ namespace Overpower.UI
         public Color loadoutPanelColor = new Color(0.05f, 0.05f, 0.07f, 0.96f);
         [Tooltip("Space between the loadout panel's background edge and its title/columns, in canvas units, on every side.")]
         public float loadoutPanelPadding = 20f;
-        [Tooltip("Extra vertical gap between the armour cards and the Mobility, Attachment and Ultimate columns below them on the Abilities & Armor page, on top of the normal item spacing, in canvas units.")]
+        [Tooltip("Extra vertical gap between the armour paths and the Mobility, Attachment and Ultimate columns below them on the Abilities & Armor page, on top of the normal item spacing, in canvas units.")]
         public float loadoutSectionGap = 16f;
         [Tooltip("Gap from the top of the screen to the top of the loadout panel, in canvas units. The panel is anchored to the TOP of the screen rather than dead-centre so a tall tree/armor column never grows down into the HUD, which sits at the bottom.")]
         public float loadoutPanelTopMargin = 24f;
         [Tooltip("Width of the shop's content area under the tabs, in canvas units - the same on both pages, so the panel never changes size when you switch tabs. Wide enough for the four weapon-tree columns (Loadout Node Width and Loadout Tree Column Gap) and for the three ability columns (Loadout Ability Card Width, two cards across).")]
         public float loadoutPageWidth = 1700f;
         [Tooltip("Height of the shop's content area under the tabs, in canvas units - the same on both pages. Must fit the weapon tree with its Reset Weapon button and the Abilities & Armor page's tallest column.")]
-        public float loadoutPageHeight = 540f;
+        public float loadoutPageHeight = 560f;
         [Tooltip("Width of one weapon node button in the upgrade tree, in canvas units. The weapons page has the whole content area to itself, so the nodes are big enough to read at a glance; eight upgrades sit side by side (two under each of the four families), so eight of these plus the gaps must fit Loadout Page Width.")]
         public float loadoutNodeWidth = 180f;
         [Tooltip("Height of one weapon node button in the upgrade tree, in canvas units.")]
         public float loadoutNodeHeight = 96f;
         [Tooltip("Width of one ability card on the Abilities & Armor page, in canvas units. Two cards fit across each of the three columns.")]
         public float loadoutAbilityCardWidth = 240f;
-        [Tooltip("Height of one ability card on the Abilities & Armor page, and of the two armour cards above them, in canvas units.")]
+        [Tooltip("Height of one ability card on the Abilities & Armor page, in canvas units.")]
         public float loadoutAbilityCardHeight = 88f;
-        [Tooltip("Width of one armour card (Absorb, Recharge) on the Abilities & Armor page, in canvas units. It holds the picture, two lines of text and the + button; the two cards and Reset Armor must fit Loadout Page Width.")]
-        public float loadoutArmorCardWidth = 500f;
-        [Tooltip("Side of the square picture on an ability card and on an armour card in the shop, in canvas units. It sits at the card's left edge with the name and price to its right, so keep it a little smaller than Loadout Ability Card Height.")]
+        [Tooltip("Width of one armour path (Absorb, Recharge) on the Abilities & Armor page, in canvas units. A path holds its picture, its name and next price, its steps and its + button, from left to right; the path and Reset Armor beside it must fit Loadout Page Width.")]
+        [UnityEngine.Serialization.FormerlySerializedAs("loadoutArmorCardWidth")]
+        public float loadoutArmorPathWidth = 780f;
+        [Tooltip("Height of one armour path, in canvas units. The two paths stand one above the other, so the armour section is twice this plus Loadout Armor Path Gap; the whole Abilities & Armor page must still fit Loadout Page Height.")]
+        public float loadoutArmorPathHeight = 64f;
+        [Tooltip("Width of an armour path's text (its name and level, then the next upgrade and its price), between its picture and its steps, in canvas units. Too narrow and the price line wraps.")]
+        public float loadoutArmorPathTextWidth = 340f;
+        [Tooltip("Side of the square picture on an armour path, in canvas units. Keep it a little smaller than Loadout Armor Path Height.")]
+        public float loadoutArmorPathIconSize = 48f;
+        [Tooltip("The heading above the two armour paths in the shop.")]
+        public string loadoutArmorHeadingText = "Armor — two upgrade paths";
+        [Tooltip("Side of one step marker on an armour path (one per level, from the starting level to the top), in canvas units. Drawn as a diamond.")]
+        public float loadoutArmorStepSize = 20f;
+        [Tooltip("Distance from one step marker's centre to the next along an armour path, in canvas units. Also the width each step's value below it may take.")]
+        public float loadoutArmorStepSpacing = 90f;
+        [Tooltip("Thickness of the line joining the step markers of an armour path, in canvas units.")]
+        public float loadoutArmorStepLineWidth = 4f;
+        [Tooltip("Size of the value under each step marker (how much it soaks, how soon it refills), in canvas units.")]
+        public float loadoutArmorStepLabelSize = 15f;
+        [Tooltip("The value under each Absorb step marker. {0} = how much damage that level soaks.")]
+        public string loadoutArmorAbsorbStepFormat = "{0}";
+        [Tooltip("The value under each Recharge step marker. {0} = how many seconds out of combat that level waits before the armour refills.")]
+        public string loadoutArmorRechargeStepFormat = "{0}s";
+        [Tooltip("Colour of an armour step you already have: its marker is filled with it and the line leading to it is lit with it.")]
+        public Color loadoutArmorStepReachedColor = new Color(0.25f, 0.6f, 1f, 1f);
+        [Tooltip("Ring colour of the armour step the path's + buys next. The marker stays hollow until it is bought.")]
+        public Color loadoutArmorStepNextColor = new Color(0.9f, 0.93f, 1f, 1f);
+        [Tooltip("Ring and line colour of an armour step you could still reach later with the upgrades you have left.")]
+        public Color loadoutArmorStepLaterColor = new Color(0.42f, 0.42f, 0.47f, 1f);
+        [Tooltip("Ring and line colour of an armour step you cannot reach with the upgrades left (both paths share one budget, and in Dominion each round allows only so many). Keep it faint.")]
+        public Color loadoutArmorStepOutOfReachColor = new Color(0.24f, 0.24f, 0.27f, 0.6f);
+        [Tooltip("Side of the square picture on an ability card in the shop, in canvas units. It sits at the card's left edge with the name and price to its right, so keep it a little smaller than Loadout Ability Card Height.")]
         public float loadoutCardIconSize = 60f;
         [Tooltip("Side of the square picture on a weapon in the shop's tree, in canvas units. It sits at the node's left edge with the name and price to its right; a bigger picture leaves less room for the text (Loadout Node Width).")]
         public float loadoutNodeIconSize = 48f;
@@ -352,18 +381,19 @@ namespace Overpower.UI
         public float loadoutCardIconGap = 8f;
         [Tooltip("Tint on an item's picture in the shop while the item cannot be picked right now (locked until the break, blocked by the shop, already passed on the weapon tree, or not open yet). White leaves the picture as drawn; grey darkens it and a lower alpha fades it into the card, so a bright picture never makes an item look pickable when it is not. Alpha alone barely shows (the UI blends in linear colour), so darken with grey first.")]
         public Color loadoutIconUnavailableTint = new Color(0.5f, 0.5f, 0.5f, 0.75f);
-        [Tooltip("Picture on the Absorb armour card in the shop. The armour upgrades have no item asset of their own, so their pictures live here.")]
+        [Tooltip("Picture on the Absorb armour path in the shop. The armour upgrades have no item asset of their own, so their pictures live here.")]
         public Sprite loadoutArmorAbsorbIcon;
-        [Tooltip("Picture on the Recharge armour card in the shop. The armour upgrades have no item asset of their own, so their pictures live here.")]
+        [Tooltip("Picture on the Recharge armour path in the shop. The armour upgrades have no item asset of their own, so their pictures live here.")]
         public Sprite loadoutArmorRechargeIcon;
         [Tooltip("Horizontal space between the Mobility, Attachment and Ultimate columns on the Abilities & Armor page, in canvas units.")]
         public float loadoutAbilityColumnGap = 60f;
-        [Tooltip("Gap between the two upgrades of a weapon family (side by side), between ability cards in a column's grid (both directions), and between the armour cards and Reset Armor, in canvas units.")]
+        [Tooltip("Gap between the two upgrades of a weapon family (side by side), between ability cards in a column's grid (both directions), and between the armour paths and Reset Armor, in canvas units.")]
         public float loadoutNodeSpacing = 20f;
-        [Tooltip("Gap between an armour card's text (Absorb, Recharge) and its own + button inside the card, in canvas units.")]
+        [Tooltip("Gap between an armour path's steps (Absorb, Recharge) and its own + button inside the path, in canvas units.")]
         public float loadoutArmorPlusGap = 12f;
-        [Tooltip("Gap between the Absorb card and the Recharge card on the Abilities & Armor page, in canvas units. Each + sits inside its own card, so the cards can stand as close as the ability cards do.")]
-        public float loadoutArmorRowGap = 20f;
+        [Tooltip("Vertical gap between the Absorb path (above) and the Recharge path (below) on the Abilities & Armor page, in canvas units. Enough to read as two separate tracks.")]
+        [UnityEngine.Serialization.FormerlySerializedAs("loadoutArmorRowGap")]
+        public float loadoutArmorPathGap = 8f;
         [Tooltip("Thickness of the highlight border drawn around the equipped weapon node or ability card, in canvas units.")]
         public float loadoutEquippedBorderWidth = 4f;
         [Tooltip("Width and height of a small square icon button - the close X and the armor +Absorb/+Recharge steppers - in canvas units. Raised from an original 44: a bigger button gives the bigger glyph below more room to stay legible.")]
@@ -424,9 +454,9 @@ namespace Overpower.UI
         public string loadoutDominionRoundText = "Round on: only empty slots can be filled";
         [Tooltip("Armour row wording for a row that is at its own top level with upgrades still left in the shared limit.")]
         public string loadoutArmorTopLevelText = "top level";
-        [Tooltip("The Absorb armour card's text. {0} = its level, {1} = the status text (which upgrade is next and its price, or max), drawn smaller (Loadout Price Line Size Percent) like an ability card's price. Keep the line break after the name.")]
+        [Tooltip("The Absorb armour path's text. {0} = its level, {1} = the status text (which upgrade is next and its price, or max), drawn smaller (Loadout Price Line Size Percent) like an ability card's price. Keep the line break after the name.")]
         [TextArea(2, 3)] public string loadoutArmorAbsorbRowFormat = "Absorb lv {0}\n{1}";
-        [Tooltip("The Recharge armour card's text. {0} = its level, {1} = the status text (which upgrade is next and its price, or max), drawn smaller (Loadout Price Line Size Percent) like an ability card's price. Keep the line break after the name.")]
+        [Tooltip("The Recharge armour path's text. {0} = its level, {1} = the status text (which upgrade is next and its price, or max), drawn smaller (Loadout Price Line Size Percent) like an ability card's price. Keep the line break after the name.")]
         [TextArea(2, 3)] public string loadoutArmorRechargeRowFormat = "Recharge lv {0}\n{1}";
         [Tooltip("Colour of the arrows from each weapon to the upgrades it opens in the shop's weapon tree (neutral grey).")]
         public Color loadoutArrowColor = new Color(0.42f, 0.42f, 0.47f, 1f);

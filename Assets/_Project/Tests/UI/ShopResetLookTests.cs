@@ -113,7 +113,7 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(LoadoutScreen), "RefreshResetButtons", Look("ButtonText")));
             Assert.IsTrue(IlWiring.Uses(typeof(LoadoutScreen), "StyleNode", Look("IconTint")), "weapon tree");
             Assert.IsTrue(IlWiring.Uses(typeof(LoadoutScreen), "RefreshAbilities", Look("IconTint")), "ability cards");
-            Assert.IsTrue(IlWiring.Uses(typeof(LoadoutScreen), "StyleArmorCard", Look("IconTint")), "armour cards");
+            Assert.IsTrue(IlWiring.Uses(typeof(LoadoutScreen), "StyleArmorPath", Look("IconTint")), "armour paths");
         }
     }
 }
