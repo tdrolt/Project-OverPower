@@ -421,6 +421,12 @@ namespace Overpower.Arena
         [Tooltip("The material every team's mech is copied from: the model's own maps, with a greyscale glow-line map so the glow can take any team colour. Each team wears its own copy at runtime, so this file is never changed while playing.")]
         public Material mechTemplate;
 
+        [Header("Hit flash")]
+        [Tooltip("How long a mech flashes white when a hit lands on it, in seconds: it is brightest at the hit and fades out over this time, and every new hit starts it over. Everyone who can see the mech sees it. 0 switches the flash off. Much above 0.15 a mech under steady fire stays white and its team colour stops reading.")]
+        [Min(0f)] public float hitFlashSeconds = 0.1f;
+        [Tooltip("How bright the white of a hit flash is at its peak: 1 lights the whole mech plain white, more makes it bloom. The white itself is the UiTheme's Flash White, the same as every gun's impact flash.")]
+        [Min(0f)] public float hitFlashGlow = 1.2f;
+
         [Header("Arena surfaces")]
         [Tooltip("The floor's paint and shine under its hexagon grid.")]
         public SurfaceLook floorSurface = new SurfaceLook(new Color(0.16f, 0.17f, 0.19f, 1f), 0.7f, 0f);

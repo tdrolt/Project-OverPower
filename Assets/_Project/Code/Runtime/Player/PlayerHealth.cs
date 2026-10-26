@@ -59,6 +59,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     // The plate round the bar and the name (NameplateView); null when the player has no theme or overhead canvas.
     private Overpower.UI.NameplateView nameplate;
+    private HitFlashView hitFlash; // null when the theme has no Arena Look
 
     // The yellow "shield immunity" look is a FRAME (four thin edge Images) round the shared health/shield rect: not a
     // recolour of either fill and not a translucent whole-bar overlay, which read grey over the blue shield fill (see
@@ -211,6 +212,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             ? Overpower.Combat.AbilityVisualGeometry.RootAboveFeet(capsule.center.y, capsule.height, transform.lossyScale.y)
             : 0f;
         Overpower.Arena.HealSparksView.TryCreate(transform, photonView, this, theme, feetBelowRoot);
+        hitFlash = HitFlashView.TryCreate(gameObject, this, theme);
     }
 
     /// <summary>Hides (or shows) the whole overhead bar; called from PlayerLifecycle.ApplyAliveState, which runs on
@@ -525,11 +527,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
                 CombatEvents.RaiseBlockedSeen(transform);
         }
 
-        // The victim is the sole authority on its own health, or every client would subtract from its own copy and
-        // the owner's next serialization would fight it back.
-        if (!photonView.IsMine || isDead)
-            return default;
-
         // Combat order: self, then teammate, then an immunity already running, then the armed trap, then the hit
         // lands. HitVerdictRule.Classify is the one home for it, so a self or teammate hit can never spring the trap
         // or touch the combat clock below.
@@ -537,6 +534,17 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         bool fromSelf = sourcePlayer != null && sourcePlayer == photonView.Owner;
         // AreSameTeam deliberately fails OPEN: an unknown team must never silently make someone invulnerable.
         bool fromTeammate = !fromSelf && Teams.AreSameTeam(sourcePlayer, photonView.Owner);
+
+        // On every copy, before the victim-only return below: each client flashes the hit it simulated itself, so the flash needs no
+        // message and shows when the shot lands on that screen. The immune look and the respawn shield are read as every client sees them.
+        if (HitFlashRule.FlashesOnHit(info.Source, info.Amount, IsAlive, fromSelf, fromTeammate, ShowsImmuneLook,
+                                      respawnShield != null && respawnShield.IsUp))
+            hitFlash?.Flash();
+
+        // The victim is the sole authority on its own health, or every client would subtract from its own copy and
+        // the owner's next serialization would fight it back.
+        if (!photonView.IsMine || isDead)
+            return default;
 
         // Dominion respawn shield: stopped before anything else, so no health, armour, mark or combat-clock change and no damage credit follows
         // (the spawn keeps healing at its fast rate; the attacker earns no ultimate charge and keeps its own shield). A teammate's hit is left
