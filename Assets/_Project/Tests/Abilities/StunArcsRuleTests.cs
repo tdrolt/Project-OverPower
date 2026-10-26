@@ -101,6 +101,9 @@ namespace Overpower.Tests
                 theme.arenaLook = look;
                 look.fxAlpha = material;
                 look.stunArcCount = 3;
+                look.stunArcWidth = 0.1f;
+                look.stunArcCoreWidth = 0.4f;
+                look.stunArcCoreGlow = 3f;
                 StunArcsView view = StunArcsView.TryCreate(player.transform, null, null, theme, 1.3f);
                 Assert.IsNotNull(view);
                 Assert.AreSame(player.transform, view.transform.parent);
@@ -108,10 +111,13 @@ namespace Overpower.Tests
                 Transform arcs = view.transform.Find(StunArcsView.ArcsChildName);
                 Assert.IsNotNull(arcs);
                 Assert.IsFalse(arcs.gameObject.activeSelf, "nobody is stunned yet");
-                LineRenderer[] lines = arcs.GetComponentsInChildren<LineRenderer>(true);
-                Assert.AreEqual(3, lines.Length);
-                foreach (LineRenderer line in lines)
+                Assert.AreEqual(3, arcs.childCount);
+                var block = new MaterialPropertyBlock();
+                Color coreGlow = Overpower.Arena.TowerLookRules.GlowKeepingHue(stunned, 3f);
+                foreach (Transform arc in arcs)
                 {
+                    LineRenderer line = arc.GetComponent<LineRenderer>();
+                    Assert.IsNotNull(line);
                     Assert.AreSame(material, line.sharedMaterial, "FX Alpha, shared: the blue stays blue over a grey floor");
                     foreach (Color c in new[] { line.startColor, line.endColor })
                     {
@@ -119,6 +125,18 @@ namespace Overpower.Tests
                         Assert.AreEqual(stunned.g, c.g, 1f / 255f);
                         Assert.AreEqual(stunned.b, c.b, 1f / 255f);
                     }
+
+                    Transform coreObject = arc.Find(StunArcsView.CoreName);
+                    Assert.IsNotNull(coreObject, "each arc has a bright line down its middle");
+                    LineRenderer core = coreObject.GetComponent<LineRenderer>();
+                    Assert.AreSame(material, core.sharedMaterial);
+                    Assert.AreEqual(0.1f * 0.4f, core.widthMultiplier, 1e-5f, "its share of the arc's thickness");
+                    Assert.Greater(core.sortingOrder, line.sortingOrder, "drawn over its arc");
+                    core.GetPropertyBlock(block);
+                    Color c2 = block.GetColor("_BaseColor");
+                    Assert.AreEqual(coreGlow.r, c2.r, 1e-3f, "the stun's blue, brightened without leaving its hue");
+                    Assert.AreEqual(coreGlow.g, c2.g, 1e-3f);
+                    Assert.AreEqual(coreGlow.b, c2.b, 1e-3f);
                 }
             }
             finally

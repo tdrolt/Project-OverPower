@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 6494199985964624525}
   - component: {fileID: 3204271302325950962}
   - component: {fileID: 6856109572906542702}
+  - component: {fileID: 1356979961997252248}
   m_Layer: 7
   m_Name: Stun Gun Bullet
   m_TagString: Untagged
@@ -54,7 +55,7 @@ MonoBehaviour:
     m_Bits: 4294967295
   maxLifetimeSeconds: 5
   fallbackImpactVfx: {fileID: 7520184254590907587, guid: f3bc8f2d337d09b4cb3c6aaad92d01d5, type: 3}
-  impactSfx: {fileID: 8300000, guid: d6bb1df959326064a8f5fcc97b8e436f, type: 3}
+  impactSfx: {fileID: 8300000, guid: e4abbcbbf8c8a134ab8ad265e1395ea2, type: 3}
 --- !u!114 &3204271302325950962
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -85,6 +86,19 @@ MonoBehaviour:
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
   abilityId: 22
   sparksInCastersTeam: 1
+--- !u!114 &1356979961997252248
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 568363968201752419}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2d7a34a7190ff140b1c53441cbc3c67, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
 --- !u!1 &5553694461565579530
 GameObject:
   m_ObjectHideFlags: 0

@@ -85,14 +85,33 @@ MonoBehaviour:
   stunBoltGlow: 6
   stunTrailSeconds: 0.12
   stunTrailWidth: 0.08
-  stunArcCount: 3
+  stunArcCount: 4
   stunArcRate: 15
   stunArcRadius: 0.85
   stunArcHeight: 0.75
   stunArcJitter: 0.25
-  stunArcWidth: 0.05
+  stunArcWidth: 0.1
   stunArcSweepDegrees: {x: 50, y: 100}
   stunArcGlow: 1
+  stunArcCoreWidth: 0.4
+  stunArcCoreGlow: 3
+  stunFlashSeconds: 0.18
+  stunFlashRayCount: 8
+  stunFlashReach: 0.9
+  stunFlashRayWidth: 0.18
+  stunFlashGlow: 4
+  stunFlashLightIntensity: 3
+  stunFlashLightRange: 4
+  stunRingSeconds: 0.45
+  stunRingStartRadius: 0.45
+  stunRingRadius: 1.8
+  stunRingWidth: 0.14
+  stunRingJitter: 0.12
+  stunRingGlow: 2.5
+  stunShakeOn: 1
+  stunShakeStrength: 0.12
+  stunShakeSeconds: 0.25
+  stunShakeFrequency: 25
   pulseArchCount: 2
   pulseSweepSeconds: 0.2
   pulseFadeSeconds: 0.2

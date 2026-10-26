@@ -84,6 +84,22 @@ public class CameraTracking : MonoBehaviour
     /// can call this defensively, e.g. on every Interrupt reason.</summary>
     public void RemoveZoomMultiplier(object key) => zoomMultipliers.Remove(key);
 
+    // A shake in progress (StunShakeRule); a negative start means none.
+    private float shakeStartedAt = -1f;
+    private float shakeSeconds;
+    private float shakeStrength;
+    private float shakeFrequency;
+
+    /// <summary>A short jolt of this camera's view, on this screen only (the numbers are the Arena Look's Stun Shake ones). A new shake
+    /// replaces one still running.</summary>
+    public void Shake(float seconds, float strength, float frequency)
+    {
+        shakeSeconds = seconds;
+        shakeStrength = strength;
+        shakeFrequency = frequency;
+        shakeStartedAt = Time.time;
+    }
+
     // Where gun sounds are heard from: the followed player, not this camera (see ListenerRig).
     private Transform listener;
 
@@ -129,6 +145,12 @@ public class CameraTracking : MonoBehaviour
 
         transform.position = target.position + currentOffset;
         transform.LookAt(target);
+        if (shakeStartedAt >= 0f)
+        {
+            // Moved after LookAt, along its own right and up, so the view slides without turning.
+            Vector2 shake = StunShakeRule.Offset(Time.time - shakeStartedAt, shakeSeconds, shakeStrength, shakeFrequency);
+            transform.position += transform.right * shake.x + transform.up * shake.y;
+        }
         ListenerRig.Follow(listener, target);
     }
 

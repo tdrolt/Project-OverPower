@@ -69,7 +69,7 @@ namespace Overpower.Arena
         [Tooltip("How thick the team-colour line behind a Stun Gun bolt is where it leaves the bolt, in metres; it thins out behind. Keep it thinner than the bolt so the electric blue still says Stun Gun.")]
         [Min(0f)] public float stunTrailWidth = 0.08f;
         [Tooltip("How many electric arcs crackle around a stunned player.")]
-        [Range(1, 6)] public int stunArcCount = 3;
+        [Range(1, 6)] public int stunArcCount = 4;
         [Tooltip("How many times a second the arcs on a stunned player jump to a new shape. The shape comes from the server clock and the player, so everyone sees the same arcs.")]
         [Min(1f)] public float stunArcRate = 15f;
         [Tooltip("How far the arcs on a stunned player sit from the middle of their body, in metres. A little wider than the body, so the arcs wrap around the mech instead of hiding inside it.")]
@@ -79,11 +79,49 @@ namespace Overpower.Arena
         [Tooltip("How jagged the arcs on a stunned player are: 0 draws smooth curves, about 0.25 draws sharp zig-zags like lightning.")]
         [Range(0f, 0.6f)] public float stunArcJitter = 0.25f;
         [Tooltip("How thick each arc on a stunned player is, in metres.")]
-        [Min(0.005f)] public float stunArcWidth = 0.05f;
+        [Min(0.005f)] public float stunArcWidth = 0.1f;
         [Tooltip("How far round a stunned player's body each arc runs, in degrees: each arc picks a length between the first number (shortest) and the second (longest). Shorter arcs read as separate sparks; long ones join into a ring round the feet when seen from above.")]
         public Vector2 stunArcSweepDegrees = new Vector2(50f, 100f);
         [Tooltip("How brightly the arcs on a stunned player glow: 1 is exactly the STUNNED label's blue; above 1 the arcs lift toward the paler blue of the player's own health bar and stop matching the label.")]
         [Min(0f)] public float stunArcGlow = 1f;
+        [Tooltip("How thick the bright line down the middle of each arc on a stunned player is, as a share of the arc's thickness: 0 draws no bright line, 0.4 leaves a darker blue edge either side of it.")]
+        [Range(0f, 1f)] public float stunArcCoreWidth = 0.4f;
+        [Tooltip("How brightly the line down the middle of each arc glows in the stun's own electric blue: above 1 it blooms. The blue stays blue however high this goes, because only its blue part grows.")]
+        [Min(0f)] public float stunArcCoreGlow = 3f;
+        [Tooltip("How long the flash of electric spikes lasts where a Stun Gun bolt strikes a player, in seconds.")]
+        [Min(0.01f)] public float stunFlashSeconds = 0.18f;
+        [Tooltip("How many electric spikes burst out of the point where a Stun Gun bolt strikes a player.")]
+        [Range(3, 16)] public int stunFlashRayCount = 8;
+        [Tooltip("How far the flash's spikes shoot out from the point where a Stun Gun bolt strikes a player, in metres.")]
+        [Min(0.05f)] public float stunFlashReach = 0.9f;
+        [Tooltip("How thick each spike of the flash is at its base, in metres; it narrows to a point at its tip.")]
+        [Min(0.01f)] public float stunFlashRayWidth = 0.18f;
+        [Tooltip("How brightly the flash's spikes glow in the stun's own electric blue: above 1 they bloom. The blue stays blue however high this goes.")]
+        [Min(0f)] public float stunFlashGlow = 4f;
+        [Tooltip("How strongly the flash lights the floor and walls around the point where a Stun Gun bolt strikes a player, in electric blue. 0 lights nothing.")]
+        [Min(0f)] public float stunFlashLightIntensity = 3f;
+        [Tooltip("How far the flash's light reaches from the point where a Stun Gun bolt strikes a player, in metres.")]
+        [Min(0.1f)] public float stunFlashLightRange = 4f;
+        [Tooltip("How long the electric shock ring on the floor under a struck player takes to spread out and fade, in seconds.")]
+        [Min(0.01f)] public float stunRingSeconds = 0.45f;
+        [Tooltip("How wide the shock ring is when it appears, in metres from its middle. About the size of the bolt itself, so the ring starts where the bolt struck.")]
+        [Min(0f)] public float stunRingStartRadius = 0.45f;
+        [Tooltip("How wide the shock ring has spread when it has faded out, in metres from its middle.")]
+        [Min(0.05f)] public float stunRingRadius = 1.8f;
+        [Tooltip("How thick the shock ring's band is, in metres.")]
+        [Min(0.01f)] public float stunRingWidth = 0.14f;
+        [Tooltip("How jagged the shock ring is, like the arcs: 0 draws a smooth circle, about 0.12 draws a crackling one.")]
+        [Range(0f, 0.5f)] public float stunRingJitter = 0.12f;
+        [Tooltip("How brightly the shock ring glows in the stun's own electric blue: above 1 it blooms. The blue stays blue however high this goes.")]
+        [Min(0f)] public float stunRingGlow = 2.5f;
+        [Tooltip("On: a player's own camera gives a short shake when they are stunned, on their screen only. Off: no shake.")]
+        public bool stunShakeOn = true;
+        [Tooltip("How far a stunned player's own camera jolts at the start of the shake, in metres; it settles to still by the end. Keep it small: about 0.1 is a jolt, above 0.3 is hard to watch.")]
+        [Min(0f)] public float stunShakeStrength = 0.12f;
+        [Tooltip("How long a stunned player's own camera shakes, in seconds. The stun itself lasts longer; this is only the jolt at its start.")]
+        [Min(0.01f)] public float stunShakeSeconds = 0.25f;
+        [Tooltip("How many times a second the shaking camera jumps to a new spot. Higher feels like a buzz, lower like a wobble.")]
+        [Min(1f)] public float stunShakeFrequency = 25f;
 
         [Header("Sonic Pulse")]
         [Tooltip("How many arches the Sonic Pulse sends out: the arch itself plus fainter after-images trailing behind it.")]

@@ -17,6 +17,7 @@ namespace Overpower.Abilities
     public sealed class StunArcsView : MonoBehaviour
     {
         public const string ArcsChildName = "Arcs";
+        public const string CoreName = "Core";
         private const int PointsPerArc = 7; // enough for a zig-zag; not a look number
 
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -26,6 +27,7 @@ namespace Overpower.Abilities
         private ArenaLook look;
         private GameObject arcs;
         private LineRenderer[] lines;
+        private LineRenderer[] cores; // null entries when the Arena Look's core width is 0
         private VisibleWhenSeen gate;
         private int shapedSeed;
         private bool shaped;
@@ -51,7 +53,10 @@ namespace Overpower.Abilities
             Color colour = LookColours.For(LookFamily.ElectricBlue, -1, theme);
             var block = new MaterialPropertyBlock();
             block.SetColor(BaseColorId, new Color(look.stunArcGlow, look.stunArcGlow, look.stunArcGlow, 1f));
+            var coreBlock = new MaterialPropertyBlock();
+            coreBlock.SetColor(BaseColorId, TowerLookRules.GlowKeepingHue(colour, look.stunArcCoreGlow)); // white vertex colours, so this is its whole colour
             var lines = new LineRenderer[look.stunArcCount];
+            var cores = new LineRenderer[lines.Length];
             for (int i = 0; i < lines.Length; i++)
             {
                 var arc = new GameObject("Arc " + i);
@@ -67,6 +72,23 @@ namespace Overpower.Abilities
                 VisualTint.SetLineColor(line, colour);
                 line.SetPropertyBlock(block); // the glow rides on the shared material's colour multiplier, per renderer
                 lines[i] = line;
+
+                if (look.stunArcCoreWidth <= 0f)
+                    continue;
+                var coreObject = new GameObject(CoreName);
+                coreObject.transform.SetParent(arc.transform, false);
+                LineRenderer core = coreObject.AddComponent<LineRenderer>();
+                core.useWorldSpace = false;
+                core.sharedMaterial = look.fxAlpha;
+                core.positionCount = PointsPerArc;
+                core.widthMultiplier = look.stunArcWidth * look.stunArcCoreWidth;
+                core.alignment = LineAlignment.View;
+                core.shadowCastingMode = ShadowCastingMode.Off;
+                core.receiveShadows = false;
+                core.sortingOrder = line.sortingOrder + 1; // both sit at the same depth, so the order alone keeps the core on top
+                VisualTint.SetLineColor(core, Color.white);
+                core.SetPropertyBlock(coreBlock);
+                cores[i] = core;
             }
 
             StunArcsView view = root.AddComponent<StunArcsView>();
@@ -75,6 +97,7 @@ namespace Overpower.Abilities
             view.look = look;
             view.arcs = arcs;
             view.lines = lines;
+            view.cores = cores;
             view.gate = VisibleWhenSeen.AttachToCaster(root, caster);
             return view;
         }
@@ -111,7 +134,12 @@ namespace Overpower.Abilities
             shapedSeed = seed;
             for (int i = 0; i < lines.Length; i++)
                 for (int k = 0; k < PointsPerArc; k++)
-                    lines[i].SetPosition(k, StunArcsRule.ArcPoint(seed, i, k, PointsPerArc, look.stunArcRadius, look.stunArcHeight, look.stunArcJitter, look.stunArcSweepDegrees.x, look.stunArcSweepDegrees.y));
+                {
+                    Vector3 p = StunArcsRule.ArcPoint(seed, i, k, PointsPerArc, look.stunArcRadius, look.stunArcHeight, look.stunArcJitter, look.stunArcSweepDegrees.x, look.stunArcSweepDegrees.y);
+                    lines[i].SetPosition(k, p);
+                    if (cores[i] != null)
+                        cores[i].SetPosition(k, p);
+                }
         }
     }
 }

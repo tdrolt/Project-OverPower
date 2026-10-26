@@ -253,6 +253,11 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         state.Apply(spec);
         ApplyStunToMotor(); // freeze at once so the stun and the movement it blocks read as the same frame
 
+        Overpower.Arena.ArenaLook look = playerHealth != null && playerHealth.Theme != null ? playerHealth.Theme.arenaLook : null;
+        if (look != null && StunShakeRule.ShakesOnApply(spec.kind, photonView.IsMine, look.stunShakeOn, look.stunShakeStrength)
+            && CameraTracking.Instance != null)
+            CameraTracking.Instance.Shake(look.stunShakeSeconds, look.stunShakeStrength, look.stunShakeFrequency);
+
         // Both raw numbers for every kind, not one picked per kind.
         StatusApplied?.Invoke(spec.kind, sourceActorNumber, spec.abilityId, spec.duration, spec.magnitude);
     }
