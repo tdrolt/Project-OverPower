@@ -9,13 +9,15 @@ using UnityEngine;
 namespace Overpower.Tests
 {
     /// <summary>The white flash on a hit mech: built idle over the mech's own renderers, lit through a property block (never a material copy,
-    /// never the team material changed), refreshed by every hit, off on a dead player, no garbage per frame; and the game asks the rule from
+    /// never the team material changed), refreshed by every hit, a flicker (not a white blob) under damage over time, off on a dead player,
+    /// no garbage per frame; and the game asks the rule from
     /// the one damage funnel on every client's copy, before only the victim's own client goes on. Literal looks, never the real asset's.</summary>
     public class HitFlashViewTests
     {
         private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
         private const float Frame = 1f / 60f;
         private const float Length = 0.1f;
+        private const float Gap = 0.3f;
         private static readonly int EmissionMapId = Shader.PropertyToID("_EmissionMap");
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
@@ -33,6 +35,7 @@ namespace Overpower.Tests
             look = ScriptableObject.CreateInstance<ArenaLook>();
             look.hitFlashSeconds = Length;
             look.hitFlashGlow = 1.5f;
+            look.overTimeFlashGapSeconds = Gap;
             theme.arenaLook = look;
             team = new Material(Shader.Find("Universal Render Pipeline/Lit")) { hideFlags = HideFlags.HideAndDontSave };
             body = new GameObject("HitFlashViewTests Body") { hideFlags = HideFlags.HideAndDontSave };
@@ -91,7 +94,7 @@ namespace Overpower.Tests
         {
             HitFlashView view = Make();
             int materials = Resources.FindObjectsOfTypeAll<Material>().Length;
-            view.Flash();
+            view.Flash(DamageSource.Projectile, 0f);
             Assert.IsTrue(view.enabled, "a hit wakes the flash");
             view.Step(true, Frame);
             Assert.IsTrue(view.Flashing);
@@ -121,7 +124,7 @@ namespace Overpower.Tests
         public void TheFlashStaysFullWhileItShows()
         {
             HitFlashView view = Make();
-            view.Flash();
+            view.Flash(DamageSource.Projectile, 0f);
             view.Step(true, Frame);
             view.Step(true, Frame);
             view.Step(true, Frame);
@@ -136,9 +139,9 @@ namespace Overpower.Tests
         public void ARepeatedHitRefreshesTheFlash()
         {
             HitFlashView view = Make();
-            view.Flash();
+            view.Flash(DamageSource.Projectile, 0f);
             for (int i = 0; i < 4; i++) view.Step(true, Frame); // most of the way out
-            view.Flash();
+            view.Flash(DamageSource.Projectile, 4 * Frame);
             view.Step(true, Frame);
             Assert.AreEqual(1f, view.CurrentStrength, 1e-5f, "a second hit starts it over at full");
             for (int i = 0; i < 4; i++) view.Step(true, Frame);
@@ -146,15 +149,65 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void BurnTicksEveryFrameFlickerInsteadOfStayingWhite()
+        {
+            HitFlashView view = Make();
+            int whiteFrames = 0, flashes = 0, longestWhite = 0, shortestDark = int.MaxValue, run = 0, dark = -1;
+            bool wasWhite = false;
+            const int Frames = 120; // two seconds of a burn ticking every frame
+            for (int i = 0; i < Frames; i++)
+            {
+                view.Flash(DamageSource.Burn, i * Frame);
+                view.Step(true, Frame);
+                if (view.Flashing)
+                {
+                    whiteFrames++;
+                    run++;
+                    if (!wasWhite)
+                    {
+                        flashes++;
+                        if (dark >= 0) shortestDark = Mathf.Min(shortestDark, dark);
+                    }
+                    longestWhite = Mathf.Max(longestWhite, run);
+                    dark = 0;
+                }
+                else
+                {
+                    run = 0;
+                    if (dark >= 0) dark++;
+                }
+                wasWhite = view.Flashing;
+            }
+            Assert.That(flashes, Is.InRange(6, 7), "one flash per gap over two seconds, not one per tick");
+            Assert.That(longestWhite, Is.LessThanOrEqualTo(7), "each flash lasts its own length, never stretched by the ticks under it");
+            Assert.That(shortestDark, Is.GreaterThanOrEqualTo(10), "the mech's own look shows between flashes");
+            Assert.That(whiteFrames, Is.LessThan(Frames / 2), "a burning mech is mostly its own colour");
+        }
+
+        [Test]
+        public void AHitWhileBurningFlashesAtOnce()
+        {
+            HitFlashView view = Make();
+            view.Flash(DamageSource.Burn, 0f);
+            for (int i = 0; i < 9; i++) view.Step(true, Frame); // 0.15 s: that flash is over, the gap is not
+            Assert.IsFalse(view.Flashing);
+            view.Flash(DamageSource.Burn, 9 * Frame);
+            Assert.IsFalse(view.enabled, "a tick inside the gap starts nothing");
+            view.Flash(DamageSource.Projectile, 9 * Frame);
+            view.Step(true, Frame);
+            Assert.IsTrue(view.Flashing, "a bullet flashes whatever the burn is doing");
+        }
+
+        [Test]
         public void ADeadPlayerDoesNotFlash()
         {
             HitFlashView view = Make();
-            view.Flash();
+            view.Flash(DamageSource.Projectile, 0f);
             view.Step(false, Frame);
             Assert.IsFalse(view.Flashing);
             AssertIdle("dead on the frame of the hit");
 
-            view.Flash();
+            view.Flash(DamageSource.Projectile, 0f);
             view.Step(true, Frame);
             Assert.IsTrue(view.Flashing);
             view.Step(false, Frame);
@@ -169,7 +222,7 @@ namespace Overpower.Tests
             var other = new Material(team) { hideFlags = HideFlags.HideAndDontSave };
             try
             {
-                view.Flash();
+                view.Flash(DamageSource.Projectile, 0f);
                 view.Step(true, Frame);
                 foreach (SkinnedMeshRenderer part in parts)
                     part.sharedMaterial = other;
@@ -190,13 +243,14 @@ namespace Overpower.Tests
         public void NoGarbageWhileFlashing()
         {
             HitFlashView view = Make();
-            view.Flash();
+            view.Flash(DamageSource.Projectile, 0f);
             view.Step(true, Frame); // warm up
             int allocations = AllocationProbe.Count(() =>
             {
                 for (int i = 0; i < 120; i++)
                 {
-                    if (i % 4 == 0) view.Flash();
+                    if (i % 4 == 0) view.Flash(DamageSource.Projectile, i * Frame);
+                    if (i % 4 == 2) view.Flash(DamageSource.Burn, i * Frame);
                     view.Step(true, Frame);
                 }
                 for (int i = 0; i < 20; i++)
@@ -227,6 +281,13 @@ namespace Overpower.Tests
             int flash = IlWiring.CallOffsets(applyDamage, Rule(nameof(HitFlashRule.FlashesOnHit))).DefaultIfEmpty(int.MaxValue).Min();
             int victimOnly = IlWiring.CallOffsets(applyDamage, isMine).DefaultIfEmpty(-1).Max();
             Assert.That(flash, Is.LessThan(victimOnly), "the rule is asked before the 'only the victim's own client goes on' return");
+        }
+
+        [Test]
+        public void EveryFlashAsksTheGapRuleAndStartsOnItsAnswer()
+        {
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(HitFlashView), "Flash", Rule(nameof(HitFlashRule.StartsFlash))),
+                "HitFlashView.Flash branches on HitFlashRule.StartsFlash");
         }
 
         [Test]

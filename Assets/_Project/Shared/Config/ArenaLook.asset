@@ -245,6 +245,7 @@ MonoBehaviour:
   mechTemplate: {fileID: 2100000, guid: 8bd3427c0e9b2d04eb19a742ff9ad1fc, type: 2}
   hitFlashSeconds: 0.1
   hitFlashGlow: 1.2
+  overTimeFlashGapSeconds: 0.35
   floorSurface:
     baseTint: {r: 0.16, g: 0.17, b: 0.19, a: 1}
     gloss: 0.7

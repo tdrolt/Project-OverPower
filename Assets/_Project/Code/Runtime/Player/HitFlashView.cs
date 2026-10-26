@@ -5,11 +5,11 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// A mech flashes white for a moment when a hit lands on it, on every client's copy (PlayerHealth.ApplyDamage asks HitFlashRule and
-    /// calls Flash). The whole body is lit through a property block that swaps in a plain white glow map and a white glow colour over the
+    /// A mech flashes white for a moment when damage lands on it, on every copy that runs the damage (PlayerHealth.ApplyDamage asks
+    /// HitFlashRule and calls Flash). The whole body is lit through a property block that swaps in a plain white glow map and a white glow colour over the
     /// team material, so no material is copied and the team colour (PlayerTeamAppearance swaps sharedMaterial) is never touched. Nothing
     /// else sets a property block on the mech's renderers, so clearing the block hands each part back its own look. Sleeps (disabled)
-    /// between hits. Length and brightness: Arena Look's Hit Flash fields; the white: UiTheme's Flash White.
+    /// between hits. Length, brightness and the damage-over-time gap: Arena Look's Hit Flash fields; the white: UiTheme's Flash White.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class HitFlashView : MonoBehaviour
@@ -24,6 +24,7 @@ namespace Overpower.Combat
         private SkinnedMeshRenderer[] parts;
         private MaterialPropertyBlock block;
         private float sinceHit = float.PositiveInfinity;
+        private float startedAt = float.NegativeInfinity; // kept while asleep: the gap runs from it, not from the flash's end
         private float strength;
 
         public bool Flashing => strength > 0f;
@@ -53,9 +54,13 @@ namespace Overpower.Combat
             return view;
         }
 
-        /// <summary>A hit landed: the flash starts over at full, whether or not one is already showing.</summary>
-        public void Flash()
+        /// <summary>Damage landed at <paramref name="now"/> (Time.time): the flash starts over at full when the rule lets it (a hit always,
+        /// damage over time once its gap is up).</summary>
+        public void Flash(DamageSource source, float now)
         {
+            if (!HitFlashRule.StartsFlash(source, now - startedAt, look.overTimeFlashGapSeconds))
+                return;
+            startedAt = now;
             sinceHit = 0f;
             enabled = true;
         }

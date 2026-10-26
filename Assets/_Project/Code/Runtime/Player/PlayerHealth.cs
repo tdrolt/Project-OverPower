@@ -532,11 +532,12 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         // AreSameTeam deliberately fails OPEN: an unknown team must never silently make someone invulnerable.
         bool fromTeammate = !fromSelf && Teams.AreSameTeam(sourcePlayer, photonView.Owner);
 
-        // On every copy, before the victim-only return below: each client flashes the hit it simulated itself, so the flash needs no
-        // message and shows when the shot lands on that screen. The immune look and the respawn shield are read as every client sees them.
+        // On every copy, before the victim-only return below: each client flashes the damage it simulated itself, so the flash needs no
+        // message and shows when the shot lands on that screen (a burn, the fence and the sudden-death circle run only on the victim's own
+        // client, so only that screen flashes for them). The immune look and the respawn shield are read as every client sees them.
         if (HitFlashRule.FlashesOnHit(info.Source, info.Amount, IsAlive, fromSelf, fromTeammate, ShowsImmuneLook,
                                       respawnShield != null && respawnShield.IsUp))
-            hitFlash?.Flash();
+            hitFlash?.Flash(info.Source, Time.time);
 
         // The victim is the sole authority on its own health, or every client would subtract from its own copy and
         // the owner's next serialization would fight it back.
