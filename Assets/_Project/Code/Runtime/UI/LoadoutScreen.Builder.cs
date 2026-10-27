@@ -183,10 +183,15 @@ namespace Overpower.UI
         /// Abilities &amp; Armor page, with Reset Armor to their right. Each path is its own row: picture, text, one step per level, its own +.</summary>
         private void BuildArmorSection(Transform page)
         {
-            AddSectionHeader(page, theme.loadoutArmorHeadingText);
+            // As wide as the ability columns and centred like them, so the heading and the paths start on the cards' start line and
+            // Reset Armor ends where the last column ends.
+            Transform block = BuildColumn(page, ShopPageColumns.Width(LoadoutAbilitySlotOrder.Length, theme.loadoutAbilityCardWidth,
+                theme.loadoutNodeSpacing, theme.loadoutAbilityColumnGap)).transform;
+            block.name = "Armor Block";
+            AddSectionHeader(block, theme.loadoutArmorHeadingText);
 
             GameObject group = new GameObject("Armor Section", typeof(RectTransform));
-            group.transform.SetParent(page, false);
+            group.transform.SetParent(block, false);
             HorizontalLayoutGroup layout = group.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = theme.loadoutNodeSpacing; // Between the paths, the spacer and Reset Armor.
             layout.childAlignment = TextAnchor.MiddleLeft;
@@ -384,8 +389,7 @@ namespace Overpower.UI
             columnsLayout.childControlWidth = columnsLayout.childControlHeight = true;
             columnsLayout.childForceExpandWidth = columnsLayout.childForceExpandHeight = false;
 
-            // Two cards across in every column.
-            float columnWidth = 2f * theme.loadoutAbilityCardWidth + theme.loadoutNodeSpacing;
+            float columnWidth = ShopPageColumns.ColumnWidth(theme.loadoutAbilityCardWidth, theme.loadoutNodeSpacing);
 
             foreach (AbilitySlot slot in LoadoutAbilitySlotOrder)
             {

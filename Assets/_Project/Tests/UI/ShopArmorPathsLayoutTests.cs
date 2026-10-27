@@ -159,6 +159,28 @@ namespace Overpower.Tests
             Assert.LessOrEqual(page.GetComponent<VerticalLayoutGroup>().preferredHeight, theme.loadoutPageHeight, "the page's content fits Loadout Page Height");
         }
 
+        [Test]
+        public void TheArmourBlockStartsOnTheAbilityCardsStartLine()
+        {
+            var page = (GameObject)Get("abilitiesPageRoot");
+            Transform columns = page.transform.Find("Ability Columns");
+            Assert.NotNull(columns, "Ability Columns");
+            Transform firstColumn = columns.GetChild(0), lastColumn = columns.GetChild(columns.childCount - 1);
+            Rect firstCard = WorldRect((RectTransform)firstColumn.GetComponentInChildren<GridLayoutGroup>().transform.GetChild(0));
+            Rect columnHeading = WorldRect(firstColumn.GetComponentInChildren<TMPro.TextMeshProUGUI>().rectTransform);
+
+            TMPro.TextMeshProUGUI armourHeading = null;
+            foreach (TMPro.TextMeshProUGUI label in page.GetComponentsInChildren<TMPro.TextMeshProUGUI>())
+                if (label.text == theme.loadoutArmorHeadingText) { armourHeading = label; break; }
+            Assert.NotNull(armourHeading, "the armour heading");
+
+            Assert.AreEqual(firstCard.xMin, WorldRect(Part<RectTransform>(Path("absorbPath"), "root")).xMin, 0.5f, "Absorb starts where the first ability card starts");
+            Assert.AreEqual(firstCard.xMin, WorldRect(Part<RectTransform>(Path("rechargePath"), "root")).xMin, 0.5f, "Recharge starts where the first ability card starts");
+            Assert.AreEqual(columnHeading.xMin, WorldRect(armourHeading.rectTransform).xMin, 0.5f, "the armour heading starts where the column headings start");
+            Rect reset = WorldRect(((Image)Get("resetArmorImage")).rectTransform);
+            Assert.LessOrEqual(reset.xMax, WorldRect((RectTransform)lastColumn).xMax + 0.5f, "Reset Armor ends inside the columns' span");
+        }
+
         [TestCase(1920f, 1080f)]
         [TestCase(1280f, 720f)]
         public void TheShopPanelFitsTheScreen(float w, float h)
@@ -184,6 +206,8 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(LoadoutScreen), "BuildArmorSection", layout.GetMethod("SectionHeight")), "section height");
             Assert.IsTrue(IlWiring.Uses(typeof(LoadoutScreen), "BuildArmorSection", layout.GetMethod("RowTop")), "path rows");
             Assert.IsTrue(IlWiring.Uses(typeof(LoadoutScreen), "BuildArmorPath", layout.GetMethod("StepCentreX")), "step places");
+            Assert.IsTrue(IlWiring.Uses(typeof(LoadoutScreen), "BuildArmorSection", typeof(ShopPageColumns).GetMethod("Width")), "armour block width");
+            Assert.IsTrue(IlWiring.Uses(typeof(LoadoutScreen), "BuildAbilitiesUi", typeof(ShopPageColumns).GetMethod("ColumnWidth")), "ability column width");
         }
     }
 }

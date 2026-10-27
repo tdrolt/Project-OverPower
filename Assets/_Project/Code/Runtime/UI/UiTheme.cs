@@ -373,11 +373,11 @@ namespace Overpower.UI
         public float loadoutNodeWidth = 180f;
         [Tooltip("Height of one weapon node button in the upgrade tree, in canvas units.")]
         public float loadoutNodeHeight = 96f;
-        [Tooltip("Width of one ability card on the Abilities & Armor page, in canvas units. Two cards fit across each of the three columns.")]
+        [Tooltip("Width of one ability card on the Abilities & Armor page, in canvas units. Two cards fit across each of the three columns, and the armour block above is as wide as the three columns, so the armour paths start on the first card's left edge.")]
         public float loadoutAbilityCardWidth = 240f;
         [Tooltip("Height of one ability card on the Abilities & Armor page, in canvas units.")]
         public float loadoutAbilityCardHeight = 88f;
-        [Tooltip("Width of one armour path (Absorb, Recharge) on the Abilities & Armor page, in canvas units. A path holds its picture, its name and next price, its steps and its + button, from left to right; the path and Reset Armor beside it must fit Loadout Page Width.")]
+        [Tooltip("Width of one armour path (Absorb, Recharge) on the Abilities & Armor page, in canvas units. A path holds its picture, its name and next price, its steps and its + button, from left to right; the path and Reset Armor beside it must fit the width of the ability columns below them.")]
         [UnityEngine.Serialization.FormerlySerializedAs("loadoutArmorCardWidth")]
         public float loadoutArmorPathWidth = 780f;
         [Tooltip("Height of one armour path, in canvas units. The two paths stand one above the other, so the armour section is twice this plus Loadout Armor Path Gap; the whole Abilities & Armor page must still fit Loadout Page Height.")]
@@ -420,7 +420,7 @@ namespace Overpower.UI
         public Sprite loadoutArmorAbsorbIcon;
         [Tooltip("Picture on the Recharge armour path in the shop. The armour upgrades have no item asset of their own, so their pictures live here.")]
         public Sprite loadoutArmorRechargeIcon;
-        [Tooltip("Horizontal space between the Mobility, Attachment and Ultimate columns on the Abilities & Armor page, in canvas units.")]
+        [Tooltip("Horizontal space between the Mobility, Attachment and Ultimate columns on the Abilities & Armor page, in canvas units. The armour block above spans the same columns, so this also widens it.")]
         public float loadoutAbilityColumnGap = 60f;
         [Tooltip("Gap between the two upgrades of a weapon family (side by side), between ability cards in a column's grid (both directions), and between the armour paths and Reset Armor, in canvas units.")]
         public float loadoutNodeSpacing = 20f;
