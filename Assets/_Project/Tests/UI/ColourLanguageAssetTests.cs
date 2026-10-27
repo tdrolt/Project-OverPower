@@ -206,6 +206,51 @@ namespace Overpower.Tests
             }
         }
 
+        // The team whose colour is nearest today's fire burns like today's fire: its flames and hearts, as drawn on the team sheets, are as
+        // strong in colour and as bright on average as fire of no team on the orange sheets, so team fire never reads paler than fire did.
+        [Test]
+        public void TheFireHuedTeamsFlamesAsDrawnAreAsStrongAndBrightAsTeamlessFire()
+        {
+            const float Tolerance = 0.08f;
+            UiTheme t = Theme();
+            ArenaLook look = Look();
+            Overpower.Abilities.FlameLook.FireColours teamless = Overpower.Abilities.FlameLook.Colours(t, t.fireEdgeColor, -1);
+            Color fireHue = Drawn(teamless.Body.Evaluate(0f), MeanOpaqueColour(Overpower.Abilities.FlameLook.SheetMaterial(look, false, false)));
+            int nearest = 0;
+            for (int team = 1; team < t.teamShotColors.Length; team++)
+                if (HueDegreesApart(t.teamShotColors[team], fireHue) < HueDegreesApart(t.teamShotColors[nearest], fireHue))
+                    nearest = team;
+            Overpower.Abilities.FlameLook.FireColours teamFire = Overpower.Abilities.FlameLook.Colours(t, t.fireEdgeColor, nearest);
+            Assert.IsTrue(teamFire.TeamSheets);
+            foreach ((bool heart, Gradient teamRamp, Gradient teamlessRamp) in new[] { (false, teamFire.Body, teamless.Body), (true, teamFire.Core, teamless.Core) })
+            {
+                string name = heart ? "hearts" : "flames";
+                (float s, float v) = MeanDrawn(teamRamp, MeanOpaqueColour(Overpower.Abilities.FlameLook.SheetMaterial(look, heart, true)));
+                (float teamlessS, float teamlessV) = MeanDrawn(teamlessRamp, MeanOpaqueColour(Overpower.Abilities.FlameLook.SheetMaterial(look, heart, false)));
+                Assert.AreEqual(teamlessS, s, Tolerance, $"team {nearest}'s {name} are drawn {s:F2} strong in colour, fire of no team {teamlessS:F2}");
+                Assert.AreEqual(teamlessV, v, Tolerance, $"team {nearest}'s {name} are drawn {v:F2} bright, fire of no team {teamlessV:F2}");
+            }
+        }
+
+        // Mean strength of colour and brightness of a ramp's solid samples drawn on a sheet.
+        private static (float s, float v) MeanDrawn(Gradient ramp, Color sheet)
+        {
+            float s = 0f, v = 0f;
+            int n = 0;
+            for (int i = 0; i <= 50; i++)
+            {
+                Color at = ramp.Evaluate(i / 50f);
+                if (at.a < 0.5f)
+                    continue;
+                Color drawn = Drawn(at, sheet);
+                s += Sat(drawn);
+                v += Val(drawn);
+                n++;
+            }
+            Assert.Greater(n, 0, "the ramp is solid for part of its life");
+            return (s / n, v / n);
+        }
+
         private static Color Drawn(Color ramp, Color sheet)
         {
             Color linear = ramp.linear, under = sheet.linear;

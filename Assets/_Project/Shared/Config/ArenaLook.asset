@@ -147,7 +147,7 @@ MonoBehaviour:
   flameJetReach: 0.75
   flameFanStrength: 0.4
   fireTeamHue: 1
-  fireTeamHeartWhiteness: 0.4
+  fireTeamHeartWhiteness: 0.2
   flameJetTeamMaterial: {fileID: 2100000, guid: b51be72a73564a9f8badf36a3cb7788f, type: 2}
   flameCoreTeamMaterial: {fileID: 2100000, guid: c60d9d9182f746a9a30009735daf0371, type: 2}
   fireFieldFlamesPerSquareMetre: 3.7

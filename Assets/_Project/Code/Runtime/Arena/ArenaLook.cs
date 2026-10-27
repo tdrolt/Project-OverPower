@@ -202,8 +202,8 @@ namespace Overpower.Arena
         [Header("Team fire")]
         [Tooltip("How fully the fire of the Flamethrower and of the Rocket's burning ground takes the colour of the team that fired it: 1 burns in the team's own colour, lower turns it part of the way from orange-red toward it, and 0 leaves every fire orange-red. Each flame keeps its own brightness either way. Fire whose team is unknown is always orange-red.")]
         [Range(0f, 1f)] public float fireTeamHue = 1f;
-        [Tooltip("How much paler than its flame the hot heart of a team's fire is: 0 gives the heart the flame's full colour, 1 makes it plain white with only its glow. Higher reads hotter but tells the teams apart less in the middle of the fire.")]
-        [Range(0f, 1f)] public float fireTeamHeartWhiteness = 0.4f;
+        [Tooltip("How much paler than its flame the hot heart of a team's fire is: 0 gives the heart the flame's full colour, 1 makes it plain white with only its glow. Higher reads hotter but tells the teams apart less in the middle of the fire; above about 0.2 the Orange team's fire looks paler than fire of no team.")]
+        [Range(0f, 1f)] public float fireTeamHeartWhiteness = 0.2f;
         [Tooltip("The see-through material put on the flames of a team's fire: the same Fire Body frames as Flame Jet Material in plain grey, so the team colour over its life comes through unchanged (the orange sheet would darken a blue or purple flame almost to black). Made by make_fire.py in Shared/FX/Textures/Source~. Empty draws team fire on Flame Jet Material.")]
         public Material flameJetTeamMaterial;
         [Tooltip("The material that adds light, put on the hot heart of a team's fire: the Fire Core frames of Flame Core Material in plain white, so the heart glows in the team's paled colour. Empty draws it on Flame Core Material.")]
