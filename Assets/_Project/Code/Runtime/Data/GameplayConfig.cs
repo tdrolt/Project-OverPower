@@ -237,10 +237,10 @@ namespace Overpower.Data
         public float DroppedGraceSeconds => droppedGraceSeconds;
 
         [Header("Mech animation")]
-        [Tooltip("The shortest time, in seconds, a mech holds its shoot pose after a shot leaves the gun, so a quick tap and a " +
-                 "charge weapon's release still show a shot. Other players see a mech's pose about 20 times a second, so below " +
-                 "about 0.15 a tap may never show on their screens. Holding the trigger keeps the pose for as long as it is held, " +
-                 "except on a charge weapon, which only shows the pose when its shot is released.")]
+        [Tooltip("The shortest time, in seconds, a mech holds its shoot pose after a shot leaves the gun; a slower shoot motion holds it " +
+                 "until the motion is done. Other players see a mech's pose about 20 times a second, so below about 0.15 a quick tap " +
+                 "may never show on their screens. Only real shots show the pose: holding the trigger while the gun cannot fire yet " +
+                 "shows nothing.")]
         [SerializeField, Min(0f)] private float shootPoseMinimumSeconds = 0.2f;
         public float ShootPoseMinimumSeconds => shootPoseMinimumSeconds;
 

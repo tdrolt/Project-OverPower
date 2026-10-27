@@ -8,9 +8,9 @@ using UnityEngine;
 
 namespace Overpower.Tests
 {
-    /// <summary>The mech's run / idle / shoot bools as levels worked out every frame: a held trigger shoots only while the weapon may fire,
-    /// a charge weapon never shoots while charging and every shot holds the pose a minimum time. Then the wiring: animScript asks this rule
-    /// with the router's input and the weapon's state, and never reads the raw keyboard or mouse again.</summary>
+    /// <summary>The mech's run / idle / shoot bools as levels worked out every frame: only a shot that left the gun shows the shoot pose, for
+    /// as long as that shot asks, and never while the weapon may not fire. Holding the trigger on a gun that cannot fire yet shows nothing. Then
+    /// the wiring: animScript asks this rule with the router's movement and the weapon's state, and never reads the held trigger or the raw keyboard.</summary>
     public class MechAnimParamsTests
     {
         private const float Pose = 0.2f;
@@ -21,15 +21,15 @@ namespace Overpower.Tests
         [Test]
         public void MovingRunsAndStandingStillIdles()
         {
-            MechAnimParams moving = MechAnimParams.For(false, Forward, true, false, NeverShot, Pose);
+            MechAnimParams moving = MechAnimParams.For(Forward, true, NeverShot, Pose);
             Assert.IsTrue(moving.Run);
             Assert.IsFalse(moving.Idle);
 
-            MechAnimParams still = MechAnimParams.For(false, Still, true, false, NeverShot, Pose);
+            MechAnimParams still = MechAnimParams.For(Still, true, NeverShot, Pose);
             Assert.IsFalse(still.Run);
             Assert.IsTrue(still.Idle);
 
-            MechAnimParams noise = MechAnimParams.For(false, new Vector2(0.01f, 0.01f), true, false, NeverShot, Pose);
+            MechAnimParams noise = MechAnimParams.For(new Vector2(0.01f, 0.01f), true, NeverShot, Pose);
             Assert.IsFalse(noise.Run, "a stick resting a hair off centre is not running");
             Assert.IsTrue(noise.Idle);
         }
@@ -39,66 +39,41 @@ namespace Overpower.Tests
         {
             foreach (Vector2 axis in new[] { Still, Forward, new Vector2(-0.7f, 0.7f), new Vector2(0.05f, 0f) })
             {
-                MechAnimParams p = MechAnimParams.For(false, axis, true, false, NeverShot, Pose);
+                MechAnimParams p = MechAnimParams.For(axis, true, NeverShot, Pose);
                 Assert.AreNotEqual(p.Run, p.Idle, "axis " + axis);
             }
         }
 
         [Test]
-        public void HoldingTheTriggerShootsForAsLongAsItIsHeld()
+        public void NoShotNoShootPose()
         {
-            Assert.IsTrue(MechAnimParams.For(true, Still, true, false, NeverShot, Pose).Shoot, "held, standing");
-            Assert.IsTrue(MechAnimParams.For(true, Forward, true, false, NeverShot, Pose).Shoot, "held, running");
-            Assert.IsTrue(MechAnimParams.For(true, Still, true, false, 5f, Pose).Shoot, "held long after the last shot (between automatic shots)");
+            // Holding fire while cooling down, overheated, charging or waiting out a wind-up: the gun may fire, but nothing left it.
+            Assert.IsFalse(MechAnimParams.For(Still, true, NeverShot, Pose).Shoot, "never fired, standing");
+            Assert.IsFalse(MechAnimParams.For(Forward, true, NeverShot, Pose).Shoot, "never fired, running");
+            Assert.IsFalse(MechAnimParams.For(Still, true, 0.5f, Pose).Shoot, "the last shot's pose is over");
         }
 
         [Test]
-        public void LettingGoStopsShootingOnceThePoseHasPlayed()
+        public void EveryShotHoldsTheShootPoseForItsOwnLength()
         {
-            Assert.IsFalse(MechAnimParams.For(false, Still, true, false, NeverShot, Pose).Shoot, "never fired");
-            Assert.IsFalse(MechAnimParams.For(false, Forward, true, false, 0.5f, Pose).Shoot, "released half a second after the last shot");
-        }
-
-        [Test]
-        public void AQuickTapStillHoldsTheShootPoseTheMinimumTime()
-        {
-            Assert.IsTrue(MechAnimParams.For(false, Still, true, false, 0f, Pose).Shoot, "the frame the tap's shot left");
-            Assert.IsTrue(MechAnimParams.For(false, Still, true, false, 0.19f, Pose).Shoot, "just inside the minimum");
-            Assert.IsFalse(MechAnimParams.For(false, Still, true, false, 0.21f, Pose).Shoot, "just past it");
-        }
-
-        [Test]
-        public void AChargeWeaponDoesNotShootWhileCharging()
-        {
-            Assert.IsFalse(MechAnimParams.For(true, Still, true, true, NeverShot, Pose).Shoot, "holding to charge, nothing fired yet");
-            Assert.IsFalse(MechAnimParams.For(true, Forward, true, true, 3f, Pose).Shoot, "charging again long after the last shot");
-        }
-
-        [Test]
-        public void AChargeShotPulsesTheShootPoseOnRelease()
-        {
-            Assert.IsTrue(MechAnimParams.For(false, Still, true, true, 0f, Pose).Shoot, "the release fired the charged shot");
-            Assert.IsTrue(MechAnimParams.For(false, Forward, true, true, 0.1f, Pose).Shoot, "still inside the pulse, running");
-            Assert.IsFalse(MechAnimParams.For(false, Still, true, true, 0.3f, Pose).Shoot, "the pulse is over");
-            Assert.IsTrue(MechAnimParams.For(true, Still, true, true, 0.05f, Pose).Shoot,
-                "pressed again right after the shot: the pulse still plays out");
+            Assert.IsTrue(MechAnimParams.For(Still, true, 0f, Pose).Shoot, "the frame the shot left");
+            Assert.IsTrue(MechAnimParams.For(Forward, true, 0.19f, Pose).Shoot, "just inside the pose, running");
+            Assert.IsFalse(MechAnimParams.For(Still, true, 0.21f, Pose).Shoot, "just past it");
         }
 
         [Test]
         public void AWeaponThatMayNotFireNeverShoots()
         {
             // mayFire is false when dead, stunned, silenced by overheat, or the gun is switched off.
-            Assert.IsFalse(MechAnimParams.For(true, Still, false, false, NeverShot, Pose).Shoot, "held while unable to fire");
-            Assert.IsFalse(MechAnimParams.For(true, Forward, false, false, 0f, Pose).Shoot, "a stun lands the frame a shot left: the pose is cut");
-            Assert.IsFalse(MechAnimParams.For(false, Still, false, true, 0.05f, Pose).Shoot, "a charge shot's pulse is cut by death");
+            Assert.IsFalse(MechAnimParams.For(Still, false, NeverShot, Pose).Shoot, "unable to fire, no shot");
+            Assert.IsFalse(MechAnimParams.For(Forward, false, 0f, Pose).Shoot, "a stun lands the frame a shot left: the pose is cut");
+            Assert.IsFalse(MechAnimParams.For(Still, false, 0.05f, Pose).Shoot, "a shot's pose is cut by death");
         }
 
         [Test]
-        public void AZeroPoseLengthMeansOnlyTheHeldTriggerShoots()
+        public void AZeroPoseLengthNeverShoots()
         {
-            Assert.IsFalse(MechAnimParams.For(false, Still, true, false, 0f, 0f).Shoot);
-            Assert.IsFalse(MechAnimParams.For(false, Still, true, true, 0f, 0f).Shoot);
-            Assert.IsTrue(MechAnimParams.For(true, Still, true, false, 0f, 0f).Shoot);
+            Assert.IsFalse(MechAnimParams.For(Still, true, 0f, 0f).Shoot);
         }
 
         // ---- wiring ----
@@ -119,15 +94,16 @@ namespace Overpower.Tests
         [Test]
         public void AnimScriptFeedsTheRuleTheRoutersInputAndTheWeaponsState()
         {
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(PlayerInputRouter), nameof(PlayerInputRouter.PrimaryHeld))));
             Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(PlayerInputRouter), nameof(PlayerInputRouter.MoveAxis))));
             Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(WeaponFiring), nameof(WeaponFiring.MayFire))));
             Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(WeaponFiring), nameof(WeaponFiring.LastShotTime))));
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(GameplayConfig), nameof(GameplayConfig.ShootPoseMinimumSeconds))));
-            // Without the weapon's own charge flag the Charge gun would hold the shoot pose all the time its trigger is held to charge.
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(WeaponFiring), nameof(WeaponFiring.Weapon))));
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(WeaponDefinition), nameof(WeaponDefinition.CanCharge))),
-                "a charge weapon must not show the shoot pose while charging");
+        }
+
+        [Test]
+        public void HoldingFireAloneNeverReachesTheShootPose()
+        {
+            Assert.IsFalse(IlWiring.Uses(typeof(animScript), Getter(typeof(PlayerInputRouter), nameof(PlayerInputRouter.PrimaryHeld))),
+                "a held trigger raised the gun while it could not fire (cooling down, overheated, winding up)");
         }
 
         [Test]

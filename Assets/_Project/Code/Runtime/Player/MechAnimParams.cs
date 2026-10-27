@@ -3,8 +3,8 @@ using UnityEngine;
 namespace Overpower.Arena
 {
     /// <summary>The mech Animator's three bools for this frame, worked out from scratch every frame so nothing (a death, a stun, a shop
-    /// click, chat) can leave one stuck, as press/release edges can. A charge weapon never holds the shoot pose while it
-    /// charges; every shot that leaves the gun holds it for at least the minimum, so a quick tap still reaches the other screens.</summary>
+    /// click, chat) can leave one stuck, as press/release edges can. Only a shot that leaves the gun shows the shoot pose, for as long
+    /// as that shot asks: a held trigger on a gun that cannot fire yet (cooling down, overheated, charging) shows nothing.</summary>
     public readonly struct MechAnimParams
     {
         public readonly bool Run;
@@ -18,12 +18,10 @@ namespace Overpower.Arena
             Shoot = shoot;
         }
 
-        public static MechAnimParams For(bool primaryHeld, Vector2 moveAxis, bool mayFire, bool canCharge,
-                                         float secondsSinceLastShot, float shootPoseSeconds)
+        public static MechAnimParams For(Vector2 moveAxis, bool mayFire, float secondsSinceLastShot, float shootPoseSeconds)
         {
             bool run = moveAxis.sqrMagnitude > RestingAxisSqr;
-            bool heldShot = primaryHeld && !canCharge;
-            bool shoot = mayFire && (heldShot || secondsSinceLastShot < shootPoseSeconds);
+            bool shoot = mayFire && secondsSinceLastShot < shootPoseSeconds;
             return new MechAnimParams(run, !run, shoot);
         }
 

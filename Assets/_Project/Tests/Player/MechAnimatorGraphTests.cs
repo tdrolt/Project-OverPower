@@ -95,7 +95,8 @@ namespace Overpower.Tests
             Assert.IsFalse(clip.isLooping, "a looping shoot clip replays on its own between shots, out of step with them");
         }
 
-        // The shoot bool turns on while the gun is cooling down too; only a shot that leaves (animScript.OnShotShown) may start the recoil.
+        // Only a shot that leaves (animScript.OnShotShown) may start the recoil. The bool alone can still turn on without one: a remote copy's
+        // streamed bool landing before the shot's RPC, or a stun lifting inside a shot's pose.
         [Test]
         public void TheShootBoolOnlyRaisesTheGunAndNeverStartsTheRecoil()
         {

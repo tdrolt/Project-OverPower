@@ -21,10 +21,11 @@ public class animScript : MonoBehaviourPun
     private PlayerInputRouter input;
     private PhotonView photonView;
     private float lastShotSeen = float.NegativeInfinity;
+    private float shotPoseSeconds;
 
     [SerializeField, Tooltip("Where the shortest shoot pose after a shot and the shoot motion's speed-up and blend come from: " +
-             "Assets/_Project/Shared/Config/GameplayConfig.asset. Left empty, the mech only shows the shoot pose while the trigger is held, " +
-             "a charge weapon's shot shows no pose at all, and a fast gun's motion is not sped up.")]
+             "Assets/_Project/Shared/Config/GameplayConfig.asset. Left empty, a shot holds the shoot pose only for the length of the " +
+             "shoot motion, and a fast gun's motion is not sped up.")]
     private GameplayConfig gameplayConfig;
 
     [SerializeField, Tooltip("The clip the Shoot state plays; its length sets how much a fast gun speeds the shoot motion up.")]
@@ -40,7 +41,7 @@ public class animScript : MonoBehaviourPun
         photonView = GetComponent<PhotonView>();
 
         if (gameplayConfig == null)
-            Debug.LogError($"[animScript] {name}: GameplayConfig is not assigned - a quick tap or a charge shot shows no shoot pose.");
+            Debug.LogError($"[animScript] {name}: GameplayConfig is not assigned - the shoot pose has no minimum and a fast gun's motion is not sped up.");
     }
 
     void OnEnable()
@@ -66,14 +67,12 @@ public class animScript : MonoBehaviourPun
 
     private void ApplyParams()
     {
-        bool held = input != null && input.PrimaryHeld;
+        // The held trigger is not read on purpose: a gun that cannot fire yet stays lowered.
         Vector2 move = input != null ? input.MoveAxis : Vector2.zero;
         bool mayFire = weaponFiring != null && weaponFiring.MayFire;
-        bool canCharge = weaponFiring != null && weaponFiring.Weapon != null && weaponFiring.Weapon.CanCharge;
         float sinceShot = weaponFiring != null ? Time.time - weaponFiring.LastShotTime : float.PositiveInfinity;
-        float pose = gameplayConfig != null ? gameplayConfig.ShootPoseMinimumSeconds : 0f;
 
-        MechAnimParams p = MechAnimParams.For(held, move, mayFire, canCharge, sinceShot, pose);
+        MechAnimParams p = MechAnimParams.For(move, mayFire, sinceShot, shotPoseSeconds);
         anim.SetBool(RunParam, p.Run);
         anim.SetBool(IdleParam, p.Idle);
         anim.SetBool(ShootParam, p.Shoot);
@@ -82,8 +81,7 @@ public class animScript : MonoBehaviourPun
     // The shot's RPC usually lands before the streamed shoot bool; without this the restarted motion blends straight back out.
     private void HoldRemoteShotPose()
     {
-        float pose = gameplayConfig != null ? gameplayConfig.ShootPoseMinimumSeconds : 0f;
-        if (ShootMotion.HoldsPose(Time.time - lastShotSeen, pose))
+        if (ShootMotion.HoldsPose(Time.time - lastShotSeen, shotPoseSeconds))
             anim.SetBool(ShootParam, true);
     }
 
@@ -93,8 +91,11 @@ public class animScript : MonoBehaviourPun
         float clipSeconds = shootClip != null ? shootClip.length : 0f;
         float maxSpeed = gameplayConfig != null ? gameplayConfig.ShootMotionMaxSpeed : 1f;
         float blend = gameplayConfig != null ? gameplayConfig.ShootMotionBlendSeconds : 0f;
+        float minimumPose = gameplayConfig != null ? gameplayConfig.ShootPoseMinimumSeconds : 0f;
+        float speed = ShootMotion.Speed(clipSeconds, fireIntervalSeconds, maxSpeed);
+        shotPoseSeconds = ShootMotion.HoldSeconds(clipSeconds, speed, minimumPose);
 
-        anim.SetFloat(ShootSpeedParam, ShootMotion.Speed(clipSeconds, fireIntervalSeconds, maxSpeed));
+        anim.SetFloat(ShootSpeedParam, speed);
         anim.CrossFadeInFixedTime(ShootState, blend, 0, 0f);
     }
 }

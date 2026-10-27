@@ -65,6 +65,21 @@ namespace Overpower.Tests
             Assert.IsFalse(ShootMotion.HoldsPose(0f, 0f), "a zero pose holds nothing");
         }
 
+        [Test]
+        public void AShotHoldsThePoseForItsWholeMotion()
+        {
+            Assert.AreEqual(0.5f, ShootMotion.HoldSeconds(Clip, 1f, 0.2f), 1e-5f, "a slow gun: the whole motion at its own speed");
+            Assert.AreEqual(0.4f, ShootMotion.HoldSeconds(Clip, 1.25f, 0.2f), 1e-5f, "sped up: the motion is shorter");
+        }
+
+        [Test]
+        public void AShotHoldsThePoseAtLeastTheMinimum()
+        {
+            Assert.AreEqual(0.2f, ShootMotion.HoldSeconds(Clip, 5f, 0.2f), 1e-5f, "a motion shorter than the minimum");
+            Assert.AreEqual(0.2f, ShootMotion.HoldSeconds(0f, 1f, 0.2f), 1e-5f, "no clip");
+            Assert.AreEqual(0.2f, ShootMotion.HoldSeconds(Clip, 0f, 0.2f), 1e-5f, "a speed of zero never ends the motion; the minimum stands in");
+        }
+
         // ---- wiring ----
 
         private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
@@ -104,6 +119,18 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(animScript), "OnShotShown",
                 typeof(Animator).GetMethod(nameof(Animator.CrossFadeInFixedTime), new[] { typeof(int), typeof(float), typeof(int), typeof(float) })),
                 "every shot must restart the motion from its first frame");
+        }
+
+        [Test]
+        public void EveryShotSetsHowLongThePoseIsHeldOnEveryClient()
+        {
+            FieldInfo hold = typeof(animScript).GetField("shotPoseSeconds", Any);
+            Assert.IsNotNull(hold, "animScript.shotPoseSeconds keeps the last shot's pose length");
+            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "OnShotShown", Rule(nameof(ShootMotion.HoldSeconds))));
+            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "OnShotShown", Getter(typeof(GameplayConfig), nameof(GameplayConfig.ShootPoseMinimumSeconds))));
+            Assert.IsTrue(IlWiring.Stores(typeof(animScript), "OnShotShown", hold), "the shot must remember its pose length");
+            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", hold), "the shooter's own pose must last that long");
+            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "HoldRemoteShotPose", hold), "a remote copy's pose must last that long");
         }
 
         [Test]
