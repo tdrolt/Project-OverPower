@@ -1125,7 +1125,7 @@ namespace Overpower.UI
         public Color[] dominionTeamTextColors = { new Color(1f, 0.5f, 0.15f, 1f), new Color(0.612f, 0.482f, 0.878f, 1f), new Color(0.31f, 0.827f, 0.871f, 1f) };
         [Tooltip("The gold of the Dominion HUD's accents: the points of the centre payout, the break countdown.")]
         public Color dominionGoldColor = new Color(0.91f, 0.725f, 0.192f, 1f);
-        [Tooltip("The dim grey of an empty round-win dot and of the small labels on the Dominion cards.")]
+        [Tooltip("The dim grey of an empty round-win dot on the break card and of the small labels on the Dominion cards (the score rows tint theirs with the team's colour).")]
         public Color dominionDimColor = new Color(0.557f, 0.545f, 0.522f, 1f);
         [Tooltip("The soft light grey of the small headings on the Dominion HUD and cards (ROUND 2 OF 3, ROUND 1).")]
         public Color dominionMutedColor = new Color(0.725f, 0.714f, 0.682f, 1f);
@@ -1161,6 +1161,10 @@ namespace Overpower.UI
         public float dominionDotGap = 9f;
         [Tooltip("Thickness of the ring of an empty round-win dot.")]
         public float dominionDotRing = 3f;
+        [Tooltip("How strongly the empty round-win dots after a team's score bar show that team's colour, from 0 (not at all) to 1 (as strong as " +
+                 "its name). The tint says whose row it is, which matters in sudden death, when only the dots are left on screen.")]
+        [Range(0f, 1f)]
+        public float dominionEmptyDotTeamAlpha = 0.5f;
         [Tooltip("What the small heading over the round clock says. {0} = the round, {1} = how many rounds there are.")]
         public string dominionRoundLabelFormat = "ROUND {0} OF {1}";
         [Tooltip("What the round clock says once the rounds are over and sudden death is on (there is no clock then).")]
@@ -1297,9 +1301,9 @@ namespace Overpower.UI
         public float dominionCentreSize = 19.5f;
         [Tooltip("Size of the line saying who holds the centre.")]
         public float dominionCentreHolderSize = 13.65f;
-        [Tooltip("The centre countdown under the minimap in a 3v3v3 match. {0} = the points the centre pays, {1} = seconds to the payout. The tags colour the points gold. " +
-                 "IV is the name the minimap's bubble gives the centre zone.")]
-        public string dominionCentreFormat = "IV zone <color=#E8B931>+{0}</color> in {1}s";
+        [Tooltip("The centre countdown under the minimap in a 3v3v3 match, read as \"IV zone +200 in 12 seconds\". {0} = the points the centre pays, " +
+                 "{1} = seconds to the payout. The tags colour the points gold. IV is the name the minimap's bubble gives the centre zone.")]
+        public string dominionCentreFormat = "IV zone <color=#E8B931>+{0}</color> in {1} seconds";
         [Tooltip("Who holds the centre. {0} = the team's name.")]
         public string dominionCentreHoldsFormat = "{0} holds it";
         [Tooltip("What the line says when nobody holds the centre.")]

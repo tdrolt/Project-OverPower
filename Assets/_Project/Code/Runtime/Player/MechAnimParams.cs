@@ -4,7 +4,8 @@ namespace Overpower.Arena
 {
     /// <summary>The mech Animator's three bools for this frame, worked out from scratch every frame so nothing (a death, a stun, a shop
     /// click, chat) can leave one stuck, as press/release edges can. Only a shot that leaves the gun shows the shoot pose, for as long
-    /// as that shot asks: a held trigger on a gun that cannot fire yet (cooling down, overheated, charging) shows nothing.</summary>
+    /// as that shot asks: a held trigger on a gun that cannot fire yet (cooling down, overheated, charging) shows nothing. A stunned or
+    /// dead mech never shows it.</summary>
     public readonly struct MechAnimParams
     {
         public readonly bool Run;
@@ -18,10 +19,14 @@ namespace Overpower.Arena
             Shoot = shoot;
         }
 
-        public static MechAnimParams For(Vector2 moveAxis, bool mayFire, float secondsSinceLastShot, float shootPoseSeconds)
+        /// <summary>Whether the mech may show a shot at all. Overheat silence is left out on purpose: the shot that fills the meter keeps
+        /// its whole motion, and a silenced gun fires no further shot to show.</summary>
+        public static bool MayShowShot(bool alive, bool gunOn, bool stunned) => alive && gunOn && !stunned;
+
+        public static MechAnimParams For(Vector2 moveAxis, bool mayShowShot, float secondsSinceLastShot, float shootPoseSeconds)
         {
             bool run = moveAxis.sqrMagnitude > RestingAxisSqr;
-            bool shoot = mayFire && secondsSinceLastShot < shootPoseSeconds;
+            bool shoot = mayShowShot && secondsSinceLastShot < shootPoseSeconds;
             return new MechAnimParams(run, !run, shoot);
         }
 

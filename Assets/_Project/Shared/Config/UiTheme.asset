@@ -426,6 +426,7 @@ MonoBehaviour:
   dominionDotSize: 18
   dominionDotGap: 9
   dominionDotRing: 3
+  dominionEmptyDotTeamAlpha: 0.5
   dominionRoundLabelFormat: ROUND {0} OF {1}
   dominionBarSuddenText: SUDDEN DEATH
   dominionBarSuddenSize: 30
@@ -491,7 +492,7 @@ MonoBehaviour:
   minimapLinesFont: {fileID: 0}
   dominionCentreSize: 19.5
   dominionCentreHolderSize: 13.65
-  dominionCentreFormat: IV zone <color=#E8B931>+{0}</color> in {1}s
+  dominionCentreFormat: IV zone <color=#E8B931>+{0}</color> in {1} seconds
   dominionCentreHoldsFormat: '{0} holds it'
   dominionCentreNobodyText: Nobody holds it
   dominionShrinkFormat: "CIRCLE SHRINKS \xB7 {0}"

@@ -9,8 +9,8 @@ using UnityEngine;
 namespace Overpower.Tests
 {
     /// <summary>The mech's run / idle / shoot bools as levels worked out every frame: only a shot that left the gun shows the shoot pose, for
-    /// as long as that shot asks, and never while the weapon may not fire. Holding the trigger on a gun that cannot fire yet shows nothing. Then
-    /// the wiring: animScript asks this rule with the router's movement and the weapon's state, and never reads the held trigger or the raw keyboard.</summary>
+    /// as long as that shot asks, and never while the mech is dead, stunned or its gun switched off. Holding the trigger on a gun that cannot fire yet shows nothing. Then
+    /// the wiring: animScript asks this rule with the router's movement and the shot gate, and never reads the held trigger or the raw keyboard.</summary>
     public class MechAnimParamsTests
     {
         private const float Pose = 0.2f;
@@ -64,10 +64,44 @@ namespace Overpower.Tests
         [Test]
         public void AWeaponThatMayNotFireNeverShoots()
         {
-            // mayFire is false when dead, stunned, silenced by overheat, or the gun is switched off.
+            // The shot gate is shut while dead, stunned, or with the gun switched off.
             Assert.IsFalse(MechAnimParams.For(Still, false, NeverShot, Pose).Shoot, "unable to fire, no shot");
             Assert.IsFalse(MechAnimParams.For(Forward, false, 0f, Pose).Shoot, "a stun lands the frame a shot left: the pose is cut");
             Assert.IsFalse(MechAnimParams.For(Still, false, 0.05f, Pose).Shoot, "a shot's pose is cut by death");
+        }
+
+        [Test]
+        public void AShotMayShowOnlyWhileAliveSwitchedOnAndNotStunned()
+        {
+            Assert.IsTrue(MechAnimParams.MayShowShot(alive: true, gunOn: true, stunned: false));
+            Assert.IsFalse(MechAnimParams.MayShowShot(alive: false, gunOn: true, stunned: false), "dead");
+            Assert.IsFalse(MechAnimParams.MayShowShot(alive: true, gunOn: false, stunned: false), "gun switched off");
+            Assert.IsFalse(MechAnimParams.MayShowShot(alive: true, gunOn: true, stunned: true), "stunned");
+        }
+
+        [Test]
+        public void AShotThatSilencesTheGunStillHoldsItsPose()
+        {
+            // The overheat lands in the same frame as the shot that caused it; silence is not part of the gate, and a silenced gun fires
+            // no further shot, so the pose still cannot come on without one.
+            bool may = MechAnimParams.MayShowShot(alive: true, gunOn: true, stunned: false);
+            Assert.IsTrue(MechAnimParams.For(Still, may, 0f, Pose).Shoot, "the frame the overheating shot left");
+            Assert.IsTrue(MechAnimParams.For(Still, may, 0.19f, Pose).Shoot, "its whole motion, while the gun is silenced");
+            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Gate), "the owner's pose must ask the shot gate, not the cast gate (which counts silence)");
+        }
+
+        [Test]
+        public void AStunnedRemoteCopyDropsTheShotPose()
+        {
+            Assert.IsFalse(MechAnimParams.For(Still, MechAnimParams.MayShowShot(true, true, stunned: true), 0.05f, Pose).Shoot);
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(animScript), "HoldRemoteShotPose", Gate),
+                "a remote copy must stop holding the shot's pose once the mech is stunned or dead");
+            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "MayShowShot", typeof(MechAnimParams).GetMethod(nameof(MechAnimParams.MayShowShot))));
+            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "MayShowShot", Getter(typeof(PlayerStatusEffects), nameof(PlayerStatusEffects.ShowsStunned))));
+            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "MayShowShot", Getter(typeof(PlayerLifecycle), nameof(PlayerLifecycle.IsAlive))));
+            // IsStunned is true on the owner only; a remote copy knows the stun from the label its owner publishes.
+            Assert.IsTrue(IlWiring.Uses(typeof(PlayerStatusEffects), "get_" + nameof(PlayerStatusEffects.ShowsStunned),
+                typeof(PlayerStatusEffects).GetMethod(nameof(PlayerStatusEffects.TryGetStatusLabel))));
         }
 
         [Test]
@@ -82,6 +116,7 @@ namespace Overpower.Tests
         private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
         private static MethodInfo Getter(System.Type type, string property) => type.GetProperty(property, Any).GetGetMethod(true);
+        private static readonly MethodInfo Gate = typeof(animScript).GetMethod("MayShowShot", Any);
 
         [Test]
         public void AnimScriptAsksTheRuleEveryFrame()
@@ -95,7 +130,9 @@ namespace Overpower.Tests
         public void AnimScriptFeedsTheRuleTheRoutersInputAndTheWeaponsState()
         {
             Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(PlayerInputRouter), nameof(PlayerInputRouter.MoveAxis))));
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(WeaponFiring), nameof(WeaponFiring.MayFire))));
+            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Gate));
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(animScript), "MayShowShot", typeof(Behaviour).GetProperty(nameof(Behaviour.enabled)).GetGetMethod()),
+                "the gun switched off (dead) must cut the pose");
             Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", Getter(typeof(WeaponFiring), nameof(WeaponFiring.LastShotTime))));
         }
 
@@ -134,8 +171,6 @@ namespace Overpower.Tests
             Assert.IsNotNull(actorBlock, "WeaponFiring.ActorBlock is the one place the weapon asks the cast gate");
             Assert.IsTrue(IlWiring.Uses(typeof(WeaponFiring), "ActorBlock", forActor));
             Assert.IsTrue(IlWiring.Uses(typeof(WeaponFiring), "TryFire", actorBlock), "TryFire refuses on the same answer");
-            Assert.IsTrue(IlWiring.Uses(typeof(WeaponFiring), "get_" + nameof(WeaponFiring.MayFire), actorBlock),
-                "MayFire must ask the same gate TryFire does");
         }
 
         [Test]

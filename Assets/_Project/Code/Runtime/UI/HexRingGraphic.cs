@@ -8,7 +8,7 @@ namespace Overpower.UI
     /// keeps the same thickness (a sprite scaled to size would thicken the line with it). Sized by the apothem: the distance from
     /// the centre to the inside of each side.
     /// </summary>
-    // Graphic's own RequireComponent is not inherited: without this a ring built in code has no CanvasRenderer and never draws.
+    // Graphic itself does not require a CanvasRenderer (Image declares its own), so a ring built in code would have nothing to draw it.
     [RequireComponent(typeof(CanvasRenderer))]
     public class HexRingGraphic : MaskableGraphic
     {

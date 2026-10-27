@@ -120,11 +120,11 @@ namespace Overpower.Tests
                     Assert.IsTrue(ReadApart(neutral, t.teamShotColors[team]), $"{name} ({neutral}) reads as team {team} ({t.teamShotColors[team]})");
         }
 
-        // Fire is orange-red (Tudor, 25 October): it reads apart from every team, or sits clearly on the red side of it (the Orange team's own
-        // orange and anything yellower read as the team), and it sits on the red side of the Shield's gold, apart from it. Its heart is
-        // the palest part of it, as a flame's hottest part is.
+        // These are the colours of fire with no known team and of the floor fan (a team's fire takes that team's colour): orange-red, reading
+        // apart from every team or clearly on the red side of it (the Orange team's own orange and anything yellower read as the team), and on
+        // the red side of the Shield's gold, apart from it. The heart is the palest part, as a flame's hottest part is.
         [Test]
-        public void FireIsOrangeRedApartFromTheTeamsAndTheShieldGold()
+        public void TeamlessFireColoursAreOrangeRedApartFromTheTeamsAndTheShieldGold()
         {
             UiTheme t = Theme();
             var fires = new[] { ("Fire Core Color", t.fireCoreColor), ("Fire Edge Color", t.fireEdgeColor), ("the Flamethrower fan's Core Color", FanCore()) };

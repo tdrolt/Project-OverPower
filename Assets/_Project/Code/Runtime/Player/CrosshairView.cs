@@ -126,6 +126,8 @@ public class CrosshairView : MonoBehaviourPun
     // under a live crosshair.
     private void Conceal()
     {
+        // The rate only decays while shown: kept, a spray cut short by death or the shop came back as a fast spin with nothing fired.
+        shotRate = 0f;
         if (parts != null && parts.canvasObject.activeSelf)
             parts.canvasObject.SetActive(false);
         if (!hidingCursor)

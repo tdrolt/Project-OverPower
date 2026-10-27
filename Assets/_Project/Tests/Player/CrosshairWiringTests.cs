@@ -141,6 +141,26 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void HidingTheCrosshairForgetsTheShotRateSoItComesBackSpinningAtRest()
+        {
+            // Edit mode: AddComponent runs no Awake, so the view needs no PhotonView or theme here.
+            var host = new GameObject("CrosshairHost");
+            try
+            {
+                var view = host.AddComponent<CrosshairView>();
+                FieldInfo rate = typeof(CrosshairView).GetField("shotRate", Any);
+                rate.SetValue(view, 12f);
+                typeof(CrosshairView).GetMethod("Conceal", Any).Invoke(view, null);
+                Assert.AreEqual(0f, (float)rate.GetValue(view),
+                    "dying or opening the shop mid-spray must not bring the crosshair back spinning fast with nothing fired");
+            }
+            finally
+            {
+                Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
         public void TheAimConeAsksTheDesignerSwitchAndSharesTheSpreadRule()
         {
             Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(AimConeView), "LateUpdate", Rule(nameof(CrosshairRules.DrawAimCone))));

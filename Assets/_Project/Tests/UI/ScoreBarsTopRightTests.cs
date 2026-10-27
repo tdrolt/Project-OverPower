@@ -175,6 +175,34 @@ namespace Overpower.Tests
             Assert.IsTrue(Child(root, "Team 0 Number Box").gameObject.activeSelf);
         }
 
+        [Test] public void AWonDotIsTheTeamsColourAndAnEmptyOneItsTextColourFaded()
+        {
+            var team = new Color(0.4f, 0.2f, 0.8f, 1f);
+            var text = new Color(0.6f, 0.5f, 0.9f, 1f);
+            Assert.AreEqual(team, DominionScoreBarRules.DotColour(true, team, text, 0.5f));
+            Assert.AreEqual(new Color(0.6f, 0.5f, 0.9f, 0.5f), DominionScoreBarRules.DotColour(false, team, text, 0.5f));
+            Assert.AreEqual(new Color(0.6f, 0.5f, 0.9f, 0.4f), DominionScoreBarRules.DotColour(false, team, new Color(0.6f, 0.5f, 0.9f, 0.8f), 0.5f),
+                "the fade multiplies the text colour's own alpha");
+            Assert.AreEqual(0f, DominionScoreBarRules.DotColour(false, team, text, -1f).a, "never below invisible");
+            Assert.AreEqual(1f, DominionScoreBarRules.DotColour(false, team, text, 3f).a, "never above the text colour");
+        }
+
+        [Test] public void InSuddenDeathEachRowsEmptyDotsSayWhoseRowItIs()
+        {
+            int[] teams = { 0, 1, 2 };
+            Transform root = Draw(teams, new[] { 0, 0, 0 }, false);
+            Color first = Child(root, "Team 0 Dot 1").GetComponent<Image>().color;
+            foreach (int team in teams)
+            {
+                Color dot = Child(root, "Team " + team + " Dot 1").GetComponent<Image>().color;
+                Color text = theme.dominionTeamTextColors[team];
+                Assert.AreEqual(new Vector3(text.r, text.g, text.b), new Vector3(dot.r, dot.g, dot.b), "team " + team + "'s empty ring is its own colour");
+                Assert.AreEqual(text.a * theme.dominionEmptyDotTeamAlpha, dot.a, 1e-4f, "team " + team + "'s ring is faded by the theme's amount");
+                if (team != 0) Assert.AreNotEqual(first, dot, "two rows' rings look alike");
+            }
+            Assert.IsTrue(IlWiring.Uses(typeof(ScoreBars), "PaintDots", typeof(UiTheme).GetField(nameof(UiTheme.dominionEmptyDotTeamAlpha))));
+        }
+
         // ---------------------------------------------------------------- the wiring
 
         private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public;

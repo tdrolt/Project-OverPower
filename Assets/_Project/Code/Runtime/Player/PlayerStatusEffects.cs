@@ -88,6 +88,16 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
     private bool publishedOnce;
 
     public bool IsStunned => state.IsActive(StatusKind.Stun);
+    /// <summary>Stunned as every client sees it: IsStunned is true on the owner only, a remote copy knows the stun from the label the
+    /// owner publishes.</summary>
+    public bool ShowsStunned
+    {
+        get
+        {
+            TryGetStatusLabel(out StatusLabel label, out _, out _);
+            return label == StatusLabel.Stunned;
+        }
+    }
     public bool IsInvulnerable => state.IsActive(StatusKind.Invulnerability);
 
     /// <summary>0..1 - what PlayerHealth multiplies incoming damage by.</summary>

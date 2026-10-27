@@ -9,7 +9,7 @@ namespace Overpower.UI
     /// <summary>
     /// The score bars at the top right, left of the corner minimap (ScoreBarLayout): one row per team in team order, the team's points in a small box,
     /// its bar in the team's colour (the leader's full, the others by their share of the leader's points), then its round-win dots, filled for the
-    /// rounds it has won. Spectators see the same rows. In sudden death only the dots show. Sizes, colours and gaps are UiTheme fields (Dominion HUD:
+    /// rounds it has won, the empty ones a faded ring of the team's colour. Spectators see the same rows. In sudden death only the dots show. Sizes, colours and gaps are UiTheme fields (Dominion HUD:
     /// score bars, and the round-win dots of the round bar); DominionScoreBarRules decides every fill. A value is only rewritten when it moved.
     /// </summary>
     public sealed class ScoreBars
@@ -202,7 +202,8 @@ namespace Overpower.UI
                 bool won = i < wins;
                 Image dot = row.Dots[i];
                 dot.sprite = won ? GeneratedSprites.Disc : DominionHudSprites.EmptyDot(theme);
-                dot.color = won ? Pick(theme.dominionTeamColors, row.Team) : theme.dominionDimColor;
+                dot.color = DominionScoreBarRules.DotColour(won, Pick(theme.dominionTeamColors, row.Team), Pick(theme.dominionTeamTextColors, row.Team),
+                                                            theme.dominionEmptyDotTeamAlpha);
             }
         }
 

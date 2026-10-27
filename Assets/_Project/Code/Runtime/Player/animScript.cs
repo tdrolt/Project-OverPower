@@ -19,6 +19,8 @@ public class animScript : MonoBehaviourPun
     private Animator anim;
     public WeaponFiring weaponFiring;
     private PlayerInputRouter input;
+    private PlayerLifecycle lifecycle;
+    private PlayerStatusEffects statusEffects;
     private PhotonView photonView;
     private float lastShotSeen = float.NegativeInfinity;
     private float shotPoseSeconds;
@@ -38,6 +40,8 @@ public class animScript : MonoBehaviourPun
         // sits on the player root with PlayerAim, PlayerOverheat and the input router it needs.
         weaponFiring = GetComponentInParent<WeaponFiring>();
         input = GetComponentInParent<PlayerInputRouter>();
+        lifecycle = GetComponentInParent<PlayerLifecycle>();
+        statusEffects = GetComponentInParent<PlayerStatusEffects>();
         photonView = GetComponent<PhotonView>();
 
         if (gameplayConfig == null)
@@ -69,19 +73,25 @@ public class animScript : MonoBehaviourPun
     {
         // The held trigger is not read on purpose: a gun that cannot fire yet stays lowered.
         Vector2 move = input != null ? input.MoveAxis : Vector2.zero;
-        bool mayFire = weaponFiring != null && weaponFiring.MayFire;
         float sinceShot = weaponFiring != null ? Time.time - weaponFiring.LastShotTime : float.PositiveInfinity;
 
-        MechAnimParams p = MechAnimParams.For(move, mayFire, sinceShot, shotPoseSeconds);
+        MechAnimParams p = MechAnimParams.For(move, MayShowShot(), sinceShot, shotPoseSeconds);
         anim.SetBool(RunParam, p.Run);
         anim.SetBool(IdleParam, p.Idle);
         anim.SetBool(ShootParam, p.Shoot);
     }
 
+    // The owner's pose and a remote copy's held pose ask the same gate, so a stun or death cuts the pose on every screen.
+    private bool MayShowShot() => MechAnimParams.MayShowShot(lifecycle == null || lifecycle.IsAlive,
+                                                             weaponFiring != null && weaponFiring.enabled,
+                                                             statusEffects != null && statusEffects.ShowsStunned);
+
     // The shot's RPC usually lands before the streamed shoot bool; without this the restarted motion blends straight back out.
     private void HoldRemoteShotPose()
     {
-        if (ShootMotion.HoldsPose(Time.time - lastShotSeen, shotPoseSeconds))
+        if (!MayShowShot())
+            anim.SetBool(ShootParam, false);
+        else if (ShootMotion.HoldsPose(Time.time - lastShotSeen, shotPoseSeconds))
             anim.SetBool(ShootParam, true);
     }
 

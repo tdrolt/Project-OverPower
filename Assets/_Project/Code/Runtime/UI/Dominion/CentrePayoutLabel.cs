@@ -5,7 +5,7 @@ using Overpower.Dominion;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The centre countdown under the minimap in a 3v3v3 match (board DomCentre): "CENTRE +200 IN 12" and who holds it ("Cyan holds it" in their
+    /// The centre countdown under the minimap in a 3v3v3 match (board DomCentre): "IV zone +200 in 12 seconds" and who holds it ("Cyan holds it" in their
     /// colour, "Nobody holds it" in grey). Conquest's scan countdown has this spot; the scan does not run in Dominion. Shown only while a round is on
     /// and the centre has a payout time written. Words and sizes are UiTheme fields.
     /// </summary>

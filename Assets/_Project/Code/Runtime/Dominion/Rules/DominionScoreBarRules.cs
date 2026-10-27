@@ -40,6 +40,15 @@ namespace Overpower.Dominion
             for (int i = 0; i < teams.Length && i < buffer.Length; i++) buffer[i] = Fill(PointsOf(points, teams[i]), leader);
         }
 
+        /// <summary>A won round-win dot is the team's colour; an empty one its text colour faded by emptyAlpha (0 to 1), so in sudden death, with
+        /// only the dots on screen, each row still says whose it is.</summary>
+        public static UnityEngine.Color DotColour(bool won, UnityEngine.Color teamColour, UnityEngine.Color teamTextColour, float emptyAlpha)
+        {
+            if (won) return teamColour;
+            teamTextColour.a *= Math.Max(0f, Math.Min(1f, emptyAlpha));
+            return teamTextColour;
+        }
+
         /// <summary>The points as shown in a bar (never negative).</summary>
         public static int PointsOf(int[] points, int team) =>
             points != null && team >= 0 && team < points.Length ? Math.Max(0, points[team]) : 0;

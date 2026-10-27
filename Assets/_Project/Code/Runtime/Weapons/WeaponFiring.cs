@@ -443,10 +443,6 @@ namespace Overpower.Weapons
         /// point - it is what tells the player the gun is not charging yet.</summary>
         public bool ChargeHeld => weapon != null && weapon.CanCharge && triggerHeldSince > 0f;
 
-        /// <summary>Whether a trigger pull would be allowed right now (cooldown aside): the gun is switched on (off while dead) and the cast gate
-        /// TryFire refuses on says nothing against it. The mech's shoot pose reads it so a stun or death cuts the pose at once.</summary>
-        public bool MayFire => enabled && ActorBlock() == CastBlock.None;
-
         /// <summary>Time.time of this owner's last committed trigger pull, stamped before the RPC goes out so it does not wait for the server
         /// echo. Owner-only, like ChargeHeld.</summary>
         public float LastShotTime { get; private set; } = float.NegativeInfinity;

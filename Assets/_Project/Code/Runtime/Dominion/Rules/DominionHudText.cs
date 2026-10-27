@@ -174,7 +174,7 @@ namespace Overpower.Dominion
             return stage != DominionStage.Overtime || unchecked(centreMs - stageEndMs) <= 0;
         }
 
-        /// <summary>"CENTRE +200 IN 12": {0} = the payout, {1} = seconds to it.</summary>
+        /// <summary>"IV zone +200 in 12 seconds": {0} = the payout, {1} = seconds to it.</summary>
         public static string CentreLine(string format, int points, int secondsLeft) => Fmt(format, points, Math.Max(0, secondsLeft));
 
         /// <summary>"Cyan holds it", or "Nobody holds it" when the centre is neutral (holder -1).</summary>
