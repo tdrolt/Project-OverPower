@@ -6,9 +6,10 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// The crosshair that replaces the arrow during play: four ticks that open with the gun's current spread around a small centre
-/// hexagon, and a hexagon that fills while a charging gun charges. Wherever a click would not fire (the shop, a menu, the chat,
-/// dead) it hides and the arrow comes back, by the router's own gate (PlayerInputRouter.PointerFireBlocked).
+/// The crosshair that replaces the arrow during play: a small centre hexagon inside a spread hexagon that opens with the gun's
+/// current spread, spins faster the faster you fire and runs white to red with the heat meter, plus a hexagon that fills while a
+/// charging gun charges. Wherever a click would not fire (the shop, a menu, the chat, dead) it hides and the arrow comes back, by
+/// the router's own gate (PlayerInputRouter.PointerFireBlocked).
 ///
 /// OWNER ONLY, no networking. Its canvas has no GraphicRaycaster and nothing on it is a raycast target: pointerOverUi would
 /// otherwise always be true under the crosshair and block every shot. Every size and colour is on UiTheme, Crosshair.
@@ -23,19 +24,22 @@ public class CrosshairView : MonoBehaviourPun
         public GameObject canvasObject;
         public Canvas canvas;
         public RectTransform reticle;
-        public RectTransform[] ticks;
         public GameObject chargeRoot;
         public Image chargeFill;
+        public RectTransform spreadHex;
+        public HexRingGraphic spreadLine;
+        public HexRingGraphic spreadEdge;
     }
-
-    // Up, right, down, left: the ticks' order in Parts.ticks.
-    private static readonly float[] TickAngles = { 0f, -90f, 180f, 90f };
 
     private PlayerAim aim;
     private WeaponFiring weaponFiring;
     private PlayerInputRouter input;
+    private PlayerOverheat overheat;
     private Parts parts;
     private float radius;
+    private float shotRate;
+    private float spinAngle;
+    private float seenShotTime = float.NegativeInfinity;
     private bool hidingCursor;
 
     private void Awake()
@@ -43,6 +47,7 @@ public class CrosshairView : MonoBehaviourPun
         aim = GetComponent<PlayerAim>();
         weaponFiring = GetComponent<WeaponFiring>();
         input = GetComponent<PlayerInputRouter>();
+        overheat = GetComponent<PlayerOverheat>();
 
         if (!photonView.IsMine)
         {
@@ -86,9 +91,18 @@ public class CrosshairView : MonoBehaviourPun
         float outerHalf = CrosshairRules.OuterHalfAngle(weapon.Simultaneous, weapon.SpreadDegrees, aim.EffectiveConeAngle);
         float target = CrosshairRules.ReticleRadius(outerHalf, theme.crosshairRestRadius, theme.crosshairUnitsPerDegree, theme.crosshairMaxRadius);
         radius = CrosshairRules.Approach(radius, target, Time.deltaTime, theme.crosshairRadiusSmoothSeconds);
-        float centreDistance = radius + theme.crosshairTickLength / 2f;
-        for (int i = 0; i < parts.ticks.Length; i++)
-            parts.ticks[i].anchoredPosition = (Vector2)(Quaternion.Euler(0f, 0f, TickAngles[i]) * Vector3.up) * centreDistance;
+
+        bool shot = weaponFiring.LastShotTime != seenShotTime;
+        seenShotTime = weaponFiring.LastShotTime;
+        shotRate = CrosshairRules.ShotRate(shotRate, shot, Time.deltaTime, theme.crosshairShotRateWindowSeconds);
+        float spin = CrosshairRules.SpinDegreesPerSecond(shotRate, theme.crosshairSpinIdleDegreesPerSecond, theme.crosshairSpinDegreesPerShot,
+                                                         theme.crosshairSpinMaxDegreesPerSecond);
+        spinAngle = CrosshairRules.SpinAngle(spinAngle, spin, Time.deltaTime);
+        // The one heat meter every gun and ability fills (OverheatState): red warns that the gun is about to lock.
+        float heat = overheat != null ? CrosshairRules.HeatShown(overheat.Normalised, overheat.IsSilenced) : 0f;
+        Color ringColour = CrosshairRules.HeatColor(heat, theme.crosshairHeatColdColor, theme.crosshairHeatWarmColor,
+                                                    theme.crosshairHeatHotColor, theme.crosshairHeatFullColor, theme.crosshairHeatFullAt);
+        DrawSpreadRing(parts, radius, spinAngle, ringColour, theme.crosshairRingLineWidth, Mathf.Max(0f, theme.crosshairOutlineWidth));
 
         bool charging = CrosshairRules.IsCharging(weaponFiring.ChargeHeld, weapon.MaxChargeSeconds);
         if (charging)
@@ -158,17 +172,22 @@ public class CrosshairView : MonoBehaviourPun
         HexOutlined(p.reticle, "Centre", theme.crosshairCentreSize, theme.crosshairCentreLineWidth, outline,
                     theme.crosshairOutlineColor, theme.crosshairColor);
 
-        p.ticks = new RectTransform[TickAngles.Length];
-        for (int i = 0; i < TickAngles.Length; i++)
-        {
-            RectTransform tick = NewRect("Tick " + (i + 1), p.reticle, Vector2.zero);
-            tick.localRotation = Quaternion.Euler(0f, 0f, TickAngles[i]);
-            if (outline > 0f)
-                Bar(tick, "Edge", new Vector2(theme.crosshairTickWidth + 2f * outline, theme.crosshairTickLength + 2f * outline), theme.crosshairOutlineColor);
-            Bar(tick, "Line", new Vector2(theme.crosshairTickWidth, theme.crosshairTickLength), theme.crosshairColor);
-            p.ticks[i] = tick;
-        }
+        p.spreadHex = NewRect("Spread Hex", p.reticle, Vector2.zero);
+        if (outline > 0f)
+            p.spreadEdge = Ring(p.spreadHex, "Spread Edge", theme.crosshairOutlineColor);
+        p.spreadLine = Ring(p.spreadHex, "Spread Line", theme.crosshairHeatColdColor);
+        DrawSpreadRing(p, theme.crosshairRestRadius, 0f, theme.crosshairHeatColdColor, theme.crosshairRingLineWidth, outline);
         return p;
+    }
+
+    /// <summary>Every frame: no allocation (CrosshairWiringTests). The dark edge reaches <paramref name="outline"/> past the line on both sides.</summary>
+    internal static void DrawSpreadRing(Parts p, float apothem, float angleDegrees, Color colour, float lineWidth, float outline)
+    {
+        p.spreadHex.localRotation = Quaternion.Euler(0f, 0f, angleDegrees);
+        p.spreadLine.SetShape(apothem, lineWidth);
+        p.spreadLine.color = colour;
+        if (p.spreadEdge != null)
+            p.spreadEdge.SetShape(apothem - outline, lineWidth + 2f * outline);
     }
 
     private static RectTransform NewRect(string name, Transform parent, Vector2 size)
@@ -186,6 +205,14 @@ public class CrosshairView : MonoBehaviourPun
         image.color = color;
         image.raycastTarget = false;
         return image;
+    }
+
+    private static HexRingGraphic Ring(Transform parent, string name, Color color)
+    {
+        HexRingGraphic ring = NewRect(name, parent, Vector2.zero).gameObject.AddComponent<HexRingGraphic>();
+        ring.color = color;
+        ring.raycastTarget = false;
+        return ring;
     }
 
     private static Image Hex(Transform parent, string name, float size, float lineWidth, Color color)

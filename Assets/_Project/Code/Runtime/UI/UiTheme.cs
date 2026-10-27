@@ -942,7 +942,7 @@ namespace Overpower.UI
         public float chargeRingStepTickWidth = 0.05f;
 
         [Header("Crosshair")]
-        [Tooltip("Colour of the crosshair's four ticks and its small centre hexagon. Kept the same for every team, so it never " +
+        [Tooltip("Colour of the crosshair's small centre hexagon at the point you aim at. Kept the same for every team, so it never " +
                  "reads as an ally or an enemy marker.")]
         public Color crosshairColor = new Color(0.85f, 1f, 1f, 0.95f);
         [Tooltip("Colour of the thin dark edge drawn around every part of the crosshair, so it stays readable on a bright floor " +
@@ -954,22 +954,44 @@ namespace Overpower.UI
         public float crosshairCentreSize = 9f;
         [Tooltip("Line thickness of that centre hexagon, in canvas units.")]
         public float crosshairCentreLineWidth = 2f;
-        [Tooltip("Length of each of the four ticks, in canvas units.")]
-        public float crosshairTickLength = 9f;
-        [Tooltip("Thickness of each of the four ticks, in canvas units.")]
-        public float crosshairTickWidth = 2.5f;
-        [Tooltip("Gap from the centre to the inner end of each tick when the gun would fire dead straight, in canvas units. Keep " +
-                 "it larger than half the Charge Hex Size, or the ticks sit on the charge hexagon.")]
+        [Tooltip("Line thickness of the spread hexagon around the centre, in canvas units. It stays this thick however wide the " +
+                 "hexagon opens.")]
+        public float crosshairRingLineWidth = 2.5f;
+        [Tooltip("Gap from the centre to the inside of the spread hexagon's sides when the gun would fire dead straight, in canvas " +
+                 "units. Keep it larger than half the Charge Hex Size, or the spread hexagon sits on the charge hexagon.")]
         public float crosshairRestRadius = 20f;
-        [Tooltip("How far the ticks move out for every degree a shot can stray from the aim, in canvas units. The stray comes " +
-                 "from the gun itself (its spread, its bloom from firing, moving or standing still), so a bigger number makes " +
-                 "the same bloom read larger on screen.")]
+        [Tooltip("How far the spread hexagon's sides move out for every degree a shot can stray from the aim, in canvas units. The " +
+                 "stray comes from the gun itself (its spread, its bloom from firing, moving or standing still), so a bigger number " +
+                 "makes the same bloom read larger on screen.")]
         public float crosshairUnitsPerDegree = 5f;
-        [Tooltip("The farthest the ticks ever move out from the centre, in canvas units, however wide the gun's spread is.")]
+        [Tooltip("The farthest the spread hexagon's sides ever move out from the centre, in canvas units, however wide the gun's " +
+                 "spread is.")]
         public float crosshairMaxRadius = 120f;
-        [Tooltip("How quickly the ticks follow a change in spread, in seconds: about how long they take to get most of the way. " +
-                 "0 snaps them at once; a little smooths a shot's bloom so the opening reads as a movement.")]
+        [Tooltip("How quickly the spread hexagon follows a change in spread, in seconds: about how long it takes to get most of the " +
+                 "way. 0 snaps it at once; a little smooths a shot's bloom so the opening reads as a movement.")]
         public float crosshairRadiusSmoothSeconds = 0.05f;
+        [Tooltip("How fast the spread hexagon turns while you are not shooting, in degrees per second (clockwise). 0 holds it still " +
+                 "until you fire.")]
+        public float crosshairSpinIdleDegreesPerSecond = 30f;
+        [Tooltip("How much faster the spread hexagon turns for every shot per second you are firing, in degrees per second. A gun " +
+                 "that fires ten times a second turns ten times this much faster than at rest.")]
+        public float crosshairSpinDegreesPerShot = 45f;
+        [Tooltip("The fastest the spread hexagon ever turns, in degrees per second, however fast the gun fires.")]
+        public float crosshairSpinMaxDegreesPerSecond = 600f;
+        [Tooltip("Over about how many seconds the spin counts your shots, which is also about how long it takes to slow back " +
+                 "down after you stop. Shorter makes every single shot kick the spin; longer makes it build up and ease off slowly.")]
+        public float crosshairShotRateWindowSeconds = 0.5f;
+        [Tooltip("Colour of the spread hexagon with no heat on the overheat meter.")]
+        public Color crosshairHeatColdColor = new Color(1f, 1f, 1f, 0.95f);
+        [Tooltip("Colour of the spread hexagon a third of the way to Heat Full At on the overheat meter.")]
+        public Color crosshairHeatWarmColor = new Color(1f, 0.9f, 0.2f, 0.95f);
+        [Tooltip("Colour of the spread hexagon two thirds of the way to Heat Full At on the overheat meter.")]
+        public Color crosshairHeatHotColor = new Color(1f, 0.55f, 0.1f, 0.95f);
+        [Tooltip("Colour of the spread hexagon from Heat Full At upward, and all the while you are overheated and cannot fire.")]
+        public Color crosshairHeatFullColor = new Color(1f, 0.12f, 0.08f, 1f);
+        [Tooltip("How full the overheat meter is, from 0 to 1, when the spread hexagon turns fully red. 0.8 matches the HUD bar's " +
+                 "warning at 80 of 100 heat; lower warns earlier.")]
+        [Range(0f, 1f)] public float crosshairHeatFullAt = 0.8f;
         [Tooltip("Width of the hexagon around the centre that fills while you charge a charging gun, corner to corner, in canvas units.")]
         public float crosshairChargeHexSize = 30f;
         [Tooltip("Line thickness of the charge hexagon, in canvas units.")]

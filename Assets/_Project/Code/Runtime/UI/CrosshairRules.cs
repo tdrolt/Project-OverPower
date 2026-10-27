@@ -4,7 +4,7 @@ namespace Overpower.UI
 {
     /// <summary>
     /// The crosshair's decisions (CrosshairView) and the designer-only aim cone's (AimConeView). OuterHalfAngle is shared by
-    /// both, so the reticle and the cone lines can never disagree about how far a shot strays. Sizes are in canvas units.
+    /// both, so the spread hexagon and the cone lines can never disagree about how far a shot strays. Sizes are in canvas units.
     /// </summary>
     public static class CrosshairRules
     {
@@ -16,7 +16,7 @@ namespace Overpower.UI
             return simultaneous && spreadDegrees > 0f ? spreadDegrees / 2f + coneHalf : coneHalf;
         }
 
-        /// <summary>Distance from the crosshair's centre to the inner end of each tick: the rest gap plus a fixed size per degree of stray,
+        /// <summary>Distance from the crosshair's centre to the inside of the spread hexagon's sides: the rest gap plus a fixed size per degree of stray,
         /// never inside the rest gap and never past the maximum (a maximum below the rest gap gives the rest gap).</summary>
         public static float ReticleRadius(float outerHalfAngle, float restRadius, float unitsPerDegree, float maxRadius)
         {
@@ -42,6 +42,40 @@ namespace Overpower.UI
             if (smoothSeconds <= 0f)
                 return target;
             return Mathf.Lerp(current, target, 1f - Mathf.Exp(-deltaTime / smoothSeconds));
+        }
+
+        /// <summary>Shots per second over roughly the last window: every shot adds one window's worth and the total fades with the
+        /// window as its time constant, so a steady gun reads its own rate and the number eases down once the trigger is let go.</summary>
+        public static float ShotRate(float rate, bool shotThisFrame, float deltaTime, float windowSeconds)
+        {
+            float window = Mathf.Max(0.01f, windowSeconds);
+            return rate * Mathf.Exp(-Mathf.Max(0f, deltaTime) / window) + (shotThisFrame ? 1f / window : 0f);
+        }
+
+        /// <summary>The resting spin plus a fixed amount for every shot per second, never below the resting spin nor above the maximum
+        /// (a maximum below the rest gives the rest).</summary>
+        public static float SpinDegreesPerSecond(float shotsPerSecond, float idleDegreesPerSecond, float degreesPerShot, float maxDegreesPerSecond)
+        {
+            float speed = idleDegreesPerSecond + Mathf.Max(0f, shotsPerSecond) * degreesPerShot;
+            return Mathf.Clamp(speed, idleDegreesPerSecond, Mathf.Max(idleDegreesPerSecond, maxDegreesPerSecond));
+        }
+
+        /// <summary>Turns clockwise (the angle falls), kept within one sixth of a turn: a hexagon looks the same every 60 degrees.</summary>
+        public static float SpinAngle(float angle, float degreesPerSecond, float deltaTime) =>
+            Mathf.Repeat(angle - degreesPerSecond * deltaTime, 60f);
+
+        /// <summary>The heat the hexagon shows, 0 to 1: the meter itself, or full while overheated, because the gun stays locked
+        /// until the meter has cooled all the way down.</summary>
+        public static float HeatShown(float normalisedHeat, bool silenced) => silenced ? 1f : Mathf.Clamp01(normalisedHeat);
+
+        /// <summary>Cold, warm, hot, full in equal steps from no heat to <paramref name="fullAt"/>, full beyond it.</summary>
+        public static Color HeatColor(float heat, Color cold, Color warm, Color hot, Color full, float fullAt)
+        {
+            float t = fullAt > 0f ? Mathf.Clamp01(heat / fullAt) : heat > 0f ? 1f : 0f;
+            float scaled = t * 3f;
+            if (scaled <= 1f)
+                return Color.Lerp(cold, warm, scaled);
+            return scaled <= 2f ? Color.Lerp(warm, hot, scaled - 1f) : Color.Lerp(hot, full, scaled - 2f);
         }
     }
 }

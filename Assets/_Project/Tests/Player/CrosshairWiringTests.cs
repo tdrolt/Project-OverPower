@@ -1,6 +1,7 @@
 using System.Reflection;
 using NUnit.Framework;
 using Overpower.UI;
+using Overpower.Weapons;
 using Photon.Pun;
 using UnityEditor;
 using UnityEngine;
@@ -53,6 +54,79 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Rule(nameof(CrosshairRules.Approach))));
             Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(CrosshairView), "LateUpdate", Rule(nameof(CrosshairRules.IsCharging))));
             Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Rule(nameof(CrosshairRules.ChargeFill))));
+        }
+
+        [Test]
+        public void TheSpreadHexagonSpinsWithTheShotRateAndColoursWithTheHeat()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Getter(typeof(WeaponFiring), nameof(WeaponFiring.LastShotTime))),
+                "the spin must count the gun's real shots");
+            Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Rule(nameof(CrosshairRules.ShotRate))));
+            Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Rule(nameof(CrosshairRules.SpinDegreesPerSecond))));
+            Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Rule(nameof(CrosshairRules.SpinAngle))));
+            Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Getter(typeof(PlayerOverheat), nameof(PlayerOverheat.Normalised))),
+                "the colour must read the same heat meter that locks the gun");
+            Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Getter(typeof(PlayerOverheat), nameof(PlayerOverheat.IsSilenced))));
+            Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Rule(nameof(CrosshairRules.HeatShown))));
+            Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Rule(nameof(CrosshairRules.HeatColor))));
+            Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", typeof(CrosshairView).GetMethod(nameof(CrosshairView.DrawSpreadRing), Any)));
+        }
+
+        [Test]
+        public void TheSpreadHexagonTakesTheRadiusTheSpinAndTheColourItIsGiven()
+        {
+            var theme = ScriptableObject.CreateInstance<UiTheme>();
+            var host = new GameObject("Crosshair Test Host");
+            try
+            {
+                CrosshairView.Parts parts = CrosshairView.BuildCanvas(theme, host.transform);
+                CrosshairView.DrawSpreadRing(parts, apothem: 40f, angleDegrees: 25f, colour: Color.red, lineWidth: 3f, outline: 1.5f);
+                Assert.AreEqual(40f, parts.spreadLine.Apothem, 1e-4f, "the inside of the sides sits at the spread radius");
+                Assert.AreEqual(3f, parts.spreadLine.LineWidth, 1e-4f);
+                Assert.AreEqual(Color.red, parts.spreadLine.color);
+                Assert.AreEqual(25f, parts.spreadHex.localEulerAngles.z, 1e-3f);
+                Assert.AreEqual(38.5f, parts.spreadEdge.Apothem, 1e-4f, "the dark edge reaches outline further in");
+                Assert.AreEqual(6f, parts.spreadEdge.LineWidth, 1e-4f, "and outline further out");
+                Assert.IsTrue(parts.spreadEdge.transform.IsChildOf(parts.spreadHex), "the edge spins with the line");
+                Assert.IsNull(host.transform.Find("Crosshair Canvas/Reticle/Tick 1"), "the four ticks are gone");
+                // Without a CanvasRenderer a Graphic builds its mesh and nothing ever draws it.
+                Assert.IsNotNull(parts.spreadLine.GetComponent<CanvasRenderer>(), "the spread hexagon has nothing to draw it");
+                Assert.IsNotNull(parts.spreadEdge.GetComponent<CanvasRenderer>(), "the spread hexagon's edge has nothing to draw it");
+            }
+            finally
+            {
+                Object.DestroyImmediate(host);
+                Object.DestroyImmediate(theme);
+            }
+        }
+
+        [Test]
+        public void DrawingTheSpreadHexagonEveryFrameMakesNoGarbage()
+        {
+            var theme = ScriptableObject.CreateInstance<UiTheme>();
+            var host = new GameObject("Crosshair Test Host");
+            try
+            {
+                CrosshairView.Parts parts = CrosshairView.BuildCanvas(theme, host.transform);
+                CrosshairView.DrawSpreadRing(parts, 20f, 0f, Color.white, 2f, 1f);
+                int allocations = AllocationProbe.Count(() =>
+                {
+                    float rate = 0f, angle = 0f;
+                    for (int frame = 0; frame < 30; frame++)
+                    {
+                        rate = CrosshairRules.ShotRate(rate, frame % 3 == 0, 0.016f, 0.5f);
+                        angle = CrosshairRules.SpinAngle(angle, CrosshairRules.SpinDegreesPerSecond(rate, 30f, 40f, 600f), 0.016f);
+                        Color c = CrosshairRules.HeatColor(CrosshairRules.HeatShown(frame / 30f, false), Color.white, Color.yellow, Color.red, Color.red, 0.8f);
+                        CrosshairView.DrawSpreadRing(parts, 20f + frame, angle, c, 2f, 1f);
+                    }
+                });
+                Assert.AreEqual(0, allocations);
+            }
+            finally
+            {
+                Object.DestroyImmediate(host);
+                Object.DestroyImmediate(theme);
+            }
         }
 
         [Test]

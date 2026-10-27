@@ -346,12 +346,20 @@ MonoBehaviour:
   crosshairOutlineWidth: 1.5
   crosshairCentreSize: 9
   crosshairCentreLineWidth: 2
-  crosshairTickLength: 9
-  crosshairTickWidth: 2.5
+  crosshairRingLineWidth: 2.5
   crosshairRestRadius: 20
   crosshairUnitsPerDegree: 5
   crosshairMaxRadius: 120
   crosshairRadiusSmoothSeconds: 0.05
+  crosshairSpinIdleDegreesPerSecond: 30
+  crosshairSpinDegreesPerShot: 45
+  crosshairSpinMaxDegreesPerSecond: 600
+  crosshairShotRateWindowSeconds: 0.5
+  crosshairHeatColdColor: {r: 1, g: 1, b: 1, a: 0.95}
+  crosshairHeatWarmColor: {r: 1, g: 0.9, b: 0.2, a: 0.95}
+  crosshairHeatHotColor: {r: 1, g: 0.55, b: 0.1, a: 0.95}
+  crosshairHeatFullColor: {r: 1, g: 0.12, b: 0.08, a: 1}
+  crosshairHeatFullAt: 0.8
   crosshairChargeHexSize: 30
   crosshairChargeLineWidth: 3
   crosshairChargeTrackColor: {r: 1, g: 1, b: 1, a: 0.18}
