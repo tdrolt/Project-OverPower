@@ -3,14 +3,17 @@ using System;
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// The score bars in the bottom-right corner (A52): one per team, the leading team's full, the others filled by their share
-    /// of the leader's points. Pure, so the drawing code in UI/Dominion/ScoreBars only places what these return.
+    /// The score bars at the top right (A52): one per team, the leading team's full, the others filled by their share of the leader's points, each
+    /// followed by the team's round-win dots. Pure, so the drawing code in UI/Dominion/ScoreBars only places what these return.
     /// </summary>
     public static class DominionScoreBarRules
     {
-        /// <summary>The bars show while the stage plays for points - a round and its overtime - and nowhere else (default: the break, sudden death and the
-        /// result hide them; the round bar and the break card already say the points there).</summary>
+        /// <summary>The bars and their points show while the stage plays for points - a round and its overtime - and nowhere else (the break card says
+        /// the points in the break; sudden death is not decided by points).</summary>
         public static bool ShownIn(DominionStage stage) => DominionRules.IsRoundPlay(stage);
+
+        /// <summary>The rows' round-win dots show in a round, its overtime and sudden death (there alone, without the bars); the break card has its own.</summary>
+        public static bool DotsShownIn(DominionStage stage) => DominionRules.IsRoundPlay(stage) || stage == DominionStage.SuddenDeath;
 
         /// <summary>The top score among the match's teams (0 when nobody has any). Only the listed teams count: a 2v2 room keeps a third slot in its points.</summary>
         public static int Leader(int[] teams, int[] points)
@@ -41,13 +44,7 @@ namespace Overpower.Dominion
         public static int PointsOf(int[] points, int team) =>
             points != null && team >= 0 && team < points.Length ? Math.Max(0, points[team]) : 0;
 
-        /// <summary>How far above the screen's bottom edge the gold readout over the "Loadout (P)" button ends, in canvas units: the button's margin, the
-        /// button, the gap, the readout's two lines of body text and their padding (the same numbers PlayerHud.BuildGoldCorner uses), all scaled by the HUD
-        /// scale. The score bars sit above this line, so they overlap neither.</summary>
-        public static float GoldReadoutTop(float margin, float buttonHeight, float goldGap, float bodyTextSize, float hudScale) =>
-            (margin + buttonHeight + goldGap + GoldReadoutHeight(bodyTextSize)) * hudScale;
-
-        /// <summary>The gold readout's height: two lines of body text and the padding. PlayerHud sizes the readout with this, and the bars stand on top of it.</summary>
+        /// <summary>The gold readout's height over the Loadout (P) button: two lines of body text and the padding. PlayerHud sizes the readout with this.</summary>
         public static float GoldReadoutHeight(float bodyTextSize) => 2f * bodyTextSize + GoldReadoutPadding;
 
         /// <summary>The extra height PlayerHud gives the gold readout beyond its two lines of text.</summary>

@@ -432,14 +432,13 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(ScoreBars), "Refresh", Rule(typeof(DominionScoreBarRules), nameof(DominionScoreBarRules.FillsInto))));
         }
 
-        [Test] public void TheGoldReadoutHeightIsOneNumberForTheHudAndTheBars()
+        [Test] public void TheGoldReadoutHeightIsTwoLinesOfBodyTextAndThePadding()
         {
             Assert.AreEqual(58f, DominionScoreBarRules.GoldReadoutHeight(24f), 1e-4f, "two lines of body text plus the padding");
-            Assert.IsTrue(IlWiring.Uses(typeof(DominionScoreBarRules), "GoldReadoutTop", Rule(typeof(DominionScoreBarRules), nameof(DominionScoreBarRules.GoldReadoutHeight))));
             Assert.IsTrue(IlWiring.Uses(typeof(PlayerHud), "BuildGoldCorner", Rule(typeof(DominionScoreBarRules), nameof(DominionScoreBarRules.GoldReadoutHeight))), "PlayerHud sizes the readout with the same rule");
         }
 
-        [Test] public void TheBarsScaleWithTheHudLikeTheCornerTheySitOn()
+        [Test] public void TheBarsScaleWithTheHud()
         {
             MethodInfo setScale = typeof(Transform).GetProperty(nameof(Transform.localScale)).GetSetMethod();
             Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(ScoreBars), "Build", setScale), "the root is scaled");

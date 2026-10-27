@@ -106,22 +106,22 @@ namespace Overpower.UI
 
             int now = PhotonNetwork.ServerTimestamp;
             string[] names = theme.scoreboardTeamNames;
-            // The score bars follow the stage rule alone: a round or its overtime shows them, every other stage (the break, sudden death, the result) hides them.
+            // The score rows follow the stage rules alone: bars and dots in a round or its overtime, the dots alone in sudden death, nothing in the break or the result.
             int[] shownTeams = DominionRules.TeamsShownIn(state.Stage, teams, state.Stage == DominionStage.Overtime ? CountPlayers() : null); // in overtime a team that left the game is hidden
-            if (DominionScoreBarRules.ShownIn(state.Stage)) scoreBars.Refresh(shownTeams, state.Points);
+            if (DominionScoreBarRules.DotsShownIn(state.Stage))
+                scoreBars.Refresh(shownTeams, state.Points, state.Wins, config.RoundsToWin, DominionScoreBarRules.ShownIn(state.Stage));
             else scoreBars.SetVisible(false);
             switch (state.Stage)
             {
                 case DominionStage.Round:
                 case DominionStage.Overtime: // the same bar, its heading says OVERTIME and the clock is the overtime's own minute
-                    round.Refresh(shownTeams, state.Round, config.MaxRounds, DominionHudText.SecondsLeft(state.EndMs, now), false, state.Stage == DominionStage.Overtime,
-                        state.Wins, config.RoundsToWin, names);
+                    round.Refresh(shownTeams, state.Round, config.MaxRounds, DominionHudText.SecondsLeft(state.EndMs, now), false, state.Stage == DominionStage.Overtime);
                     breakCard.SetVisible(false);
                     sudden.Hide();
                     RefreshCentre(config, now, names);
                     break;
                 case DominionStage.SuddenDeath:
-                    round.Refresh(teams, state.Round, config.MaxRounds, 0, true, false, state.Wins, config.RoundsToWin, names);
+                    round.Refresh(teams, state.Round, config.MaxRounds, 0, true, false);
                     breakCard.SetVisible(false);
                     centre.SetVisible(false);
                     RefreshSudden(now);
@@ -231,7 +231,7 @@ namespace Overpower.UI
             if (shop != null) shop.Toggle();
         }
 
-        /// <summary>The screen pixels the top-centre HUD covers now: the round bar with room for the payout flash under it, and the break card.
+        /// <summary>The screen pixels the top-centre HUD covers now: the round clock with room for the payout flash under it, and the break card.
         /// Empty when neither shows. The death card is placed clear of it.</summary>
         public Rect TopBandOnScreen()
         {

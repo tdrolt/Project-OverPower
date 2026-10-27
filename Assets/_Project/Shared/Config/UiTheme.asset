@@ -291,7 +291,7 @@ MonoBehaviour:
   minimapScanRingWidth: 2.5
   scanCountdownFormat: Scan {0}
   scanCountdownFontSize: 28
-  scanMinimapCountdownFontSize: 22
+  scanMinimapCountdownFontSize: 14.3
   bountyLabelFormat: BOUNTY {0}
   bountyLabelGoldFormat: BOUNTY {0} GOLD
   bountyPopFormat: +{0}
@@ -408,12 +408,9 @@ MonoBehaviour:
   dominionBarRadius: 12
   dominionBarHeight: 80
   dominionBarClockFill: {r: 0, g: 0, b: 0, a: 0.25}
-  dominionBarSideWidth: 90
   dominionBarClockWidth: 190
-  dominionBar3SideWidth: 90
   dominionBar3ClockWidth: 200
   dominionBarEdgeThickness: 6
-  dominionBarDotsMargin: 18
   dominionClockSize: 36
   dominionClock3Size: 34
   dominionRoundLabelSize: 18
@@ -484,9 +481,9 @@ MonoBehaviour:
   dominionOpensNothing: nothing new
   minimapLinesGap: 6
   minimapLinesFont: {fileID: 0}
-  dominionCentreSize: 30
-  dominionCentreHolderSize: 21
-  dominionCentreFormat: CENTRE <color=#E8B931>+{0}</color> IN {1}
+  dominionCentreSize: 19.5
+  dominionCentreHolderSize: 13.65
+  dominionCentreFormat: IV zone <color=#E8B931>+{0}</color> in {1}s
   dominionCentreHoldsFormat: '{0} holds it'
   dominionCentreNobodyText: Nobody holds it
   dominionShrinkFormat: "CIRCLE SHRINKS \xB7 {0}"
@@ -496,7 +493,9 @@ MonoBehaviour:
   dominionScoreBarGap: 9
   dominionScoreBarNumberWidth: 75
   dominionScoreBarNumberSize: 24
-  dominionScoreBarsAboveGold: 12
+  dominionScoreBarsTop: 30
+  dominionScoreBarsMinimapGap: 24
+  dominionScoreDotsGap: 9
   dominionScoreBarTrackColor: {r: 0.059, g: 0.063, b: 0.078, a: 0.75}
   dominionBannerTop: 175
   dominionBannerSeconds: 8

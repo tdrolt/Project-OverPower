@@ -8,8 +8,8 @@ using Overpower.Vision;
 
 namespace Overpower.Tests
 {
-    /// <summary>Dominion Task 17 (Tudor A51-A53): the respawn shield drops the moment its owner leaves their own spawn area, the score bars in the
-    /// bottom-right corner fill by the leader's points, and Conquest's centre scan wave is yellow while the enemy dots it leaves keep their colour.
+    /// <summary>Dominion Task 17 (Tudor A51-A53): the respawn shield drops the moment its owner leaves their own spawn area, the score bars
+    /// fill by the leader's points, and Conquest's centre scan wave is yellow while the enemy dots it leaves keep their colour.
     /// Rules are pure; the wiring tests read the components' method bodies (IlWiring), so putting an inline copy back fails them.</summary>
     public class DominionTask17Tests
     {
@@ -171,13 +171,6 @@ namespace Overpower.Tests
             Assert.IsFalse(DominionScoreBarRules.ShownIn(DominionStage.None));
         }
 
-        [Test] public void TheBarsSitAboveTheGoldReadoutAndTheLoadoutButton()
-        {
-            // button margin 24, button 48 high, gap 8, body text 24 (two lines + 10), scale 0.8 -> the readout's top is (24+48+8+58) * 0.8 above the corner
-            Assert.AreEqual(110.4f, DominionScoreBarRules.GoldReadoutTop(24f, 48f, 8f, 24f, 0.8f), 1e-3f);
-            Assert.AreEqual(138f, DominionScoreBarRules.GoldReadoutTop(24f, 48f, 8f, 24f, 1f), 1e-3f, "unscaled");
-        }
-
         [Test] public void TheHudHostShowsTheBarsOnlyForTheTestedStagesAndHandsThemThePoints()
         {
             Assert.IsTrue(IlWiring.Uses(typeof(DominionHud), "Update", Method(typeof(DominionScoreBarRules), nameof(DominionScoreBarRules.ShownIn))));
@@ -185,11 +178,8 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(DominionHud), "HideBars", Method(typeof(ScoreBars), nameof(ScoreBars.SetVisible))), "the break, the result and a left room hide them");
         }
 
-        [Test] public void TheBarsFillThroughTheTestedRuleAndSitWhereTheRuleSays()
-        {
+        [Test] public void TheBarsFillThroughTheTestedRule() =>
             Assert.IsTrue(IlWiring.Uses(typeof(ScoreBars), "Refresh", Method(typeof(DominionScoreBarRules), nameof(DominionScoreBarRules.FillsInto))));
-            Assert.IsTrue(IlWiring.Uses(typeof(ScoreBars), "Build", Method(typeof(DominionScoreBarRules), nameof(DominionScoreBarRules.GoldReadoutTop))));
-        }
 
         // ---------------------------------------------------------------- A53: the scan wave is yellow, the dots keep their colour
 

@@ -796,7 +796,7 @@ namespace Overpower.UI
         [Min(1f)] public float scanCountdownFontSize = 28f;
         [Tooltip("Text size of the second countdown, the one fixed under the corner minimap, in reference pixels (1080p). Same words " +
                  "and colour as the one above the tower; it is always on screen while there is a scan, so it can stay smaller.")]
-        [Min(1f)] public float scanMinimapCountdownFontSize = 22f;
+        [Min(1f)] public float scanMinimapCountdownFontSize = 14.3f;
         [Tooltip("The yellow text floating above a tower that carries a bounty in Dominion. {0} is the points the team that takes the zone will get, " +
                  "e.g. \"BOUNTY {0}\" reads \"BOUNTY 150\".")]
         public string bountyLabelFormat = "BOUNTY {0}";
@@ -1097,7 +1097,7 @@ namespace Overpower.UI
         // Dominion HUD. Sizes are in reference pixels (the boards' pixels x 1.5 at 1920 x 1080), like the lobby screens.
         // ------------------------------------------------------------------------------------------------
         [Header("Dominion HUD: team colours")]
-        [Tooltip("Each team's colour in the Dominion HUD (the underline of its score, its round-win dots, its name on the break card), in team order: orange, purple, cyan.")]
+        [Tooltip("Each team's colour in the Dominion HUD (the fill of its score bar, its round-win dots, its name on the break card), in team order: orange, purple, cyan.")]
         public Color[] dominionTeamColors = { new Color(1f, 0.45f, 0.05f, 1f), new Color(0.42f, 0.247f, 0.749f, 1f), new Color(0.169f, 0.722f, 0.769f, 1f) };
         [Tooltip("Each team's lighter colour for writing its name or number on a dark card (a plain purple is too dark to read there), in team order: orange, purple, cyan.")]
         public Color[] dominionTeamTextColors = { new Color(1f, 0.5f, 0.15f, 1f), new Color(0.612f, 0.482f, 0.878f, 1f), new Color(0.31f, 0.827f, 0.871f, 1f) };
@@ -1108,29 +1108,23 @@ namespace Overpower.UI
         [Tooltip("The soft light grey of the small headings on the Dominion HUD and cards (ROUND 2 OF 3, ROUND 1).")]
         public Color dominionMutedColor = new Color(0.725f, 0.714f, 0.682f, 1f);
 
-        [Header("Dominion HUD: round bar (top of the screen during a round)")]
-        [Tooltip("How far the round bar sits below the top edge of the screen.")]
+        [Header("Dominion HUD: round clock (top centre of the screen during a round)")]
+        [Tooltip("How far the round clock sits below the top edge of the screen.")]
         public float dominionBarTop = 30f;
-        [Tooltip("The dark box behind the round bar.")]
+        [Tooltip("The dark box behind the round clock.")]
         public Color dominionBarFill = new Color(0.059f, 0.063f, 0.078f, 0.75f);
-        [Tooltip("The rounded corners of the round bar.")]
+        [Tooltip("The rounded corners of the round clock's box.")]
         public float dominionBarRadius = 12f;
-        [Tooltip("Height of the round bar.")]
+        [Tooltip("Height of the round clock's box.")]
         public float dominionBarHeight = 80f;
-        [Tooltip("The slightly darker box behind the round clock in the middle of the bar.")]
+        [Tooltip("The slightly darker fill inside the round clock's box.")]
         public Color dominionBarClockFill = new Color(0f, 0f, 0f, 0.25f);
-        [Tooltip("Narrowest a team's block gets in a 2v2 match (the clock sits between the two); it widens when more round-win dots need room.")]
-        public float dominionBarSideWidth = 90f;
-        [Tooltip("Width of the clock block in a 2v2 match.")]
+        [Tooltip("Width of the round clock's box in a 2v2 match.")]
         public float dominionBarClockWidth = 190f;
-        [Tooltip("Narrowest a team's block gets in a 3v3v3 match (three blocks, then the clock); it widens when more round-win dots need room.")]
-        public float dominionBar3SideWidth = 90f;
-        [Tooltip("Width of the clock block in a 3v3v3 match.")]
+        [Tooltip("Width of the round clock's box in a 3v3v3 match.")]
         public float dominionBar3ClockWidth = 200f;
-        [Tooltip("Thickness of the line under each team's block, in the team's colour.")]
+        [Tooltip("Thickness of the team-colour stripe along the top of the death card.")]
         public float dominionBarEdgeThickness = 6f;
-        [Tooltip("Empty space left and right of a team's round-win dots. A block is never narrower than its dots plus this on both sides, so a match with many round wins needed still fits.")]
-        public float dominionBarDotsMargin = 18f;
         [Tooltip("Size of the round clock in a 2v2 match.")]
         public float dominionClockSize = 36f;
         [Tooltip("Size of the round clock in a 3v3v3 match.")]
@@ -1139,7 +1133,7 @@ namespace Overpower.UI
         public float dominionRoundLabelSize = 18f;
         [Tooltip("Extra space between the letters of the small headings, in reference pixels.")]
         public float dominionLabelSpacing = 3f;
-        [Tooltip("Width and height of one round-win dot.")]
+        [Tooltip("Width and height of one round-win dot, after each team's score bar and on the break card.")]
         public float dominionDotSize = 18f;
         [Tooltip("Space between two round-win dots.")]
         public float dominionDotGap = 9f;
@@ -1147,13 +1141,13 @@ namespace Overpower.UI
         public float dominionDotRing = 3f;
         [Tooltip("What the small heading over the round clock says. {0} = the round, {1} = how many rounds there are.")]
         public string dominionRoundLabelFormat = "ROUND {0} OF {1}";
-        [Tooltip("What the round bar's clock slot says once the rounds are over and sudden death is on (there is no clock then).")]
+        [Tooltip("What the round clock says once the rounds are over and sudden death is on (there is no clock then).")]
         public string dominionBarSuddenText = "SUDDEN DEATH";
         [Tooltip("Size of the words in the clock slot during sudden death.")]
         public float dominionBarSuddenSize = 30f;
         [Tooltip("What the small heading over the round clock says during overtime, in place of the round number. The clock under it then counts the overtime's own minute down.")]
         public string dominionBarOvertimeText = "OVERTIME";
-        [Tooltip("What flashes under the team blocks when the centre pays out. {0} = the points, {1} = the team's name in capitals.")]
+        [Tooltip("What flashes under the round clock, in the paid team's colour, when the centre pays out. {0} = the points, {1} = the team's name in capitals.")]
         public string dominionFlashFormat = "+{0} {1}";
         [Tooltip("Size of the centre payout flash.")]
         public float dominionFlashSize = 36f;
@@ -1161,9 +1155,9 @@ namespace Overpower.UI
         public float dominionFlashSeconds = 2.5f;
         [Tooltip("How long the centre payout flash takes to fade out at the end of its time, in seconds.")]
         [Min(0.01f)] public float dominionFlashFadeSeconds = 0.5f;
-        [Tooltip("Gap between the bottom of the round bar and the centre payout flash under it.")]
+        [Tooltip("Gap between the bottom of the round clock and the centre payout flash under it.")]
         public float dominionFlashGap = 6f;
-        [Tooltip("How far below the top of the bar the 'ROUND 2 OF 3' label sits, as a share of the bar's height (0.16 = a sixth).")]
+        [Tooltip("How far below the top of the clock's box the 'ROUND 2 OF 3' label sits, as a share of the box's height (0.16 = a sixth).")]
         [Range(0f, 0.5f)] public float dominionRoundLabelTopShare = 0.1f;
 
         [Header("Dominion HUD: break card (between rounds)")]
@@ -1277,12 +1271,13 @@ namespace Overpower.UI
         public TMP_FontAsset minimapLinesFont;
 
         [Header("Dominion HUD: under the minimap")]
-        [Tooltip("Size of the centre countdown line (CENTRE +200 IN 12). The gap under the map and the font of these lines are set above, under 'Under the minimap: all lines'.")]
-        public float dominionCentreSize = 30f;
+        [Tooltip("Size of the centre countdown line (IV zone +200 in 12s). The gap under the map and the font of these lines are set above, under 'Under the minimap: all lines'.")]
+        public float dominionCentreSize = 19.5f;
         [Tooltip("Size of the line saying who holds the centre.")]
-        public float dominionCentreHolderSize = 21f;
-        [Tooltip("The centre countdown under the minimap in a 3v3v3 match. {0} = the points the centre pays, {1} = seconds to the payout. The tags colour the points gold.")]
-        public string dominionCentreFormat = "CENTRE <color=#E8B931>+{0}</color> IN {1}";
+        public float dominionCentreHolderSize = 13.65f;
+        [Tooltip("The centre countdown under the minimap in a 3v3v3 match. {0} = the points the centre pays, {1} = seconds to the payout. The tags colour the points gold. " +
+                 "IV is the name the minimap's bubble gives the centre zone.")]
+        public string dominionCentreFormat = "IV zone <color=#E8B931>+{0}</color> in {1}s";
         [Tooltip("Who holds the centre. {0} = the team's name.")]
         public string dominionCentreHoldsFormat = "{0} holds it";
         [Tooltip("What the line says when nobody holds the centre.")]
@@ -1292,7 +1287,7 @@ namespace Overpower.UI
         [Tooltip("Size of the circle countdown line.")]
         public float dominionShrinkSize = 27f;
 
-        [Header("Dominion HUD: score bars (bottom-right corner, during a round and overtime)")]
+        [Header("Dominion HUD: score bars (top right, left of the minimap, during a round and overtime)")]
         [Tooltip("How long each team's score bar is, not counting the little box with its number in front of it.")]
         public float dominionScoreBarWidth = 255f;
         [Tooltip("How tall each team's score bar is.")]
@@ -1301,10 +1296,14 @@ namespace Overpower.UI
         public float dominionScoreBarGap = 9f;
         [Tooltip("The width of the little box in front of each bar that holds the team's points as a number.")]
         public float dominionScoreBarNumberWidth = 75f;
-        [Tooltip("The size of the points number in that box. Small, so it never fights the round bar at the top.")]
+        [Tooltip("The size of the points number in that box. Small, so it never fights the round clock.")]
         public float dominionScoreBarNumberSize = 24f;
-        [Tooltip("How far above the gold readout (which sits over the Loadout (P) button) the score bars start, so the two never touch.")]
-        public float dominionScoreBarsAboveGold = 12f;
+        [Tooltip("How far below the top edge of the screen the first score bar starts.")]
+        public float dominionScoreBarsTop = 30f;
+        [Tooltip("The gap between the score bars' right end (the last round-win dot) and the left edge of the corner minimap.")]
+        public float dominionScoreBarsMinimapGap = 24f;
+        [Tooltip("The gap between the end of a team's score bar and its round-win dots. The dots' size and spacing are the round clock's Dominion Dot fields.")]
+        public float dominionScoreDotsGap = 9f;
         [Tooltip("The dark colour behind each score bar and behind its number. The team's colour fills it from the left.")]
         public Color dominionScoreBarTrackColor = new Color(0.059f, 0.063f, 0.078f, 0.75f);
 

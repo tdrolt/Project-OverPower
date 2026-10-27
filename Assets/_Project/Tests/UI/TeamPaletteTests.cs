@@ -56,7 +56,6 @@ namespace Overpower.Tests
         }
 
         [TestCase(typeof(BreakCard), "TextColour")]
-        [TestCase(typeof(RoundHud), "TeamColour")]
         [TestCase(typeof(RoundHud), "TextColour")]
         public void EveryTeamColourHelperGoesThroughThePicker(System.Type screen, string helper)
         {
