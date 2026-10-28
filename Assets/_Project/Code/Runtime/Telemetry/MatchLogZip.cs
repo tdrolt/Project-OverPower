@@ -104,6 +104,8 @@ namespace Overpower.Telemetry
 
         private void TryZip()
         {
+            if (!MatchLogZipRule.ZipsOnThisPlatform(Application.platform == RuntimePlatform.WebGLPlayer))
+                return;
             try
             {
                 MatchTelemetry mt = MatchTelemetry.Instance;

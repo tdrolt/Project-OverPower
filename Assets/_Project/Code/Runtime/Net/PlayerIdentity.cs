@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Overpower.Match;
+using Overpower.Web;
 using UnityEngine;
 
 namespace Overpower.Net
@@ -17,11 +18,16 @@ namespace Overpower.Net
     /// The id is a random GUID made the first time the game runs. It is the Photon user id (what lets the server give a
     /// dropped player their own slot back), never the name and never the address. It is never logged in full: use
     /// <see cref="PlayerIdRule.ForLog"/>.
+    ///
+    /// In the browser both live in the tab instead (<see cref="BrowserTabStore"/>): every tab of a site shares one file storage,
+    /// so files would make all tabs one player.
     /// </summary>
     public static class PlayerIdentity
     {
         public const string IdFileName = "overpower-player-id.txt";
         public const string LastMatchFileName = "overpower-last-match.json";
+        private const string TabIdKey = "overpower-player-id";
+        private const string TabLastMatchKey = "overpower-last-match";
 
         private static string cachedId;
 
@@ -32,6 +38,14 @@ namespace Overpower.Net
             {
                 if (!string.IsNullOrEmpty(cachedId))
                     return cachedId;
+
+                if (PlayerIdRule.KeepsIdPerBrowserTab(Application.platform == RuntimePlatform.WebGLPlayer))
+                {
+                    cachedId = PlayerIdRule.Resolve(BrowserTabStore.Get(TabIdKey), PlayerIdRule.NewId, out bool made);
+                    if (made)
+                        BrowserTabStore.Set(TabIdKey, cachedId);
+                    return cachedId;
+                }
 
                 // The file holds "id@tag" (machine + folder): a build folder copied elsewhere makes its own id.
                 string tag = PlayerIdRule.Tag(SystemInfo.deviceName, Folder());
@@ -63,7 +77,9 @@ namespace Overpower.Net
         /// <summary>The saved record, or null when there is none or it cannot be read.</summary>
         public static RejoinRecord LoadLastMatch()
         {
-            string text = TryRead(LastMatchPath());
+            string text = PlayerIdRule.KeepsIdPerBrowserTab(Application.platform == RuntimePlatform.WebGLPlayer)
+                ? BrowserTabStore.Get(TabLastMatchKey)
+                : TryRead(LastMatchPath());
             return RejoinRecord.TryParse(text, out RejoinRecord record) ? record : null;
         }
 
@@ -80,12 +96,20 @@ namespace Overpower.Net
                 Nick = nick ?? "",
                 SavedAtMs = NowMs(),
             };
-            TryWrite(LastMatchPath(), record.Serialize());
+            if (PlayerIdRule.KeepsIdPerBrowserTab(Application.platform == RuntimePlatform.WebGLPlayer))
+                BrowserTabStore.Set(TabLastMatchKey, record.Serialize());
+            else
+                TryWrite(LastMatchPath(), record.Serialize());
         }
 
         /// <summary>Forgets the saved match: the player chose a new one, or the rejoin found nothing to return to.</summary>
         public static void ClearLastMatch()
         {
+            if (PlayerIdRule.KeepsIdPerBrowserTab(Application.platform == RuntimePlatform.WebGLPlayer))
+            {
+                BrowserTabStore.Remove(TabLastMatchKey);
+                return;
+            }
             try
             {
                 string path = LastMatchPath();

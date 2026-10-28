@@ -61,6 +61,10 @@ namespace Overpower.Match
 
         public static string NewId() => Guid.NewGuid().ToString("N");
 
+        /// <summary>The web player keeps the id and the saved last match in the browser tab, not in files: every tab of a site shares
+        /// the browser's file storage, and Photon refuses two connections with one user id in a room.</summary>
+        public static bool KeepsIdPerBrowserTab(bool webPlayer) => webPlayer;
+
         /// <summary>A short stable fingerprint of where an id was made: the machine and the game folder. A build folder copied to
         /// another folder or PC gets a different tag, so it does not share the original's id (Photon refuses two connections
         /// with one id in a room).</summary>

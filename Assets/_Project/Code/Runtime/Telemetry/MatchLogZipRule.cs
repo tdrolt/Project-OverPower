@@ -22,6 +22,9 @@ namespace Overpower.Telemetry
         /// remembered while still in the room, or it would look for "-1_..." files and miss the whole log.</summary>
         public static int ResolveActor(int live, int remembered) => live > 0 ? live : remembered;
 
+        /// <summary>No zip in the web player: its log sits in the tab's memory and a web page cannot open a folder.</summary>
+        public static bool ZipsOnThisPlatform(bool webPlayer) => !webPlayer;
+
         /// <summary>The nick counterpart of <see cref="ResolveActor"/>: the live one while in a room, else the remembered one.</summary>
         public static string ResolveNick(string live, string remembered, int liveActor)
         {

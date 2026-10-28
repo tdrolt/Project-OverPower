@@ -18,6 +18,13 @@ namespace Overpower.Telemetry
         /// ones from mixing under a different name.</summary>
         public static string ResolveMatchLogsRoot(string legacyFolderName)
         {
+            if (TelemetryPathRules.KeepsLogsInMemory(Application.platform == RuntimePlatform.WebGLPlayer))
+            {
+                // temporaryCachePath is the tab's in-memory file system in the web player.
+                TryUseFolder(Application.temporaryCachePath, MatchLogsFolderName, out string memoryRoot);
+                return memoryRoot ?? Path.Combine(Application.temporaryCachePath, MatchLogsFolderName);
+            }
+
             string gameFolder = SafeParentOf(Application.dataPath);
             bool gameFolderOk = TryUseFolder(gameFolder, MatchLogsFolderName, out string gameRoot);
 

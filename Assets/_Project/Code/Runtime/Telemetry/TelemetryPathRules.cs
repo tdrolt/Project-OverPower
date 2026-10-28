@@ -24,5 +24,9 @@ namespace Overpower.Telemetry
             if (documentsWritable) return MatchLogLocation.Documents;
             return MatchLogLocation.Legacy;
         }
+
+        /// <summary>The web player keeps its log in the tab's memory (gone with the tab): the browser's lasting storage would keep
+        /// every match for good, and nobody can open it to read the files anyway.</summary>
+        public static bool KeepsLogsInMemory(bool webPlayer) => webPlayer;
     }
 }
