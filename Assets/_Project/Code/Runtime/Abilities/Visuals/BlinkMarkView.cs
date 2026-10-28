@@ -23,7 +23,7 @@ namespace Overpower.Abilities
         private const float FlatTopYaw = 30f; // half a side off the floor's pointy-topped hex tiles, so the ring never reads as a lit tile
 
         [SerializeField, Tooltip("Where the marks' colour (the Blink row of the look table), material and sizes come from: " +
-                 "Assets/_Project/Shared/Config/UiTheme.asset and its Arena Look.")]
+                 "Assets/_Project/Design/Settings/UiTheme.asset and its Arena Look.")]
         private UiTheme theme;
 
         private AbilityModule module;

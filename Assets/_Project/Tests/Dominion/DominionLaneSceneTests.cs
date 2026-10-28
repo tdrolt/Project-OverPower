@@ -172,7 +172,7 @@ namespace Overpower.Tests
                 Assert.IsTrue(config.RectangularFrame);
                 Assert.Greater(config.WorldSizeMetres, config.WorldDepthMetres * 1.5f, "the lane is much longer than it is wide");
             });
-            MinimapConfig arena = AssetDatabase.LoadAssetAtPath<MinimapConfig>("Assets/_Project/Shared/Config/MinimapConfig.asset");
+            MinimapConfig arena = AssetDatabase.LoadAssetAtPath<MinimapConfig>("Assets/_Project/Design/Settings/MinimapConfig.asset");
             Assert.IsFalse(arena.RectangularFrame);
             Assert.AreEqual(arena.WorldSizeMetres, arena.WorldDepthMetres, "a triangle arena's picture is a square");
         }

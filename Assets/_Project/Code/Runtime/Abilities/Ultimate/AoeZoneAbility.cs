@@ -17,7 +17,7 @@ namespace Overpower.Abilities
     public sealed class AoeZoneAbility : AbilityModule
     {
         [SerializeField, Tooltip("The zone that gets placed - a networked object that must live in " +
-                 "Assets/_Project/Resources (PhotonNetwork.Instantiate resolves it by name). Every number the " +
+                 "Assets/_Project/Design/Resources (PhotonNetwork.Instantiate resolves it by name). Every number the " +
                  "zone itself uses - radius, heal, duration, tick rate, whether it follows the " +
                  "caster - lives on that prefab; this ability only reads its name to spawn it.")]
         private GameObject zonePrefab;

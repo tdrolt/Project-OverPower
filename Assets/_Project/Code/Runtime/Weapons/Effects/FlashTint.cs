@@ -12,7 +12,7 @@ namespace Overpower.Weapons
     public sealed class FlashTint : MonoBehaviour
     {
         [SerializeField, Tooltip("Where the flash's white (Flash White) and how much brighter it is drawn (its Arena Look's Gun Flash Glow) " +
-                 "come from: Assets/_Project/Shared/Config/UiTheme.asset.")]
+                 "come from: Assets/_Project/Design/Settings/UiTheme.asset.")]
         private UiTheme theme;
 
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");

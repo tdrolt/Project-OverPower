@@ -13,7 +13,7 @@ namespace Overpower.Tests
     /// and the player prefab carries the crosshair. Each IL check fails with its wiring reverted.</summary>
     public class CrosshairWiringTests
     {
-        private const string PlayerPrefab = "Assets/_Project/Resources/Multiplayer Player.prefab";
+        private const string PlayerPrefab = "Assets/_Project/Design/Resources/Multiplayer Player.prefab";
         private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
         private static MethodInfo Rule(string name) => typeof(CrosshairRules).GetMethod(name, Any);

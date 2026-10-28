@@ -176,7 +176,7 @@ namespace Overpower.Tests
         [Test]
         public void ThePlayerPrefabsMechHasTheGameplayConfig()
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Multiplayer Player.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Resources/Multiplayer Player.prefab");
             Assert.IsNotNull(prefab);
             animScript script = prefab.GetComponentInChildren<animScript>(true);
             Assert.IsNotNull(script);

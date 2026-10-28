@@ -22,7 +22,7 @@ namespace Overpower.Tests
     /// never fail (Min(a,b) &lt;= Max(a,b) is a tautology), so it was dropped 2026-09-24.</summary>
     public class GameplayConfigVentTests
     {
-        private const string AssetPath = "Assets/_Project/Shared/Config/GameplayConfig.asset";
+        private const string AssetPath = "Assets/_Project/Design/Settings/GameplayConfig.asset";
 
         [Test]
         public void TheAssetFileOnDiskHasEveryVentFieldLine()

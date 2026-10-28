@@ -283,7 +283,7 @@ namespace Overpower.Tests
             Assert.IsTrue(painters[0].enabled);
             var theme = new SerializedObject(painters[0]).FindProperty("theme").objectReferenceValue as UiTheme;
             Assert.IsNotNull(theme, "the painter has a theme");
-            Assert.AreEqual("Assets/_Project/Shared/Config/UiTheme.asset", AssetDatabase.GetAssetPath(theme));
+            Assert.AreEqual("Assets/_Project/Design/Settings/UiTheme.asset", AssetDatabase.GetAssetPath(theme));
             Assert.IsNotNull(theme.arenaLook, "and the theme reaches the arena look (tile size and band)");
         }
     }

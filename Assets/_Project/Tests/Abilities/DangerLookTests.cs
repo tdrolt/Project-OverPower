@@ -20,13 +20,13 @@ namespace Overpower.Tests
     {
         private const BindingFlags Any = MovementLookTestKit.Any;
         private const int RaybeamId = 24, AoeId = 27;
-        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
+        private const string ThemePath = "Assets/_Project/Design/Settings/UiTheme.asset";
         private const string FxAlphaPath = "Assets/_Project/Shared/FX/Materials/FX Alpha.mat";
-        private const string ZonePath = "Assets/_Project/Resources/AoE Zone.prefab";
-        private const string RaybeamPath = "Assets/_Project/Features/Abilities/Data/Raybeam.prefab";
+        private const string ZonePath = "Assets/_Project/Design/Resources/AoE Zone.prefab";
+        private const string RaybeamPath = "Assets/_Project/Design/Abilities/Prefabs/Raybeam.prefab";
         private const string BeamPath = "Assets/_Project/Shared/FX/Raybeam Beam.prefab";
         private const string ScorchPath = "Assets/_Project/Shared/FX/Impacts/FX Raybeam Scorch.prefab";
-        private const string LaserBeamPath = "Assets/_Project/Features/Weapons/Projectiles/Laser Beam VFX.prefab";
+        private const string LaserBeamPath = "Assets/_Project/Design/Weapons/Projectiles/Laser Beam VFX.prefab";
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly Color White = new Color(0.93f, 0.96f, 0.99f, 1f);
         private static readonly Color Green = new Color(0.21f, 0.83f, 0.27f, 1f);

@@ -9,7 +9,7 @@ namespace Overpower.Tests
     /// <summary>The round bar at the top centre is the round heading and the clock alone: the points and the round-win dots are on the score bars, top right.</summary>
     public class RoundBarSlimTests
     {
-        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
+        private const string ThemePath = "Assets/_Project/Design/Settings/UiTheme.asset";
         private UiTheme theme;
         private LobbyUiKit kit;
         private GameObject canvas;

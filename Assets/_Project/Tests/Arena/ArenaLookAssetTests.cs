@@ -13,7 +13,7 @@ namespace Overpower.Tests
     /// carry a full-sentence play-term tooltip.</summary>
     public class ArenaLookAssetTests
     {
-        private const string AssetPath = "Assets/_Project/Shared/Config/ArenaLook.asset";
+        private const string AssetPath = "Assets/_Project/Design/Settings/ArenaLook.asset";
         private const BindingFlags Instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
         private static FieldInfo[] SerializedFields(System.Type type) => type.GetFields(Instance)

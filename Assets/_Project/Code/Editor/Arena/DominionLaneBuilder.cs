@@ -33,7 +33,7 @@ namespace Overpower.EditorTools
         public const string HealGroupName = "Spawn Heal Areas";
         public const string LayoutPath = DominionLaneLayoutFactory.AssetPath;
         public const string MinimapImagePath = "Assets/_Project/Features/UI/DominionLaneMinimap.png";
-        public const string MinimapConfigPath = "Assets/_Project/Shared/Config/DominionLaneMinimapConfig.asset";
+        public const string MinimapConfigPath = "Assets/_Project/Design/Settings/DominionLaneMinimapConfig.asset";
 
         public const int TopZone = 0, BottomZone = 1, OrangeSpawnZone = 2, PurpleSpawnZone = 3;
 
@@ -67,7 +67,7 @@ namespace Overpower.EditorTools
             if (scene.name != SceneName) { report.Add($"PROBLEM: the open scene is '{scene.name}', not '{SceneName}' - the lane is never built into any other scene."); return report; }
 
             var layout = AssetDatabase.LoadAssetAtPath<DominionLaneLayout>(LayoutPath);
-            var arenaLayout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Shared/Config/ArenaLayout.asset");
+            var arenaLayout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Design/Settings/ArenaLayout.asset");
             if (layout == null || arenaLayout == null) { report.Add("PROBLEM: the lane layout or the arena layout asset is missing."); return report; }
 
             ArenaSymmetry[] arenas = scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<ArenaSymmetry>(true)).ToArray();
@@ -177,7 +177,7 @@ namespace Overpower.EditorTools
             if (EditorApplication.isPlayingOrWillChangePlaymode) { report.Add("PROBLEM: not in Play Mode."); return report; }
             if (scene.name != SceneName) { report.Add($"PROBLEM: the open scene is '{scene.name}', not '{SceneName}'."); return report; }
             var layout = AssetDatabase.LoadAssetAtPath<DominionLaneLayout>(LayoutPath);
-            var arenaLayout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Shared/Config/ArenaLayout.asset");
+            var arenaLayout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Design/Settings/ArenaLayout.asset");
             if (layout == null || arenaLayout == null) { report.Add("PROBLEM: the lane layout or the arena layout asset is missing."); return report; }
             ArenaSymmetry[] arenas = scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<ArenaSymmetry>(true)).ToArray();
             if (arenas.Length != 1) { report.Add($"PROBLEM: {arenas.Length} ArenaSymmetry components in the scene (need exactly one)."); return report; }

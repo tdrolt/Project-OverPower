@@ -29,7 +29,7 @@ namespace Overpower.Tests
                 .Select(m => m.SeatsPerTeam).DefaultIfEmpty(0).Max();
             Assert.Greater(seats, 0, "no game mode plays on Game Scene");
 
-            CapsuleCollider body = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Multiplayer Player.prefab").GetComponent<CapsuleCollider>();
+            CapsuleCollider body = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Resources/Multiplayer Player.prefab").GetComponent<CapsuleCollider>();
             float apart = 2f * body.radius + 0.2f; // two players side by side, plus a margin
             // From just above the floor (the floor is not a wall) to the top of the body.
             float bottom = body.radius + 0.05f, top = Mathf.Max(bottom, body.center.y + body.height * 0.5f - body.radius);

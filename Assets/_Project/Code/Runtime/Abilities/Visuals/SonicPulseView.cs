@@ -27,7 +27,7 @@ namespace Overpower.Abilities
         private const int ArchPoints = 25; // keeps the drawn curve within a couple of centimetres of the rule's at 5 m; not a look number
 
         [SerializeField, Tooltip("Where the arch's colour (the Sonic Pulse row of the look table), material and timing come from: " +
-                 "Assets/_Project/Shared/Config/UiTheme.asset and its Arena Look.")]
+                 "Assets/_Project/Design/Settings/UiTheme.asset and its Arena Look.")]
         private UiTheme theme;
 
         private AbilityModule module;

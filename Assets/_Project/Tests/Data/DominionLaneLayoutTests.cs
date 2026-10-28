@@ -18,8 +18,8 @@ namespace Overpower.Tests
 
         private static DominionLaneLayout Layout()
         {
-            var layout = AssetDatabase.LoadAssetAtPath<DominionLaneLayout>("Assets/_Project/Shared/Config/DominionLaneLayout.asset");
-            Assert.IsNotNull(layout, "Assets/_Project/Shared/Config/DominionLaneLayout.asset is missing: run OverPower > Dominion > Write lane layout from the board");
+            var layout = AssetDatabase.LoadAssetAtPath<DominionLaneLayout>("Assets/_Project/Design/Settings/DominionLaneLayout.asset");
+            Assert.IsNotNull(layout, "Assets/_Project/Design/Settings/DominionLaneLayout.asset is missing: run OverPower > Dominion > Write lane layout from the board");
             return layout;
         }
 
@@ -186,7 +186,7 @@ namespace Overpower.Tests
         [Test] public void BothZonesAreTheTierThreeSizeOfTheTerritoryConfig()
         {
             DominionLaneLayout layout = Layout();
-            var territory = AssetDatabase.LoadAssetAtPath<TerritoryConfig>("Assets/_Project/Shared/Config/TerritoryConfig.asset");
+            var territory = AssetDatabase.LoadAssetAtPath<TerritoryConfig>("Assets/_Project/Design/Settings/TerritoryConfig.asset");
             Assert.IsNotNull(territory);
             Assert.AreEqual(3, layout.ZoneTier);
             float radius = territory.ForTier(layout.ZoneTier).captureRadius;
@@ -196,7 +196,7 @@ namespace Overpower.Tests
         [Test] public void EveryZoneCircleIsInsideThePlayableOutlineAndClearOfTheH()
         {
             DominionLaneLayout layout = Layout();
-            var territory = AssetDatabase.LoadAssetAtPath<TerritoryConfig>("Assets/_Project/Shared/Config/TerritoryConfig.asset");
+            var territory = AssetDatabase.LoadAssetAtPath<TerritoryConfig>("Assets/_Project/Design/Settings/TerritoryConfig.asset");
             float radius = territory.ForTier(layout.ZoneTier).captureRadius;
             var bounds = Overpower.Arena.ArenaBounds.FromPolygon(layout.Outline);
             Assert.IsNotNull(bounds);

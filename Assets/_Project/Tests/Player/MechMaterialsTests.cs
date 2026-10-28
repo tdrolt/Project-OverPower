@@ -14,7 +14,7 @@ namespace Overpower.Tests
     /// is URP Lit with a greyscale glow map, so tinting the glow colour gives the team's hue.</summary>
     public class MechMaterialsTests
     {
-        private const string LookPath = "Assets/_Project/Shared/Config/ArenaLook.asset";
+        private const string LookPath = "Assets/_Project/Design/Settings/ArenaLook.asset";
         private const string BakedGlowMapFolder = "Assets/_Project/Shared/Art/";
         private static readonly Color Team0 = new Color(0.93f, 0.97f, 1f, 1f);
         private static readonly Color Team1 = new Color(0.68f, 0.32f, 1f, 1f);

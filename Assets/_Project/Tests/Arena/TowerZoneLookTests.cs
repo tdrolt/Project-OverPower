@@ -257,7 +257,7 @@ namespace Overpower.Tests
         [SetUp]
         public void SetUp()
         {
-            Material arenaWall = AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Shared/Config/ArenaLook.asset").towerBody;
+            Material arenaWall = AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Design/Settings/ArenaLook.asset").towerBody;
             theme = ScriptableObject.CreateInstance<UiTheme>();
             theme.teamShotColors = new[] { new Color(0.93f, 0.97f, 1f, 1f), new Color(0.68f, 0.32f, 1f, 1f), new Color(0.15f, 0.95f, 1f, 1f) };
             theme.captureRingWarningColor = new Color(1f, 0.2f, 0.15f, 1f);

@@ -17,7 +17,7 @@ namespace Overpower.Tests
     {
         private const BindingFlags Any = MovementLookTestKit.Any;
         private const int DashId = 14;
-        private const string DashPrefab = "Assets/_Project/Features/Abilities/Data/Dash.prefab";
+        private const string DashPrefab = "Assets/_Project/Design/Abilities/Prefabs/Dash.prefab";
 
         [Test]
         public void ChevronsStartAtTheLaunchAndStayInsideTheDash()
@@ -299,7 +299,7 @@ namespace Overpower.Tests
             Assert.IsFalse(System.IO.File.ReadAllText(DashPrefab).Contains("f6fe46bab45b4034e9ac2662f30ba5d8"), "no reference to Dash Trail.mat left in the prefab");
             DashStreakView view = dash.GetComponent<DashStreakView>();
             Assert.IsNotNull(view, "Dash.prefab carries the streak view");
-            Assert.AreEqual("Assets/_Project/Shared/Config/UiTheme.asset", AssetDatabase.GetAssetPath(new SerializedObject(view).FindProperty("theme").objectReferenceValue));
+            Assert.AreEqual("Assets/_Project/Design/Settings/UiTheme.asset", AssetDatabase.GetAssetPath(new SerializedObject(view).FindProperty("theme").objectReferenceValue));
             Assert.IsNull(typeof(DashAbility).GetField("remoteTrail", Any), "no trail field");
         }
     }

@@ -16,7 +16,7 @@ namespace Overpower.Tests
     /// plain text, strings and numbers moved to the theme, the apostrophe of a lobby name.</summary>
     public class LobbyTask9ReviewTests
     {
-        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
+        private const string ThemePath = "Assets/_Project/Design/Settings/UiTheme.asset";
         private UiTheme theme;
         private readonly System.Collections.Generic.List<Object> made = new System.Collections.Generic.List<Object>();
 

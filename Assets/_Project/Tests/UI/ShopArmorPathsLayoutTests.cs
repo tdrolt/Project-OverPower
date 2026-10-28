@@ -34,8 +34,8 @@ namespace Overpower.Tests
         {
             ResetPageMemory();
             createdEventSystem = EventSystem.current == null;
-            theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
-            armor = AssetDatabase.LoadAssetAtPath<ArmorConfig>("Assets/_Project/Shared/Config/ArmorConfig.asset");
+            theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Design/Settings/UiTheme.asset");
+            armor = AssetDatabase.LoadAssetAtPath<ArmorConfig>("Assets/_Project/Design/Settings/ArmorConfig.asset");
             Assert.NotNull(theme, "UiTheme.asset");
             Assert.NotNull(armor, "ArmorConfig.asset");
 
@@ -43,8 +43,8 @@ namespace Overpower.Tests
             screen = screenGo.AddComponent<LoadoutScreen>();
             Set("theme", theme);
             Set("armorConfig", armor);
-            Set("weapons", AssetDatabase.LoadAssetAtPath<WeaponCatalogue>("Assets/_Project/Features/Weapons/Data/WeaponCatalogue.asset"));
-            Set("abilities", AssetDatabase.LoadAssetAtPath<AbilityCatalogue>("Assets/_Project/Shared/Config/AbilityCatalogue.asset"));
+            Set("weapons", AssetDatabase.LoadAssetAtPath<WeaponCatalogue>("Assets/_Project/Design/Weapons/WeaponCatalogue.asset"));
+            Set("abilities", AssetDatabase.LoadAssetAtPath<AbilityCatalogue>("Assets/_Project/Design/Abilities/AbilityCatalogue.asset"));
             typeof(LoadoutScreen).GetMethod("BuildWeaponTree", Private).Invoke(screen, null);
             typeof(LoadoutScreen).GetMethod("BuildUi", Private).Invoke(screen, null);
 

@@ -70,9 +70,9 @@ namespace Overpower.Tests
         public void TheStunAndZipGunsKeepTheirOwnImpacts()
         {
             Assert.AreEqual("Assets/_Project/Shared/FX/Impacts/FX Stun Burst.prefab",
-                FallbackOf(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Weapons/Projectiles/Stun Gun Bullet.prefab")));
+                FallbackOf(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Weapons/Projectiles/Stun Gun Bullet.prefab")));
             const string zipHit = "Assets/_Project/Shared/FX/Impacts/FX Zip Hit.prefab";
-            Assert.AreEqual(zipHit, FallbackOf(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Weapons/Projectiles/Zip Gun Bullet.prefab")),
+            Assert.AreEqual(zipHit, FallbackOf(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Weapons/Projectiles/Zip Gun Bullet.prefab")),
                 "the Zip Gun's hit is its own silver burst, not the old yellow-to-red puff (yellow reads as the Shield's gold)");
             var tint = AssetDatabase.LoadAssetAtPath<GameObject>(zipHit).GetComponent<LookTint>();
             Assert.IsNotNull(tint, "coloured by the look table");

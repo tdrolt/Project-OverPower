@@ -28,7 +28,7 @@ namespace Overpower.Weapons
                  "the test range replace it at runtime through PlayerLoadout.")]
         private WeaponDefinition startingWeapon;
 
-        // The muzzle's one home is its Transform on Assets/_Project/Resources/Multiplayer Player.prefab - tune
+        // The muzzle's one home is its Transform on Assets/_Project/Design/Resources/Multiplayer Player.prefab - tune
         // it by moving that child. It sits just inside the player's body capsule; the shot logic
         // ignores the shooter, so that is safe.
         [SerializeField, Tooltip("Where projectiles leave the gun. Falls back to the player's own " +
@@ -36,7 +36,7 @@ namespace Overpower.Weapons
         private Transform muzzle;
 
         [SerializeField, Tooltip("Where a laser's wind-up warning line gets its team colour and its width/alpha/material numbers from " +
-                 "- Assets/_Project/Shared/Config/UiTheme.asset, shared with the HUD, the aim cone and every shot's trail. " +
+                 "- Assets/_Project/Design/Settings/UiTheme.asset, shared with the HUD, the aim cone and every shot's trail. " +
                  "Presentation only; every weapon still fires with this left empty, the warning line just falls back " +
                  "to plain numbers and no material instead of the theme's.")]
         private UiTheme theme;

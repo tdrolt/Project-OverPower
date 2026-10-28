@@ -17,14 +17,14 @@ namespace Overpower.Tests
         private const float MinTeamSaturation = 0.4f;
         private const float SameHueDegrees = 20f;
 
-        private static UiTheme Theme() => AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
-        private static ArenaLook Look() => AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Shared/Config/ArenaLook.asset");
-        private static Color ScanWave() => AssetDatabase.LoadAssetAtPath<VisionConfig>("Assets/_Project/Shared/Config/VisionConfig.asset").ScanWaveColour;
+        private static UiTheme Theme() => AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Design/Settings/UiTheme.asset");
+        private static ArenaLook Look() => AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Design/Settings/ArenaLook.asset");
+        private static Color ScanWave() => AssetDatabase.LoadAssetAtPath<VisionConfig>("Assets/_Project/Design/Settings/VisionConfig.asset").ScanWaveColour;
 
         // The Flamethrower fan's own hot tip under the caster, a second fire colour kept on the prefab.
         private static Color FanCore()
         {
-            var cone = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
+            var cone = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Abilities/Prefabs/Flamethrower Cone.prefab");
             Assert.NotNull(cone, "the Flamethrower cone prefab");
             var view = cone.GetComponentInChildren<Overpower.Abilities.FlameConeVisual>(true);
             Assert.NotNull(view, "its FlameConeVisual");

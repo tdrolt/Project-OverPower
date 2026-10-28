@@ -21,9 +21,9 @@ namespace Overpower.Tests
     /// </summary>
     public class ScopePrefabGuardTests
     {
-        private const string DefinitionPath = "Assets/_Project/Features/Abilities/Data/28 Scope A.asset";
-        private const string PrefabPath = "Assets/_Project/Features/Abilities/Data/Scope.prefab";
-        private const string CataloguePath = "Assets/_Project/Shared/Config/AbilityCatalogue.asset";
+        private const string DefinitionPath = "Assets/_Project/Design/Abilities/28 Scope A.asset";
+        private const string PrefabPath = "Assets/_Project/Design/Abilities/Prefabs/Scope.prefab";
+        private const string CataloguePath = "Assets/_Project/Design/Abilities/AbilityCatalogue.asset";
 
         // The shop's own cutoff (LoadoutScreen.Builder.cs:237, LoadoutScreen.cs:65, and
         // RaybeamUltimateGuardTests's own copy of this same rule) - test content, not a real ability.

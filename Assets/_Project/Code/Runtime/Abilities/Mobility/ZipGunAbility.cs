@@ -42,7 +42,7 @@ namespace Overpower.Abilities
         private float projectileRadius = 0.225f;
 
         [SerializeField, Tooltip("The projectile this ability fires - a ProjectileMotor plus " +
-                 "AbilityHitRelay, no WeaponDefinition involved. Lives in Assets/_Project/Features/Weapons/Projectiles " +
+                 "AbilityHitRelay, no WeaponDefinition involved. Lives in Assets/_Project/Design/Weapons/Projectiles " +
                  "next to every other bullet.")]
         private GameObject projectilePrefab;
 
@@ -62,7 +62,7 @@ namespace Overpower.Abilities
                  "when the pull itself takes longer (distance ÷ Pull Speed).")]
         private float tetherMarkerSeconds = 0.3f;
 
-        [SerializeField, Tooltip("Material of the square anchor - Assets/_Project/Features/Abilities/Data/Ability Visual Solid.mat. " +
+        [SerializeField, Tooltip("Material of the square anchor - Assets/_Project/Features/Abilities/Materials/Ability Visual Solid.mat. " +
                  "Its colour is the Zip Gun's row in the look table (grey with a faint team tint), like the harpoon and its cable; the cable's own " +
                  "look is in UiTheme's Arena Look.")]
         private Material anchorMaterial;

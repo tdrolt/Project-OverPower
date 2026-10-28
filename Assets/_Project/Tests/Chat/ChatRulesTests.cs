@@ -102,7 +102,7 @@ namespace Overpower.Tests
         [Test]
         public void TheThemeAssetCarriesTheChatLook()
         {
-            var theme = UnityEditor.AssetDatabase.LoadAssetAtPath<Overpower.UI.UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
+            var theme = UnityEditor.AssetDatabase.LoadAssetAtPath<Overpower.UI.UiTheme>("Assets/_Project/Design/Settings/UiTheme.asset");
             Assert.IsNotNull(theme);
             // The look (alpha, text size, placeholder, the spectator tag) is Tudor's, tuned in the asset: only the structure is guarded.
             Assert.IsFalse(string.IsNullOrEmpty(theme.chatInputPlaceholder));

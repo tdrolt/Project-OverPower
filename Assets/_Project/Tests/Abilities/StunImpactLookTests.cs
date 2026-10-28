@@ -205,7 +205,7 @@ namespace Overpower.Tests
         [Test]
         public void TheStunGunBoltCarriesTheMark()
         {
-            var bolt = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Weapons/Projectiles/Stun Gun Bullet.prefab");
+            var bolt = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Weapons/Projectiles/Stun Gun Bullet.prefab");
             Assert.IsNotNull(bolt);
             StunImpactOnHit mark = bolt.GetComponent<StunImpactOnHit>();
             Assert.IsNotNull(mark, "the bolt plays the mark where it strikes");

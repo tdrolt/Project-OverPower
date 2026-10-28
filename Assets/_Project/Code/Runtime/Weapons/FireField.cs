@@ -62,7 +62,7 @@ namespace Overpower.Weapons
                  "It is in the SHOOTER's team colour, so a player can tell whose fire they are standing in; the flames say it is fire.")]
         private LineRenderer rim;
 
-        [SerializeField, Tooltip("Assets/_Project/Shared/Config/UiTheme.asset: the fire colours and Arena Look for the flames, and the team " +
+        [SerializeField, Tooltip("Assets/_Project/Design/Settings/UiTheme.asset: the fire colours and Arena Look for the flames, and the team " +
                  "colours (Shot Color For) for the rim.")]
         private UiTheme theme;
 

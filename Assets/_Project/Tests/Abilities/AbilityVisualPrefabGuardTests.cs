@@ -22,30 +22,30 @@ namespace Overpower.Tests
     {
         private static readonly string[] TouchedPrefabs =
         {
-            "Assets/_Project/Resources/Mine.prefab",
-            "Assets/_Project/Resources/Portal.prefab",
-            "Assets/_Project/Resources/Electric Fence.prefab",
-            "Assets/_Project/Resources/Fire Field.prefab",
-            "Assets/_Project/Features/Weapons/Projectiles/Rocket.prefab",
-            "Assets/_Project/Features/Weapons/Projectiles/Rocket Distance.prefab",
-            "Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab",
-            "Assets/_Project/Features/Weapons/Projectiles/Zip Gun Bullet.prefab",
-            "Assets/_Project/Features/Abilities/Data/Mines.prefab",
-            "Assets/_Project/Features/Abilities/Data/Teleport.prefab",
-            "Assets/_Project/Features/Abilities/Data/Electric Fence.prefab",
-            "Assets/_Project/Features/Abilities/Data/Flamethrower.prefab",
-            "Assets/_Project/Features/Abilities/Data/Zip Gun.prefab",
+            "Assets/_Project/Design/Resources/Mine.prefab",
+            "Assets/_Project/Design/Resources/Portal.prefab",
+            "Assets/_Project/Design/Resources/Electric Fence.prefab",
+            "Assets/_Project/Design/Resources/Fire Field.prefab",
+            "Assets/_Project/Design/Weapons/Projectiles/Rocket.prefab",
+            "Assets/_Project/Design/Weapons/Projectiles/Rocket Distance.prefab",
+            "Assets/_Project/Design/Weapons/Projectiles/Rocket Cursor.prefab",
+            "Assets/_Project/Design/Weapons/Projectiles/Zip Gun Bullet.prefab",
+            "Assets/_Project/Design/Abilities/Prefabs/Mines.prefab",
+            "Assets/_Project/Design/Abilities/Prefabs/Teleport.prefab",
+            "Assets/_Project/Design/Abilities/Prefabs/Electric Fence.prefab",
+            "Assets/_Project/Design/Abilities/Prefabs/Flamethrower.prefab",
+            "Assets/_Project/Design/Abilities/Prefabs/Zip Gun.prefab",
             StunBulletPath,
             StunBurstPath,
-            "Assets/_Project/Features/Abilities/Data/Sonic Pulse.prefab",
+            "Assets/_Project/Design/Abilities/Prefabs/Sonic Pulse.prefab",
             FlameConePath,
         };
 
-        private const string StunBulletPath = "Assets/_Project/Features/Weapons/Projectiles/Stun Gun Bullet.prefab";
+        private const string StunBulletPath = "Assets/_Project/Design/Weapons/Projectiles/Stun Gun Bullet.prefab";
         private const string StunBurstPath = "Assets/_Project/Shared/FX/Impacts/FX Stun Burst.prefab";
-        private const string FlameConePath = "Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab";
-        private const string LookPath = "Assets/_Project/Shared/Config/ArenaLook.asset";
-        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
+        private const string FlameConePath = "Assets/_Project/Design/Abilities/Prefabs/Flamethrower Cone.prefab";
+        private const string LookPath = "Assets/_Project/Design/Settings/ArenaLook.asset";
+        private const string ThemePath = "Assets/_Project/Design/Settings/UiTheme.asset";
         private const int StunGunId = 22;
 
         private static GameObject Load(string path)
@@ -86,46 +86,46 @@ namespace Overpower.Tests
         [Test]
         public void MineIsWired()
         {
-            PhotonViews("Assets/_Project/Resources/Mine.prefab", 1);
+            PhotonViews("Assets/_Project/Design/Resources/Mine.prefab", 1);
 
-            SerializedObject ability = Fields<MineAbility>("Assets/_Project/Features/Abilities/Data/Mines.prefab");
-            AssetAt(ability, "minePrefab", "Assets/_Project/Resources/Mine.prefab");
+            SerializedObject ability = Fields<MineAbility>("Assets/_Project/Design/Abilities/Prefabs/Mines.prefab");
+            AssetAt(ability, "minePrefab", "Assets/_Project/Design/Resources/Mine.prefab");
         }
 
         [Test]
         public void PortalIsWired()
         {
-            PhotonViews("Assets/_Project/Resources/Portal.prefab", 1);
+            PhotonViews("Assets/_Project/Design/Resources/Portal.prefab", 1);
 
-            SerializedObject ability = Fields<TeleportAbility>("Assets/_Project/Features/Abilities/Data/Teleport.prefab");
-            AssetAt(ability, "portalPrefab", "Assets/_Project/Resources/Portal.prefab");
+            SerializedObject ability = Fields<TeleportAbility>("Assets/_Project/Design/Abilities/Prefabs/Teleport.prefab");
+            AssetAt(ability, "portalPrefab", "Assets/_Project/Design/Resources/Portal.prefab");
         }
 
         [Test]
         public void ElectricFenceIsWired()
         {
-            PhotonViews("Assets/_Project/Resources/Electric Fence.prefab", 2); // two today - flagged for Tudor, not fixed here
+            PhotonViews("Assets/_Project/Design/Resources/Electric Fence.prefab", 2); // two today - flagged for Tudor, not fixed here
 
-            SerializedObject ability = Fields<ElectricFenceAbility>("Assets/_Project/Features/Abilities/Data/Electric Fence.prefab");
-            AssetAt(ability, "fencePrefab", "Assets/_Project/Resources/Electric Fence.prefab");
+            SerializedObject ability = Fields<ElectricFenceAbility>("Assets/_Project/Design/Abilities/Prefabs/Electric Fence.prefab");
+            AssetAt(ability, "fencePrefab", "Assets/_Project/Design/Resources/Electric Fence.prefab");
         }
 
         [Test]
         public void ZipGunIsWired()
         {
-            SerializedObject zip = Fields<ZipGunAbility>("Assets/_Project/Features/Abilities/Data/Zip Gun.prefab");
-            AssetAt(zip, "projectilePrefab", "Assets/_Project/Features/Weapons/Projectiles/Zip Gun Bullet.prefab");
+            SerializedObject zip = Fields<ZipGunAbility>("Assets/_Project/Design/Abilities/Prefabs/Zip Gun.prefab");
+            AssetAt(zip, "projectilePrefab", "Assets/_Project/Design/Weapons/Projectiles/Zip Gun Bullet.prefab");
 
-            Assert.IsNotNull(Load("Assets/_Project/Features/Weapons/Projectiles/Zip Gun Bullet.prefab").GetComponent<AbilityHitRelay>());
+            Assert.IsNotNull(Load("Assets/_Project/Design/Weapons/Projectiles/Zip Gun Bullet.prefab").GetComponent<AbilityHitRelay>());
         }
 
         // The falloff curve's SHAPE (full damage at distance 0, less at the outer edge) is every splash weapon's
         // actual rule, not a value Tudor retunes - unlike splashDamage/splashRadius (his to change freely), which
         // this file no longer pins. hitMask/splashMask are dropped too: raw layer bitmasks are level-design/tuning
         // levers here, not enforced anywhere else as a structural invariant the way a PhotonView count is.
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket.prefab")]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Distance.prefab")]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab")]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket.prefab")]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket Distance.prefab")]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket Cursor.prefab")]
         public void RocketSplashFalloffShapeIsUnchanged(string path)
         {
             SerializedObject explode = Fields<ExplodeOnImpact>(path);
@@ -150,9 +150,9 @@ namespace Overpower.Tests
             // FireField.BurnEveryoneInside burns an upright capsule over the drawn disc instead of a sphere at the
             // field's old floating centre (FireField.OverlapBurnZone, pinned in FireFieldBurnZoneTests against real
             // colliders - a capsule query needs a live PhysicsScene, which this asset-only pin test never opens).
-            AssetAt(Fields<DetonateAtCursor>("Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab"), "fireFieldPrefab",
-                "Assets/_Project/Resources/Fire Field.prefab");
-            PhotonViews("Assets/_Project/Resources/Fire Field.prefab", 1);
+            AssetAt(Fields<DetonateAtCursor>("Assets/_Project/Design/Weapons/Projectiles/Rocket Cursor.prefab"), "fireFieldPrefab",
+                "Assets/_Project/Design/Resources/Fire Field.prefab");
+            PhotonViews("Assets/_Project/Design/Resources/Fire Field.prefab", 1);
         }
 
         [Test]
@@ -194,9 +194,9 @@ namespace Overpower.Tests
         [Test]
         public void PulseHasAView()
         {
-            SerializedObject view = Fields<SonicPulseView>("Assets/_Project/Features/Abilities/Data/Sonic Pulse.prefab");
+            SerializedObject view = Fields<SonicPulseView>("Assets/_Project/Design/Abilities/Prefabs/Sonic Pulse.prefab");
             AssetAt(view, "theme", ThemePath);
-            Assert.IsNotNull(Load("Assets/_Project/Features/Abilities/Data/Sonic Pulse.prefab").GetComponent<SonicPulseAbility>());
+            Assert.IsNotNull(Load("Assets/_Project/Design/Abilities/Prefabs/Sonic Pulse.prefab").GetComponent<SonicPulseAbility>());
         }
 
         [Test]
@@ -224,7 +224,7 @@ namespace Overpower.Tests
                               || renderer.sharedMaterial == look.fxAlpha || renderer.sharedMaterial == look.fxAdditive,
                     renderer.name + " is drawn with an FX material");
             Assert.GreaterOrEqual(tongues.GetComponentsInChildren<ParticleSystem>(true).Length, 3, "flames, their hearts and embers");
-            Assert.AreEqual("Assets/_Project/Features/Abilities/Data/Flame Cone.mat",
+            Assert.AreEqual("Assets/_Project/Features/Abilities/Materials/Flame Cone.mat",
                 AssetDatabase.GetAssetPath(cone.transform.Find("Fan").GetComponent<MeshRenderer>().sharedMaterial), "the fan is untouched");
         }
 

@@ -90,7 +90,7 @@ namespace Overpower.Tests
 
         // ---------------------------------------------------------------- the drawn bars (the theme asset gives structure only)
 
-        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
+        private const string ThemePath = "Assets/_Project/Design/Settings/UiTheme.asset";
         private UiTheme theme;
         private LobbyUiKit kit;
         private GameObject canvasGo;

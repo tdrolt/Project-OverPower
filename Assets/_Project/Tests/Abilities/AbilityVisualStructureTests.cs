@@ -14,28 +14,28 @@ namespace Overpower.Tests
     /// </summary>
     public class AbilityVisualStructureTests
     {
-        private const string SolidPath = "Assets/_Project/Features/Abilities/Data/Ability Visual Solid.mat";
-        private const string GlassPath = "Assets/_Project/Features/Abilities/Data/Ability Visual Glass.mat";
+        private const string SolidPath = "Assets/_Project/Features/Abilities/Materials/Ability Visual Solid.mat";
+        private const string GlassPath = "Assets/_Project/Features/Abilities/Materials/Ability Visual Glass.mat";
         private const string LinePath = "Assets/_Project/Features/UI/AimConeLine.mat";
-        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
-        private const string MarkerPath = "Assets/_Project/Features/Weapons/Projectiles/Blast Marker.prefab";
+        private const string ThemePath = "Assets/_Project/Design/Settings/UiTheme.asset";
+        private const string MarkerPath = "Assets/_Project/Design/Weapons/Projectiles/Blast Marker.prefab";
         private const string PuckPath = "Assets/_Project/Shared/Art/MinePuck.fbx";
         private const string PylonPath = "Assets/_Project/Shared/Art/FencePylon.fbx";
         private const string PlacedBodyPath = "Assets/_Project/Shared/FX/Materials/Placed Body.mat";
         private const string WallPath = "Assets/_Project/Features/Arena/Materials/Arena Wall.mat";
-        private const string CoverPath = "Assets/_Project/Resources/Cover Wall.prefab";
+        private const string CoverPath = "Assets/_Project/Design/Resources/Cover Wall.prefab";
 
         // A6 (Tudor 2026-09-17 evening): rocket blasts stay at their real height, so step 6 needs a short see-through
         // shell at the burst point instead of a floor BlastMarker. Built here, in the shared kit, so step 6 has it
         // ready - see this file's own extra test below the marker's.
-        private const string ShellPath = "Assets/_Project/Features/Weapons/Projectiles/Splash Shell.prefab";
+        private const string ShellPath = "Assets/_Project/Design/Weapons/Projectiles/Splash Shell.prefab";
 
         // A3 (Tudor 2026-09-17 evening): the flamethrower's fan needs a genuine per-vertex tip-to-edge gradient, and
         // GlassPath (URP/Unlit) never reads a mesh's vertex colours at all (verified against the shader's own HLSL
         // source - its Attributes struct has no COLOR semantic). Laser Beam.mat hit exactly this bug on 2026-09-15 and
         // was moved to Particles/Unlit; the fan below gets its OWN new material for the same reason, rather than
         // reshading Ability Visual Glass.mat out from under the mine, portal and fence, which already ship with it.
-        private const string FlamePath = "Assets/_Project/Features/Abilities/Data/Flame Cone.mat";
+        private const string FlamePath = "Assets/_Project/Features/Abilities/Materials/Flame Cone.mat";
 
         private static GameObject Load(string path)
         {
@@ -149,9 +149,9 @@ namespace Overpower.Tests
             Assert.IsNull(prefab.GetComponent<SnapVisualToGround>(), "the ring stays at the real burst height - never snapped to the floor");
         }
 
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket.prefab")]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Distance.prefab")]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab")]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket.prefab")]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket Distance.prefab")]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket Cursor.prefab")]
         public void EveryRocketShowsASplashShellAtItsRealBurstPoint(string path)
         {
             // A6: replaces the plan's own printed RocketBlastView (a floor BlastMarker) - the shell stays at the
@@ -171,7 +171,7 @@ namespace Overpower.Tests
             // PhotonNetwork.Instantiate's position), so nothing in the field snaps to the ground on its own. The
             // burning ground is floor flames in the fire colours, sized to the real Radius when it lights (FireFieldLookTests), and the rim
             // still marks the true edge.
-            GameObject prefab = Load("Assets/_Project/Resources/Fire Field.prefab");
+            GameObject prefab = Load("Assets/_Project/Design/Resources/Fire Field.prefab");
             Assert.IsNull(prefab.transform.Find("Visual"), "no flat disc: the burning ground is drawn by its flames");
             Assert.IsEmpty(prefab.GetComponentsInChildren<SnapVisualToGround>(true), "the field's root is placed on the floor at spawn time");
             var field = prefab.GetComponent<FireField>();
@@ -193,7 +193,7 @@ namespace Overpower.Tests
         [Test]
         public void TheMineIsAHexPuckWithATeamCapAndNoCollider()
         {
-            GameObject prefab = Load("Assets/_Project/Resources/Mine.prefab");
+            GameObject prefab = Load("Assets/_Project/Design/Resources/Mine.prefab");
             Transform visual = Child(prefab.transform, "Visual");
             Assert.AreSame(visual, Ref(prefab.GetComponent<Mine>(), "visual"), "Mine hides this the instant it detonates");
             Assert.AreEqual(Vector3.zero, visual.localPosition);
@@ -230,7 +230,7 @@ namespace Overpower.Tests
         [Test]
         public void ThePortalIsAHexGateWithATurningInnerHexAndNoCollider()
         {
-            GameObject prefab = Load("Assets/_Project/Resources/Portal.prefab");
+            GameObject prefab = Load("Assets/_Project/Design/Resources/Portal.prefab");
             Assert.IsNull(prefab.transform.Find("Visual"), "the old grey cylinder is gone");
             Transform footprint = Child(prefab.transform, "Footprint");
             AssertMeshAsset(footprint, HexDiscMesh.AssetPath, GlassPath);
@@ -260,7 +260,7 @@ namespace Overpower.Tests
         [Test]
         public void TheElectricFenceIsAngularPylonsWithArcsAndNoCollider()
         {
-            GameObject prefab = Load("Assets/_Project/Resources/Electric Fence.prefab");
+            GameObject prefab = Load("Assets/_Project/Design/Resources/Electric Fence.prefab");
             Assert.IsNull(Ref(prefab.GetComponent<ElectricFence>(), "visual"), "nothing is stretched to the radius any more");
             Assert.IsNull(prefab.transform.Find("Visual"), "the old flat disc is gone");
             Transform cage = Child(prefab.transform, "Cage");
@@ -340,10 +340,10 @@ namespace Overpower.Tests
         {
             (string definition, string field, System.Type view)[] placed =
             {
-                ("Assets/_Project/Features/Abilities/Data/17 Teleport M.asset", "portalPrefab", typeof(PortalView)),
-                ("Assets/_Project/Features/Abilities/Data/19 Mines A.asset", "minePrefab", typeof(MineView)),
-                ("Assets/_Project/Features/Abilities/Data/20 Deployable Cover A.asset", "coverPrefab", typeof(CoverPanelView)),
-                ("Assets/_Project/Features/Abilities/Data/26 Electric Fence U.asset", "fencePrefab", typeof(FenceCageView)),
+                ("Assets/_Project/Design/Abilities/17 Teleport M.asset", "portalPrefab", typeof(PortalView)),
+                ("Assets/_Project/Design/Abilities/19 Mines A.asset", "minePrefab", typeof(MineView)),
+                ("Assets/_Project/Design/Abilities/20 Deployable Cover A.asset", "coverPrefab", typeof(CoverPanelView)),
+                ("Assets/_Project/Design/Abilities/26 Electric Fence U.asset", "fencePrefab", typeof(FenceCageView)),
             };
             foreach (var (definitionPath, field, viewType) in placed)
             {
@@ -377,10 +377,10 @@ namespace Overpower.Tests
         [Test]
         public void TheFlamethrowerDrawsASoftFlameConePrefabWithNoCollider()
         {
-            GameObject module = Load("Assets/_Project/Features/Abilities/Data/Flamethrower.prefab");
+            GameObject module = Load("Assets/_Project/Design/Abilities/Prefabs/Flamethrower.prefab");
             var cone = Ref(module.GetComponent<FlamethrowerAbility>(), "sprayVfxPrefab") as FlameConeVisual;
             Assert.IsNotNull(cone, "Flamethrower › Spray Vfx Prefab");
-            Assert.AreEqual("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab", AssetDatabase.GetAssetPath(cone));
+            Assert.AreEqual("Assets/_Project/Design/Abilities/Prefabs/Flamethrower Cone.prefab", AssetDatabase.GetAssetPath(cone));
             Transform fan = Child(cone.transform, "Fan");
             // A3: the fan's own material is FlamePath, not GlassPath - see TheFlameConeMaterialIsUnlitParticles... and
             // this file's own FlamePath comment, above.
@@ -395,7 +395,7 @@ namespace Overpower.Tests
         [Test]
         public void TheZipHookIsAHarpoonHeadOnACableWithNoCollider()
         {
-            GameObject prefab = Load("Assets/_Project/Features/Weapons/Projectiles/Zip Gun Bullet.prefab");
+            GameObject prefab = Load("Assets/_Project/Design/Weapons/Projectiles/Zip Gun Bullet.prefab");
             Assert.AreEqual(Vector3.one, prefab.transform.localScale, "the old 0.2 sphere scale is gone");
             Assert.IsNull(prefab.GetComponent<MeshRenderer>(), "the head is a child now");
             Assert.IsNotNull(prefab.GetComponent<ProjectileMotor>());
@@ -414,7 +414,7 @@ namespace Overpower.Tests
             Assert.AreSame(rope, Ref(view, "rope"));
             AssertNoCollider(prefab);
 
-            var ability = Load("Assets/_Project/Features/Abilities/Data/Zip Gun.prefab").GetComponent<ZipGunAbility>();
+            var ability = Load("Assets/_Project/Design/Abilities/Prefabs/Zip Gun.prefab").GetComponent<ZipGunAbility>();
             Assert.AreEqual(SolidPath, AssetDatabase.GetAssetPath(Ref(ability, "anchorMaterial")));
         }
     }

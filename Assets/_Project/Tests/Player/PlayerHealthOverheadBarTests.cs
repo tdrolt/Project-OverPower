@@ -19,7 +19,7 @@ namespace Overpower.Tests
     /// Edit-mode components never run Awake automatically (confirmed elsewhere in this suite, e.g.
     /// ScopeAbilityTests) - Awake is invoked here by reflection after wiring the three Image fields,
     /// the same way a designer wires them in the Inspector on the real prefab (Bar is their shared
-    /// parent there too - confirmed against Assets/_Project/Resources/Multiplayer Player.prefab).
+    /// parent there too - confirmed against Assets/_Project/Design/Resources/Multiplayer Player.prefab).
     /// </summary>
     public class PlayerHealthOverheadBarTests
     {

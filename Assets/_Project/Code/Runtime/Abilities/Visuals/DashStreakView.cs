@@ -24,7 +24,7 @@ namespace Overpower.Abilities
         private const float ChevronDepthOfWidth = 0.45f; // how far the wings trail the tip, as a share of the chevron's width; keeps the V's shape
 
         [SerializeField, Tooltip("Where the streak's colour (the Dash row of the look table), material and sizes come from: " +
-                 "Assets/_Project/Shared/Config/UiTheme.asset and its Arena Look.")]
+                 "Assets/_Project/Design/Settings/UiTheme.asset and its Arena Look.")]
         private UiTheme theme;
 
         private AbilityModule module;

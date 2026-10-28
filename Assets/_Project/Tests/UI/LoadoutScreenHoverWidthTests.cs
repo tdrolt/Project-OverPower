@@ -67,9 +67,9 @@ namespace Overpower.Tests
             ResetPageMemory();
             createdEventSystem = EventSystem.current == null;
 
-            theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
-            weapons = AssetDatabase.LoadAssetAtPath<WeaponCatalogue>("Assets/_Project/Features/Weapons/Data/WeaponCatalogue.asset");
-            abilities = AssetDatabase.LoadAssetAtPath<AbilityCatalogue>("Assets/_Project/Shared/Config/AbilityCatalogue.asset");
+            theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Design/Settings/UiTheme.asset");
+            weapons = AssetDatabase.LoadAssetAtPath<WeaponCatalogue>("Assets/_Project/Design/Weapons/WeaponCatalogue.asset");
+            abilities = AssetDatabase.LoadAssetAtPath<AbilityCatalogue>("Assets/_Project/Design/Abilities/AbilityCatalogue.asset");
             Assert.NotNull(theme, "UiTheme.asset");
             Assert.NotNull(weapons, "WeaponCatalogue.asset");
             Assert.NotNull(abilities, "AbilityCatalogue.asset");

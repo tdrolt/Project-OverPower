@@ -15,7 +15,7 @@ namespace Overpower.Weapons
     public sealed class StunImpactOnHit : MonoBehaviour, IProjectileBehaviour
     {
         [SerializeField, Tooltip("Where the mark's colour (the STUNNED label's electric blue), sizes and timings come from: " +
-                 "Assets/_Project/Shared/Config/UiTheme.asset and its Arena Look (the Stun Flash, Stun Ring and Stun Arc Rate fields).")]
+                 "Assets/_Project/Design/Settings/UiTheme.asset and its Arena Look (the Stun Flash, Stun Ring and Stun Arc Rate fields).")]
         private UiTheme theme;
 
         public void OnSpawned(ProjectileMotor motor, ProjectileContext context) { }

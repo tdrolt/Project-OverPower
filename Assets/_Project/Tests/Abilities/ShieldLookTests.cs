@@ -16,8 +16,8 @@ namespace Overpower.Tests
     /// shows only through the seams, and the old cyan colours are gone from the prefab.</summary>
     public class ShieldLookTests
     {
-        private const string LookPath = "Assets/_Project/Shared/Config/ArenaLook.asset";
-        private const string PrefabPath = "Assets/_Project/Features/Abilities/Data/Invulnerability.prefab";
+        private const string LookPath = "Assets/_Project/Design/Settings/ArenaLook.asset";
+        private const string PrefabPath = "Assets/_Project/Design/Abilities/Prefabs/Invulnerability.prefab";
         private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
         private const int ShieldId = 25;
 

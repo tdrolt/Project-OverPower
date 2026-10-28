@@ -14,7 +14,7 @@ namespace Overpower.Abilities
     public sealed class ElectricFenceAbility : AbilityModule
     {
         [SerializeField, Tooltip("The fence that gets placed - a networked object that must live in " +
-                 "Assets/_Project/Resources (PhotonNetwork.Instantiate resolves it by name). Every number the " +
+                 "Assets/_Project/Design/Resources (PhotonNetwork.Instantiate resolves it by name). Every number the " +
                  "ring itself uses - radius, band width, damage, slow, cooldown, duration, whether it " +
                  "follows the caster - lives on that prefab; this ability only reads its name to spawn it.")]
         private GameObject fencePrefab;

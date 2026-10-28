@@ -14,7 +14,7 @@ namespace Overpower.Tests
     {
         private const System.Reflection.BindingFlags Any = MovementLookTestKit.Any;
         private const int ZipId = 18;
-        private const string BulletPath = "Assets/_Project/Features/Weapons/Projectiles/Zip Gun Bullet.prefab";
+        private const string BulletPath = "Assets/_Project/Design/Weapons/Projectiles/Zip Gun Bullet.prefab";
         private const string HarpoonPath = "Assets/_Project/Shared/Art/HarpoonHead.fbx";
         private const string CablePath = "Assets/_Project/Shared/FX/Materials/Zip Cable.mat";
         private const string HarpoonMaterialPath = "Assets/_Project/Shared/FX/Materials/Zip Harpoon.mat";
@@ -168,7 +168,7 @@ namespace Overpower.Tests
             Assert.AreEqual(HarpoonMaterialPath, AssetDatabase.GetAssetPath(head.GetComponent<MeshRenderer>().sharedMaterial));
 
             ZipBoltView view = bullet.GetComponent<ZipBoltView>();
-            Assert.AreEqual("Assets/_Project/Shared/Config/UiTheme.asset", AssetDatabase.GetAssetPath(new SerializedObject(view).FindProperty("theme").objectReferenceValue));
+            Assert.AreEqual("Assets/_Project/Design/Settings/UiTheme.asset", AssetDatabase.GetAssetPath(new SerializedObject(view).FindProperty("theme").objectReferenceValue));
             Assert.AreEqual(CablePath, AssetDatabase.GetAssetPath(bullet.transform.Find("Rope").GetComponent<LineRenderer>().sharedMaterial));
             Assert.IsFalse(System.IO.File.ReadAllText(BulletPath).Contains("hookColor"), "the prefab holds no hook colour");
         }
@@ -176,14 +176,14 @@ namespace Overpower.Tests
         [Test]
         public void TheCableMaterialRepeatsItsPatternAlongTheCable()
         {
-            var look = AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Shared/Config/ArenaLook.asset");
+            var look = AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Design/Settings/ArenaLook.asset");
             Assert.AreEqual(CablePath, AssetDatabase.GetAssetPath(look.zipCable), "ArenaLook > Zip Cable");
             Assert.AreEqual("Universal Render Pipeline/Unlit", look.zipCable.shader.name, "an Unlit that reads the texture's tiling and offset, so the chevrons can run");
             Assert.AreEqual(1f, look.zipCable.GetFloat("_Surface"), "see-through between the segments");
             Texture pattern = look.zipCable.GetTexture("_BaseMap");
             Assert.IsNotNull(pattern, "the segment-and-chevron pattern");
             Assert.AreEqual(TextureWrapMode.Repeat, pattern.wrapModeU, "repeats along the cable");
-            Assert.IsFalse(System.IO.File.ReadAllText("Assets/_Project/Features/Abilities/Data/Zip Gun.prefab").Contains("ropeMaterial"), "Zip Gun.prefab holds no rope material");
+            Assert.IsFalse(System.IO.File.ReadAllText("Assets/_Project/Design/Abilities/Prefabs/Zip Gun.prefab").Contains("ropeMaterial"), "Zip Gun.prefab holds no rope material");
         }
     }
 }

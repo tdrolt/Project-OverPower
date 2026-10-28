@@ -20,7 +20,7 @@ namespace Overpower.Tests
         private const float MostOfTheTop = 0.7f;
 
         private static float StripeWidth() =>
-            AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Shared/Config/ArenaLook.asset").barrierTopStripeWidth;
+            AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Design/Settings/ArenaLook.asset").barrierTopStripeWidth;
 
         [TestCase("Assets/_Project/Scenes/Game Scene.unity")]
         [TestCase("Assets/_Project/Scenes/Dominion 2v2.unity")]
@@ -61,7 +61,7 @@ namespace Overpower.Tests
         [Test]
         public void TheShrinksRecessBarrierWearsTheBarrierSurfaceToo()
         {
-            var layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Shared/Config/ArenaLayout.asset");
+            var layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Design/Settings/ArenaLayout.asset");
             Assert.AreSame(AssetDatabase.LoadAssetAtPath<Material>(BarrierPath), layout.BarrierMaterial);
             MethodInfo barrierMaterial = typeof(ArenaLayout).GetProperty(nameof(ArenaLayout.BarrierMaterial)).GetMethod;
             Assert.IsTrue(IlWiring.Uses(typeof(ArenaPhaseTwoCut), "Apply", barrierMaterial), "the shrink builds its recess barrier in the layout's barrier surface");

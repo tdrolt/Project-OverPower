@@ -134,7 +134,7 @@ namespace Overpower.Tests
                 Object.DestroyImmediate(look);
             }
 
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Fire Field.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Resources/Fire Field.prefab");
             GameObject field = Object.Instantiate(prefab);
             try
             {
@@ -188,7 +188,7 @@ namespace Overpower.Tests
                 typeof(ParticleSystem).GetMethod(nameof(ParticleSystem.Stop), new[] { typeof(bool), typeof(ParticleSystemStopBehavior) })),
                 "by stopping new flames, so those in the air burn out on their own");
 
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Fire Field.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Resources/Fire Field.prefab");
             GameObject field = Object.Instantiate(prefab);
             try
             {
@@ -215,7 +215,7 @@ namespace Overpower.Tests
         [Test]
         public void TheShippedFieldBurnsOverTheRadiusItWasSent()
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Fire Field.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Resources/Fire Field.prefab");
             GameObject field = Object.Instantiate(prefab);
             try
             {
@@ -257,7 +257,7 @@ namespace Overpower.Tests
         [Test]
         public void WithoutAnArenaLookTheFieldShowsNoFlames()
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Fire Field.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Resources/Fire Field.prefab");
             GameObject field = Object.Instantiate(prefab);
             try
             {
@@ -295,7 +295,7 @@ namespace Overpower.Tests
         [Test]
         public void TheBurningGroundsHeartsBurnOnTheirFlames()
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Fire Field.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Resources/Fire Field.prefab");
             GameObject field = Object.Instantiate(prefab);
             try
             {

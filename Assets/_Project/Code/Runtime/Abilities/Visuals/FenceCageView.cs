@@ -19,7 +19,7 @@ namespace Overpower.Abilities
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
 
-        [SerializeField, Tooltip("Team colours and the Arena Look - Assets/_Project/Shared/Config/UiTheme.asset.")]
+        [SerializeField, Tooltip("Team colours and the Arena Look - Assets/_Project/Design/Settings/UiTheme.asset.")]
         private UiTheme theme;
 
         [SerializeField, Tooltip("Which row of the Arena Look table colours this fence's arcs: the Electric Fence ability's id.")]

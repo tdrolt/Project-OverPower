@@ -10,8 +10,8 @@ namespace Overpower.Tests
     /// <summary>The How to play asset: structure only (six pages, each with a title, a text and a picture); never the words.</summary>
     public class HowToPlayPagesAssetTests
     {
-        private const string PagesPath = "Assets/_Project/Shared/Config/HowToPlayPages.asset";
-        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
+        private const string PagesPath = "Assets/_Project/Design/Settings/HowToPlayPages.asset";
+        private const string ThemePath = "Assets/_Project/Design/Settings/UiTheme.asset";
         private const string PictureFolder = "Assets/_Project/Features/UI/HowToPlay/";
 
         private static HowToPlayPages Pages() => AssetDatabase.LoadAssetAtPath<HowToPlayPages>(PagesPath);

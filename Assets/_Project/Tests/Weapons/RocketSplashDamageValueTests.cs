@@ -90,18 +90,18 @@ namespace Overpower.Tests
         // Four points across the blast (centre, a third out, two thirds out, the edge), as a FRACTION of whatever
         // splashRadius the prefab currently has - not a fixed metre distance - so this keeps testing the same four
         // meaningful points on the curve no matter how Tudor retunes splashRadius.
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket.prefab", 0f)]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket.prefab", 0.3333333f)]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket.prefab", 0.6666667f)]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket.prefab", 1f)]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Distance.prefab", 0f)]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Distance.prefab", 0.3333333f)]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Distance.prefab", 0.6666667f)]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Distance.prefab", 1f)]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab", 0f)]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab", 0.3333333f)]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab", 0.6666667f)]
-        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab", 1f)]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket.prefab", 0f)]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket.prefab", 0.3333333f)]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket.prefab", 0.6666667f)]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket.prefab", 1f)]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket Distance.prefab", 0f)]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket Distance.prefab", 0.3333333f)]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket Distance.prefab", 0.6666667f)]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket Distance.prefab", 1f)]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket Cursor.prefab", 0f)]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket Cursor.prefab", 0.3333333f)]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket Cursor.prefab", 0.6666667f)]
+        [TestCase("Assets/_Project/Design/Weapons/Projectiles/Rocket Cursor.prefab", 1f)]
         public void SplashDamageAtDistanceFractionMatchesTheFalloffFormula(string prefabPath, float radiusFraction)
         {
             ExplodeOnImpact source = LoadPrefab(prefabPath).GetComponent<ExplodeOnImpact>();
@@ -123,9 +123,9 @@ namespace Overpower.Tests
         // Direct damage must always pay more than the best possible splash - Tudor asked for more splash, not more
         // direct damage, and the whole "aiming still matters" argument depends on this relationship, not on either
         // number's actual value.
-        [TestCase("Assets/_Project/Features/Weapons/Data/02 Rocket.asset")]
-        [TestCase("Assets/_Project/Features/Weapons/Data/03 Rocket - Distance.asset")]
-        [TestCase("Assets/_Project/Features/Weapons/Data/04 Rocket - Cursor Fire.asset")]
+        [TestCase("Assets/_Project/Design/Weapons/02 Rocket.asset")]
+        [TestCase("Assets/_Project/Design/Weapons/03 Rocket - Distance.asset")]
+        [TestCase("Assets/_Project/Design/Weapons/04 Rocket - Cursor Fire.asset")]
         public void ADirectHitPaysMoreThanANearMissAndTheBlastIsTheMainDamage(string weaponPath)
         {
             var weapon = AssetDatabase.LoadAssetAtPath<Overpower.Data.WeaponDefinition>(weaponPath);

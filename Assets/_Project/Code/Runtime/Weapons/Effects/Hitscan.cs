@@ -48,7 +48,7 @@ namespace Overpower.Weapons
         private GameObject beamVfx;
 
         [SerializeField, Tooltip("Where the beam's team colour, width, glow and linger time come from - " +
-                 "Assets/_Project/Shared/Config/UiTheme.asset, shared with the HUD, the aim cone and every shot's trail. " +
+                 "Assets/_Project/Design/Settings/UiTheme.asset, shared with the HUD, the aim cone and every shot's trail. " +
                  "Presentation only; nothing here is a gameplay value. Serialized here rather than passed in from " +
                  "WeaponFiring because this component ALREADY holds its other presentation fields (Beam Vfx above) as " +
                  "plain serialized fields on this same never-spawned prefab asset - see the class comment - so this " +

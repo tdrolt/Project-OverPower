@@ -234,7 +234,7 @@ namespace Overpower.Tests
         [Test]
         public void TheCornerBlockByTheCentreIsSymmetricAboutItsOwnDiagonal()
         {
-            var layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Shared/Config/ArenaLayout.asset");
+            var layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Design/Settings/ArenaLayout.asset");
             List<ArenaLayout.Piece> pieces = CornerBlock(layout);
             Assert.AreEqual(3, pieces.Count, $"the corner block is three '{CornerBlockPrefix}' rows: a square where the arms meet, and two arms");
 

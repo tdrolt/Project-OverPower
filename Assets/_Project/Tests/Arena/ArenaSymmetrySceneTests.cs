@@ -68,7 +68,7 @@ namespace Overpower.Tests
                 Assert.IsNotNull(bounds, "Source Outline is empty: set it to the boundary walls' inner faces.");
 
                 // The real player's own capsule, so this test can't disagree with what blink and portals check against.
-                float radius = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Multiplayer Player.prefab")
+                float radius = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Resources/Multiplayer Player.prefab")
                     .GetComponent<CapsuleCollider>().radius;
 
                 RoomManager rooms = Find<RoomManager>(scene).Single();

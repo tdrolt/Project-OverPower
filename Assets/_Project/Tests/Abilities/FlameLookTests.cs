@@ -57,7 +57,7 @@ namespace Overpower.Tests
         // The shipped cone, sprayed with the look and placed with its feet at the origin, aiming +Z, the gun at Muzzle.
         private static (GameObject cone, ParticleSystem tongues) SprayedCone(UiTheme theme, float angle)
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Abilities/Prefabs/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             var visual = cone.GetComponent<FlameConeVisual>();
             visual.Configure(Range, angle, Color.red, Color.red, true);
@@ -206,7 +206,7 @@ namespace Overpower.Tests
         [Test]
         public void TheShippedJetLeavesTheGunAndSpreadsOverTheCone()
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Abilities/Prefabs/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = JetLook();
@@ -404,7 +404,7 @@ namespace Overpower.Tests
         [Test]
         public void EachHeartFliesWithItsFlame()
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Abilities/Prefabs/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = JetLook();
@@ -533,7 +533,7 @@ namespace Overpower.Tests
             // The cone rule counts on it: each frame of both fire sheets draws only inside the circle that fits its square, whichever way the
             // flame is turned. The flame itself reads as fire up its middle, base to tongue, over Fire Drawn Share of its size (the no-gap
             // rules count that much), and its edge is anti-aliased, never a hard cut-out.
-            var look = UnityEditor.AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Shared/Config/ArenaLook.asset");
+            var look = UnityEditor.AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Design/Settings/ArenaLook.asset");
             foreach ((Material material, bool body) in new[] { (look.flameJetMaterial, true), (look.flameCoreMaterial, false) })
             {
                 Assert.IsNotNull(material, body ? "Flame Jet Material" : "Flame Core Material");
@@ -671,7 +671,7 @@ namespace Overpower.Tests
         public void AJetPressedAgainstAWallNeverKeepsMoreThanItsMostFlamesAlive()
         {
             // A wall pulls the gun's muzzle back toward the cone's tip, where the flames must start tiny to stay inside it.
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Abilities/Prefabs/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = JetLook();
@@ -932,7 +932,7 @@ namespace Overpower.Tests
         [Test]
         public void EachSprayHandsTheLiveConeToTheFlames()
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Abilities/Prefabs/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = JetLook();
@@ -980,7 +980,7 @@ namespace Overpower.Tests
         [Test]
         public void EveryPhysicsStepJetsTheFlamesFromTheGun()
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Abilities/Prefabs/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = JetLook();
@@ -1099,7 +1099,7 @@ namespace Overpower.Tests
         [Test]
         public void TheFanIsLeftAFaintMarkerInTheFireColour()
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Abilities/Prefabs/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = ScriptableObject.CreateInstance<ArenaLook>();
@@ -1138,7 +1138,7 @@ namespace Overpower.Tests
         [Test]
         public void AimingTheJetEveryPhysicsStepAllocatesNothing()
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Abilities/Prefabs/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = ScriptableObject.CreateInstance<ArenaLook>();

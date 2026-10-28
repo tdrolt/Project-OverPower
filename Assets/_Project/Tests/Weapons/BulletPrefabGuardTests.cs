@@ -15,7 +15,7 @@ namespace Overpower.Tests
 
         internal static WeaponDefinition[] Weapons()
         {
-            string[] guids = AssetDatabase.FindAssets("t:WeaponDefinition", new[] { "Assets/_Project/Features/Weapons/Data" });
+            string[] guids = AssetDatabase.FindAssets("t:WeaponDefinition", new[] { "Assets/_Project/Design/Weapons" });
             var weapons = new WeaponDefinition[guids.Length];
             for (int i = 0; i < guids.Length; i++)
                 weapons[i] = AssetDatabase.LoadAssetAtPath<WeaponDefinition>(AssetDatabase.GUIDToAssetPath(guids[i]));

@@ -15,7 +15,7 @@ namespace Overpower.Tests
     /// scoreboard, the pages closing when a match starts and on Escape, the missing-theme fallbacks, and the numbers moved to the theme.</summary>
     public class LobbyTask10ReviewTests
     {
-        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
+        private const string ThemePath = "Assets/_Project/Design/Settings/UiTheme.asset";
         private UiTheme theme;
         private readonly List<Object> made = new List<Object>();
 

@@ -152,7 +152,7 @@ namespace Overpower.Tests
         [Test]
         public void ThePlayerPrefabsMechKnowsTheShootStatesClip()
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Multiplayer Player.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Resources/Multiplayer Player.prefab");
             animScript script = prefab.GetComponentInChildren<animScript>(true);
             Assert.IsNotNull(script);
             var clip = typeof(animScript).GetField("shootClip", Any)?.GetValue(script) as AnimationClip;

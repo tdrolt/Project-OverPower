@@ -14,7 +14,7 @@ namespace Overpower.Abilities
     {
         private static readonly int PanelEdgeId = Shader.PropertyToID(CoverPanelLook.PropertyName);
 
-        [SerializeField, Tooltip("Team colours and the Arena Look - Assets/_Project/Shared/Config/UiTheme.asset.")]
+        [SerializeField, Tooltip("Team colours and the Arena Look - Assets/_Project/Design/Settings/UiTheme.asset.")]
         private UiTheme theme;
 
         [SerializeField, Tooltip("Which row of the Arena Look table colours this cover: the Deployable Cover ability's id.")]

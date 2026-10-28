@@ -137,7 +137,7 @@ namespace Overpower.Tests
         [Test]
         public void TheLookFieldsAreInTheYamlWithATooltip()
         {
-            string yaml = System.IO.File.ReadAllText("Assets/_Project/Shared/Config/UiTheme.asset").Replace("\r\n", "\n");
+            string yaml = System.IO.File.ReadAllText("Assets/_Project/Design/Settings/UiTheme.asset").Replace("\r\n", "\n");
             foreach (string name in new[] { "statusStunnedColor", "movementGreyColor", "fireCoreColor", "fireEdgeColor", "fireBodyOverLife", "fireCoreOverLife", "dangerColor",
                          "flashWhiteColor", "healGreenColor", "arenaNeutralLineColor", "arenaOutOfPlayLineColor", "arenaLook" })
             {
@@ -153,8 +153,8 @@ namespace Overpower.Tests
         [Test]
         public void ThemePointsAtArenaLook()
         {
-            var real = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
-            var look = AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Shared/Config/ArenaLook.asset");
+            var real = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Design/Settings/UiTheme.asset");
+            var look = AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Design/Settings/ArenaLook.asset");
             Assert.NotNull(look, "ArenaLook.asset");
             Assert.AreSame(look, real.arenaLook, "effects find their look through the theme");
         }

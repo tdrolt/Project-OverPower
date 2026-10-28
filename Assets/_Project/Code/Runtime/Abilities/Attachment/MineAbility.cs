@@ -22,7 +22,7 @@ namespace Overpower.Abilities
     public sealed class MineAbility : AbilityModule
     {
         [SerializeField, Tooltip("The mine that gets placed - a networked object that must live in " +
-                 "Assets/_Project/Resources (PhotonNetwork.Instantiate resolves it by name). Its own damage, " +
+                 "Assets/_Project/Design/Resources (PhotonNetwork.Instantiate resolves it by name). Its own damage, " +
                  "slow, radii and arm delay are the single home for those numbers; this ability only " +
                  "reads its name to spawn it.")]
         private GameObject minePrefab;

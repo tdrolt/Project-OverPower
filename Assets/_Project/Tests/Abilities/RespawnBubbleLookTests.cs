@@ -17,7 +17,7 @@ namespace Overpower.Tests
     /// must be fully dressed before the fog gate collects its renderer.</summary>
     public class RespawnBubbleLookTests
     {
-        private const string LookPath = "Assets/_Project/Shared/Config/ArenaLook.asset";
+        private const string LookPath = "Assets/_Project/Design/Settings/ArenaLook.asset";
         private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
         private static readonly Color Team0 = new Color(0.11f, 0.12f, 0.13f, 1f);

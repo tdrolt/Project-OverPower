@@ -14,7 +14,7 @@ namespace Overpower.Tests
         [Test]
         public void TeamNamesAreTheGamesOwnNames()
         {
-            var theme = UnityEditor.AssetDatabase.LoadAssetAtPath<Overpower.UI.UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
+            var theme = UnityEditor.AssetDatabase.LoadAssetAtPath<Overpower.UI.UiTheme>("Assets/_Project/Design/Settings/UiTheme.asset");
             for (int team = 0; team < 3; team++)
                 Assert.AreEqual(theme.scoreboardTeamNames[team], ArenaNames.TeamName(team), "team " + team);
         }
@@ -22,7 +22,7 @@ namespace Overpower.Tests
         [Test]
         public void TheReportDrawsEachTeamInTheGamesColour()
         {
-            var theme = UnityEditor.AssetDatabase.LoadAssetAtPath<Overpower.UI.UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
+            var theme = UnityEditor.AssetDatabase.LoadAssetAtPath<Overpower.UI.UiTheme>("Assets/_Project/Design/Settings/UiTheme.asset");
             string source = System.IO.File.ReadAllText("Assets/_Project/Code/Editor/Telemetry/HtmlReportWriter.cs");
             var list = System.Text.RegularExpressions.Regex.Match(source, @"var TEAM_COLORS = \[([^\]]*)\]");
             Assert.IsTrue(list.Success, "the report's team colour list");

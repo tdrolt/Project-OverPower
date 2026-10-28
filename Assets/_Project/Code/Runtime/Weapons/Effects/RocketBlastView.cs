@@ -21,10 +21,10 @@ namespace Overpower.Weapons
     [RequireComponent(typeof(ExplodeOnImpact))]
     public sealed class RocketBlastView : MonoBehaviour, IProjectileBehaviour
     {
-        [SerializeField, Tooltip("The flat shockwave ring shown at the real burst point - Assets/_Project/Features/Weapons/Projectiles/Splash Shell.prefab.")]
+        [SerializeField, Tooltip("The flat shockwave ring shown at the real burst point - Assets/_Project/Design/Weapons/Projectiles/Splash Shell.prefab.")]
         private SplashShell splashShellPrefab;
 
-        [SerializeField, Tooltip("Assets/_Project/Shared/Config/UiTheme.asset. The ring is its Flash White, as thick as its Arena Look's Blast Ring Width.")]
+        [SerializeField, Tooltip("Assets/_Project/Design/Settings/UiTheme.asset. The ring is its Flash White, as thick as its Arena Look's Blast Ring Width.")]
         private UiTheme theme;
 
         private ExplodeOnImpact explode;

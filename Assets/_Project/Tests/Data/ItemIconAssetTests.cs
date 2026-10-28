@@ -16,7 +16,7 @@ namespace Overpower.Tests
         [Test]
         public void EveryWeaponInTheCatalogueHasAnIcon()
         {
-            var catalogue = AssetDatabase.LoadAssetAtPath<WeaponCatalogue>("Assets/_Project/Features/Weapons/Data/WeaponCatalogue.asset");
+            var catalogue = AssetDatabase.LoadAssetAtPath<WeaponCatalogue>("Assets/_Project/Design/Weapons/WeaponCatalogue.asset");
             Assert.NotNull(catalogue, "WeaponCatalogue moved? Update the path.");
             var missing = new List<string>();
             foreach (WeaponDefinition weapon in catalogue.Weapons)
@@ -28,7 +28,7 @@ namespace Overpower.Tests
         [Test]
         public void EveryShopAbilityInTheCatalogueHasAnIcon()
         {
-            var catalogue = AssetDatabase.LoadAssetAtPath<AbilityCatalogue>("Assets/_Project/Shared/Config/AbilityCatalogue.asset");
+            var catalogue = AssetDatabase.LoadAssetAtPath<AbilityCatalogue>("Assets/_Project/Design/Abilities/AbilityCatalogue.asset");
             Assert.NotNull(catalogue, "AbilityCatalogue moved? Update the path.");
             var missing = new List<string>();
             foreach (AbilityDefinition ability in catalogue.Abilities)
@@ -40,8 +40,8 @@ namespace Overpower.Tests
         [Test]
         public void NoTwoWeaponsOrShopAbilitiesShareAPicture()
         {
-            var weapons = AssetDatabase.LoadAssetAtPath<WeaponCatalogue>("Assets/_Project/Features/Weapons/Data/WeaponCatalogue.asset");
-            var abilities = AssetDatabase.LoadAssetAtPath<AbilityCatalogue>("Assets/_Project/Shared/Config/AbilityCatalogue.asset");
+            var weapons = AssetDatabase.LoadAssetAtPath<WeaponCatalogue>("Assets/_Project/Design/Weapons/WeaponCatalogue.asset");
+            var abilities = AssetDatabase.LoadAssetAtPath<AbilityCatalogue>("Assets/_Project/Design/Abilities/AbilityCatalogue.asset");
             Assert.NotNull(weapons, "WeaponCatalogue moved? Update the path.");
             Assert.NotNull(abilities, "AbilityCatalogue moved? Update the path.");
             var owners = new Dictionary<Sprite, string>();
@@ -62,7 +62,7 @@ namespace Overpower.Tests
         [Test]
         public void BothArmourUpgradesHaveAnIconInTheTheme()
         {
-            var theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
+            var theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Design/Settings/UiTheme.asset");
             Assert.NotNull(theme, "UiTheme moved? Update the path.");
             Assert.NotNull(theme.loadoutArmorAbsorbIcon, "UiTheme: Loadout Armor Absorb Icon is empty.");
             Assert.NotNull(theme.loadoutArmorRechargeIcon, "UiTheme: Loadout Armor Recharge Icon is empty.");

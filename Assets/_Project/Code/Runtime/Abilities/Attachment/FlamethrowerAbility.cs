@@ -72,7 +72,7 @@ namespace Overpower.Abilities
                  "the burn itself depends on it.")]
         private Color vfxColor = new Color(1f, 0.45f, 0.1f, 1f);
 
-        [SerializeField, Tooltip("The soft flame cone - Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab. Drawn from Cone Angle and " +
+        [SerializeField, Tooltip("The soft flame cone - Assets/_Project/Design/Abilities/Prefabs/Flamethrower Cone.prefab. Drawn from Cone Angle and " +
                  "Cone Range above, with its tip under the caster, so it always shows exactly the area the burn " +
                  "checks (a soft tip-to-edge gradient, not a hard outline). Visual only.")]
         private FlameConeVisual sprayVfxPrefab;

@@ -21,8 +21,8 @@ namespace Overpower.Tests
         private static WeaponCatalogue Catalogue()
         {
             var catalogue = AssetDatabase.LoadAssetAtPath<WeaponCatalogue>(
-                "Assets/_Project/Features/Weapons/Data/WeaponCatalogue.asset");
-            Assert.NotNull(catalogue, "Expected the real WeaponCatalogue at Assets/_Project/Features/Weapons/Data/WeaponCatalogue.asset - if it moved, update this path.");
+                "Assets/_Project/Design/Weapons/WeaponCatalogue.asset");
+            Assert.NotNull(catalogue, "Expected the real WeaponCatalogue at Assets/_Project/Design/Weapons/WeaponCatalogue.asset - if it moved, update this path.");
             return catalogue;
         }
 

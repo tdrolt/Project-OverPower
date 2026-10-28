@@ -16,7 +16,7 @@ namespace Overpower.EditorTools
     public static class ArenaSpawnSlotBuilder
     {
         public const string SlotPrefix = "Slot ";
-        private const string PlayerPrefabPath = "Assets/_Project/Resources/Multiplayer Player.prefab";
+        private const string PlayerPrefabPath = "Assets/_Project/Design/Resources/Multiplayer Player.prefab";
 
         /// <summary>Places the slots under every team spawn point of the scene's RoomManager and reports, one line each, any slot whose
         /// player-sized capsule touches a collider (a "PROBLEM" line). Never runs in Play Mode; never saves the scene.</summary>
@@ -76,7 +76,7 @@ namespace Overpower.EditorTools
         [MenuItem("OverPower/Arena/Place spawn slots")]
         private static void MenuPlaceAll()
         {
-            ArenaLayout layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Shared/Config/ArenaLayout.asset");
+            ArenaLayout layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Design/Settings/ArenaLayout.asset");
             Debug.Log("[ArenaSpawnSlotBuilder] Place spawn slots:\n" + string.Join("\n", PlaceAll(SceneManager.GetActiveScene(), layout)));
         }
     }

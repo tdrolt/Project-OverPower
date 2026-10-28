@@ -14,7 +14,7 @@ public class VFXManager : MonoBehaviour
     public static VFXManager Instance;
 
     [SerializeField, Tooltip("Where the most copies of one flash on screen at once and how far a flash is drawn toward the camera come " +
-             "from (its Arena Look's Fx Pool Cap and Fx Camera Pull): Assets/_Project/Shared/Config/UiTheme.asset.")]
+             "from (its Arena Look's Fx Pool Cap and Fx Camera Pull): Assets/_Project/Design/Settings/UiTheme.asset.")]
     private UiTheme theme;
 
     private sealed class Copy

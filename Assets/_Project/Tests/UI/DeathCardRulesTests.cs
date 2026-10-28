@@ -204,7 +204,7 @@ namespace Overpower.Tests
         [Test]
         public void TheDeathCardAndPopUpFieldsAreInTheYamlWithATooltip()
         {
-            string yaml = System.IO.File.ReadAllText("Assets/_Project/Shared/Config/UiTheme.asset").Replace("\r\n", "\n");
+            string yaml = System.IO.File.ReadAllText("Assets/_Project/Design/Settings/UiTheme.asset").Replace("\r\n", "\n");
             foreach (string name in new[] { "deathCardRespawnFormat", "deathCardWidth", "deathCardTitleSize", "deathCardPadding", "deathCardGap", "deathCardMargin",
                          "deathVignetteColor", "popupDimColor", "popupCardWidth", "popupTitleSize", "popupBodySize", "masterVolumeLabel", "masterVolumePercentFormat",
                          "masterVolumeRowHeight", "matchLogDismissText", "resultPanelCardWidth", "resultPanelTitleSize", "resultPanelButtonWidth",

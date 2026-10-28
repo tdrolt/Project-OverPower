@@ -22,7 +22,7 @@ namespace Overpower.Tests
         public void EveryNetworkPrefabPhotonView_SavesTheObservablesItsSearchWouldFind()
         {
             var problems = new List<string>();
-            string[] prefabs = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/_Project/Resources" });
+            string[] prefabs = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/_Project/Design/Resources" });
             Assert.IsNotEmpty(prefabs, "no network prefabs found: the Resources folder moved, so this check would pass on nothing");
 
             foreach (string guid in prefabs)

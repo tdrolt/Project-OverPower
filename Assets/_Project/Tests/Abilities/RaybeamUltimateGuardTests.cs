@@ -26,8 +26,8 @@ namespace Overpower.Tests
     /// </summary>
     public class RaybeamUltimateGuardTests
     {
-        private const string RaybeamPath = "Assets/_Project/Features/Abilities/Data/24 Raybeam U.asset";
-        private const string CataloguePath = "Assets/_Project/Shared/Config/AbilityCatalogue.asset";
+        private const string RaybeamPath = "Assets/_Project/Design/Abilities/24 Raybeam U.asset";
+        private const string CataloguePath = "Assets/_Project/Design/Abilities/AbilityCatalogue.asset";
 
         // The shop's own cutoff (LoadoutScreen.Builder.cs:237, LoadoutScreen.cs:65) - see this
         // class's own comment for why the same number belongs here too.

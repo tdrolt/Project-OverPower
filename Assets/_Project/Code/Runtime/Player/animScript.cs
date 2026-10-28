@@ -26,7 +26,7 @@ public class animScript : MonoBehaviourPun
     private float shotPoseSeconds;
 
     [SerializeField, Tooltip("Where the shortest shoot pose after a shot and the shoot motion's speed-up and blend come from: " +
-             "Assets/_Project/Shared/Config/GameplayConfig.asset. Left empty, a shot holds the shoot pose only for the length of the " +
+             "Assets/_Project/Design/Settings/GameplayConfig.asset. Left empty, a shot holds the shoot pose only for the length of the " +
              "shoot motion, and a fast gun's motion is not sped up.")]
     private GameplayConfig gameplayConfig;
 

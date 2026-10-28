@@ -76,7 +76,7 @@ namespace Overpower.Tests
         [Test]
         public void TheTerritoryConfigListIsNeverSlowerWithMorePlayersAndStartsAboveZero()
         {
-            var config = AssetDatabase.LoadAssetAtPath<TerritoryConfig>("Assets/_Project/Shared/Config/TerritoryConfig.asset");
+            var config = AssetDatabase.LoadAssetAtPath<TerritoryConfig>("Assets/_Project/Design/Settings/TerritoryConfig.asset");
             Assert.NotNull(config);
             Assert.IsNotNull(config.CaptureSpeedByPlayers);
             Assert.Greater(config.CaptureSpeedByPlayers.Count, 0);

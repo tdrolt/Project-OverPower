@@ -19,7 +19,7 @@ namespace Overpower.EditorTools
     {
         public int callbackOrder => 0;
 
-        public const string OutputPath = "Assets/_Project/Resources/BuildInfo.txt";
+        public const string OutputPath = "Assets/_Project/Design/Resources/BuildInfo.txt";
 
         public void OnPreprocessBuild(BuildReport report) => Write();
 

@@ -23,7 +23,7 @@ namespace Overpower.Abilities
     [DisallowMultipleComponent]
     public sealed class PortalView : MonoBehaviour, IDeployableView
     {
-        [SerializeField, Tooltip("Team colours and the Arena Look - Assets/_Project/Shared/Config/UiTheme.asset.")]
+        [SerializeField, Tooltip("Team colours and the Arena Look - Assets/_Project/Design/Settings/UiTheme.asset.")]
         private UiTheme theme;
 
         [SerializeField, Tooltip("Which row of the Arena Look table colours this portal: the Teleport ability's id.")]

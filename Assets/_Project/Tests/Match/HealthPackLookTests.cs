@@ -171,7 +171,7 @@ namespace Overpower.Tests
         [Test]
         public void TheLookFieldsAreInTheYamlWithATooltip()
         {
-            const string path = "Assets/_Project/Shared/Config/HealthPackConfig.asset";
+            const string path = "Assets/_Project/Design/Settings/HealthPackConfig.asset";
             Assert.NotNull(AssetDatabase.LoadAssetAtPath<HealthPackConfig>(path), path);
             string yaml = System.IO.File.ReadAllText(path).Replace("\r\n", "\n");
             foreach (string name in new[] { "takenColour", "readyGlow", "respawningBrightness", "padColour", "padThicknessMetres",
@@ -194,7 +194,7 @@ namespace Overpower.Tests
             HealthPackManager manager = prefab.GetComponentInChildren<HealthPackManager>(true);
             Assert.NotNull(manager, "MatchSystems has the health pack manager");
             Object assigned = new SerializedObject(manager).FindProperty("theme").objectReferenceValue;
-            Assert.AreSame(AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset"), assigned,
+            Assert.AreSame(AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Design/Settings/UiTheme.asset"), assigned,
                            "without the theme the packs lose their green and their glowing edge");
         }
 

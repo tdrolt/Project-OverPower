@@ -9,7 +9,7 @@ namespace Overpower.Tests
     /// the bar sits on (and the plate is built on), and nothing over a player's head is legacy, stretched-bitmap UI text.</summary>
     public class NameplatePrefabTests
     {
-        private const string PrefabPath = "Assets/_Project/Resources/Multiplayer Player.prefab";
+        private const string PrefabPath = "Assets/_Project/Design/Resources/Multiplayer Player.prefab";
 
         private static GameObject Prefab()
         {

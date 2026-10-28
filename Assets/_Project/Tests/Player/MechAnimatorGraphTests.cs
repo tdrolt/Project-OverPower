@@ -118,7 +118,7 @@ namespace Overpower.Tests
             Assert.IsNotNull(p, shoot.speedParameter);
             Assert.AreEqual(AnimatorControllerParameterType.Float, p.type);
 
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Multiplayer Player.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Resources/Multiplayer Player.prefab");
             var sync = prefab.GetComponentInChildren<Photon.Pun.PhotonAnimatorView>(true);
             Assert.IsNotNull(sync);
             Assert.AreEqual(Photon.Pun.PhotonAnimatorView.SynchronizeType.Disabled, sync.GetParameterSynchronizeType(shoot.speedParameter),
