@@ -65,6 +65,18 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheBrowserPlayerSettingsKeepTheMatchRunning()
+        {
+            Assert.IsTrue(PlayerSettings.runInBackground, "the host's tab runs the match logic for everyone");
+            Assert.AreEqual(ManagedStrippingLevel.Minimal, PlayerSettings.GetManagedStrippingLevel(UnityEditor.Build.NamedBuildTarget.WebGL),
+                "Photon finds its browser socket class by name; higher stripping can remove it");
+            Assert.AreNotEqual(WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly, PlayerSettings.WebGL.exceptionSupport,
+                "without null checks a bug that Windows logs and survives crashes the browser build");
+            Assert.AreEqual(WebGLCompressionFormat.Gzip, PlayerSettings.WebGL.compressionFormat);
+            Assert.IsTrue(PlayerSettings.WebGL.decompressionFallback, "the build must load whether or not the host sends gzip headers");
+        }
+
+        [Test]
         public void TheWebRendererKeepsTheFogFeature()
         {
             SerializedProperty features = RendererOf(AssetDatabase.LoadMainAssetAtPath(WebPipelinePath)).FindProperty("m_RendererFeatures");
