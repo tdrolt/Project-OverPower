@@ -2,7 +2,7 @@ namespace Overpower.UI
 {
     /// <summary>
     /// The pure rule behind QuitConfirmPanel's Escape handling. Component Update() order is not fixed, and both
-    /// LoadoutScreen and the chat panel (chatmanager.cs's Escape block) close THEMSELVES on Escape in the SAME frame
+    /// LoadoutScreen and the chat panel (PhotonChat.cs's Escape block) close THEMSELVES on Escape in the SAME frame
     /// the key is pressed. Checking only "open this frame" misses ownership whenever the other component's Update()
     /// ran first and already closed itself; checking one frame back too catches it from either side of that race.
     /// </summary>

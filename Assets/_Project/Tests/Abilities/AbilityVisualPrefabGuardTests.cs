@@ -188,7 +188,7 @@ namespace Overpower.Tests
             SerializedObject burstTint = Fields<LookTint>(StunBurstPath);
             Assert.AreEqual(StunGunId, Field(burstTint, "abilityId").intValue, "the burst is blue like the bolt");
             AssetAt(burstTint, "theme", ThemePath);
-            Assert.IsNotNull(Load(StunBurstPath).GetComponent<ParticleSystem>(), "VFXManager times the burst from its particle systems");
+            Assert.IsNotNull(Load(StunBurstPath).GetComponent<ParticleSystem>(), "VfxManager times the burst from its particle systems");
         }
 
         [Test]

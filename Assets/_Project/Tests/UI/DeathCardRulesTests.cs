@@ -184,7 +184,7 @@ namespace Overpower.Tests
         [Test]
         public void MatchUiSkinsTheResultPanels()
         {
-            Assert.IsTrue(IlWiring.Uses(typeof(MatchUI), "Awake", typeof(ResultPanelSkin).GetMethod(nameof(ResultPanelSkin.Apply))));
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchUi), "Awake", typeof(ResultPanelSkin).GetMethod(nameof(ResultPanelSkin.Apply))));
         }
 
         [Test]
@@ -193,11 +193,11 @@ namespace Overpower.Tests
             MethodInfo respawn = typeof(DeathCard).GetMethod(nameof(DeathCard.SetRespawn));
             MethodInfo waiting = typeof(DeathCard).GetMethod(nameof(DeathCard.SetWaiting));
             MethodInfo note = typeof(DeathCard).GetMethod(nameof(DeathCard.SetNote));
-            Assert.IsTrue(IlWiring.Uses(typeof(MatchUI), nameof(MatchUI.SetRespawnPanelVisible), respawn));
-            Assert.IsTrue(IlWiring.Uses(typeof(MatchUI), nameof(MatchUI.ShowWaitingPanel), waiting));
-            Assert.IsTrue(IlWiring.Uses(typeof(MatchUI), nameof(MatchUI.HideWaitingPanel), waiting));
-            Assert.IsTrue(IlWiring.Uses(typeof(MatchUI), nameof(MatchUI.SetRespawnNote), note));
-            Assert.IsTrue(IlWiring.Uses(typeof(MatchUI), "RPC_HideWaitingPanelAll", typeof(MatchUI).GetMethod(nameof(MatchUI.HideWaitingPanel))),
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchUi), nameof(MatchUi.SetRespawnPanelVisible), respawn));
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchUi), nameof(MatchUi.ShowWaitingPanel), waiting));
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchUi), nameof(MatchUi.HideWaitingPanel), waiting));
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchUi), nameof(MatchUi.SetRespawnNote), note));
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchUi), "RPC_HideWaitingPanelAll", typeof(MatchUi).GetMethod(nameof(MatchUi.HideWaitingPanel))),
                 "an older client's hide still reaches the card, like the other kept RPCs");
         }
 

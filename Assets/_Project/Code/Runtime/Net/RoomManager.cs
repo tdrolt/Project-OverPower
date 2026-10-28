@@ -277,7 +277,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
                 PlayerLifecycle lifecycle = view.GetComponent<PlayerLifecycle>();
                 // "waiting" is read from THIS body (its own wait panel), not from the player's "lastStand" property - that one
                 // survives the drop and would end the watch before the new body had even started its respawn.
-                MatchUI bodyUi = view.GetComponent<MatchUI>();
+                MatchUi bodyUi = view.GetComponent<MatchUi>();
                 bool waiting = bodyUi != null && (bodyUi.IsWaitingForRespawn || bodyUi.MatchOver); // a result panel ends the watch too
                 if (RejoinRules.BodyWatchIsDone(true, lifecycle != null && lifecycle.IsAlive, waiting, total))
                     yield break; // respawned, or in the last-stand wait: nothing more to watch for

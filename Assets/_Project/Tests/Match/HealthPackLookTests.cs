@@ -190,7 +190,7 @@ namespace Overpower.Tests
         [Test]
         public void TheMatchPacksTakeTheirGreenFromTheTheme()
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Match/Prefabs/MatchSystems.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Match/Prefabs/Match Systems.prefab");
             HealthPackManager manager = prefab.GetComponentInChildren<HealthPackManager>(true);
             Assert.NotNull(manager, "MatchSystems has the health pack manager");
             Object assigned = new SerializedObject(manager).FindProperty("theme").objectReferenceValue;

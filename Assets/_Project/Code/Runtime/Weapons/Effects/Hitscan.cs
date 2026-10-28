@@ -312,8 +312,8 @@ namespace Overpower.Weapons
         private static void PlayImpact(WeaponDefinition weapon, Vector3 at, int shooterTeamId)
         {
             // An enemy beam's impact flash in the fog is not shown (own team's always). (D2)
-            if (weapon.ImpactVfx != null && VFXManager.Instance != null && TeamSight.ShotShownAt(shooterTeamId, at))
-                VFXManager.Instance.PlayVFX(weapon.ImpactVfx, at);
+            if (weapon.ImpactVfx != null && VfxManager.Instance != null && TeamSight.ShotShownAt(shooterTeamId, at))
+                VfxManager.Instance.PlayVFX(weapon.ImpactVfx, at);
         }
 
         /// <summary>Fades the fired beam's own LineRenderer to transparent over its linger time, then

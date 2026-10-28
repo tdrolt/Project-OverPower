@@ -177,7 +177,7 @@ public class CameraTracking : MonoBehaviour
 
         // If the LOCAL player's body ends up on a different team after this camera already resolved (a safety net:
         // seats are locked at Start), re-resolve the same way as the first time, or the first team's angle sticks for
-        // the match. CaptureRingView self-corrects off Yaw changing (Building capture.cs), not off this flag, so a
+        // the match. CaptureRingView self-corrects off Yaw changing (BuildingCapture.cs), not off this flag, so a
         // moment unresolved here breaks nothing.
         if (teamYawResolved)
         {

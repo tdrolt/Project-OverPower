@@ -600,7 +600,7 @@ namespace Overpower.Tests
                     "gated like a gun's impact"),
                 (IlWiring.Uses(typeof(RaybeamAbility), "FireOneBeam", typeof(RaybeamLook).GetMethod(nameof(RaybeamLook.ScorchSpot))),
                     "the scorch lies where the rule puts it"),
-                (IlWiring.Uses(typeof(RaybeamAbility), "FireOneBeam", typeof(VFXManager).GetMethod(nameof(VFXManager.PlayVFX), new[] { typeof(GameObject), typeof(Vector3), typeof(Quaternion) })),
+                (IlWiring.Uses(typeof(RaybeamAbility), "FireOneBeam", typeof(VfxManager).GetMethod(nameof(VfxManager.PlayVFX), new[] { typeof(GameObject), typeof(Vector3), typeof(Quaternion) })),
                     "pooled like the gun impacts, turned to lie on the surface"));
         }
 
@@ -656,7 +656,7 @@ namespace Overpower.Tests
 
             GameObject scorch = AssetDatabase.LoadAssetAtPath<GameObject>(ScorchPath);
             Assert.IsNotNull(scorch, ScorchPath);
-            Assert.IsNotEmpty(scorch.GetComponentsInChildren<ParticleSystem>(true), "VFXManager times a flash from its particle systems");
+            Assert.IsNotEmpty(scorch.GetComponentsInChildren<ParticleSystem>(true), "VfxManager times a flash from its particle systems");
             foreach (ParticleSystem system in scorch.GetComponentsInChildren<ParticleSystem>(true))
             {
                 Assert.IsFalse(system.main.loop, system.name + " ends on its own");

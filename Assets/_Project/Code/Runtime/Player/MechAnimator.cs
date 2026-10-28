@@ -7,7 +7,7 @@ using Overpower.Weapons;
 // After PhotonAnimatorView (default order 0): on a remote copy its Update writes the streamed shoot bool, and the pose held after a shot
 // this client saw must win over a stale value in the same frame.
 [DefaultExecutionOrder(100)]
-public class animScript : MonoBehaviourPun
+public class MechAnimator : MonoBehaviourPun
 {
     private static readonly int RunParam = Animator.StringToHash("run");
     private static readonly int IdleParam = Animator.StringToHash("idle");
@@ -45,7 +45,7 @@ public class animScript : MonoBehaviourPun
         photonView = GetComponent<PhotonView>();
 
         if (gameplayConfig == null)
-            Debug.LogError($"[animScript] {name}: GameplayConfig is not assigned - the shoot pose has no minimum and a fast gun's motion is not sped up.");
+            Debug.LogError($"[MechAnimator] {name}: GameplayConfig is not assigned - the shoot pose has no minimum and a fast gun's motion is not sped up.");
     }
 
     void OnEnable()

@@ -108,7 +108,7 @@ namespace Overpower.Lobby
             TryShowResult(); // the match may already be decided
         }
 
-        /// <summary>The room named a winner (spec section 11). A spectator has no body and so no MatchUI panel; they get the
+        /// <summary>The room named a winner (spec section 11). A spectator has no body and so no MatchUi panel; they get the
         /// result card instead - the winner and the same Back to the lobby list button. Called by MatchDirector for a client with no body;
         /// a no-op for anyone not watching.</summary>
         public void ShowMatchResult(int winningTeam)
@@ -139,7 +139,7 @@ namespace Overpower.Lobby
             string title = SpectateRules.ResultTitle(theme.spectatorResultTitle, theme.scoreboardTeamNames, resultWinner);
             resultCard = SpectatorResultCard.Create(transform, theme, title, theme.ShotColorFor(resultWinner), Leave);
             Debug.Log("[SPECTATOR] match over: " + title);
-            // The zip is written at the match end, as for a player (MatchUI.ShowMatchResult); only a spectator HOST has a log, so only they get the saved-log box.
+            // The zip is written at the match end, as for a player (MatchUi.ShowMatchResult); only a spectator HOST has a log, so only they get the saved-log box.
             Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
         }
 

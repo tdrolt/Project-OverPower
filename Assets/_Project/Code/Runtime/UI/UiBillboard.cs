@@ -5,7 +5,7 @@ namespace RhinoGame
 	/// <summary>
 	/// Orientates the gameobject, this script is attached to always face the camera.
 	/// </summary>
-	public class UIBillboard : MonoBehaviour
+	public class UiBillboard : MonoBehaviour
 	{
 		/// <summary>
 		/// If enabled, scales this object to always stay at the same size,

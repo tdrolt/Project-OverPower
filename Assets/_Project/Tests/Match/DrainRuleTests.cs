@@ -134,7 +134,7 @@ namespace Overpower.Tests
         // TheLastCapturerLeavingANeutralZoneEndsTheCapture, ADrainerLeavingAndComingBackInOneNetworkUpdateKeepsThe
         // DrainGoing) retired 2026-09-24: it reset a neutral zone's capturingId/captureProgress to (-1, 0) the
         // instant its last capturer left, which was exactly the "snaps instead of fading" bug captureFadeSpeed
-        // fixes - see Building capture.cs's RemoveFromZone and CaptureFadeRuleTests. Its owned-zone half
+        // fixes - see BuildingCapture.cs's RemoveFromZone and CaptureFadeRuleTests. Its owned-zone half
         // (LeavingEndsCapture always false when zoneOwned) was already redundant with Decide: an owned zone's
         // drain was always decided by Decide above regardless, which ADrainerLeavingAndComingBackInOneNetworkUpdate
         // KeepsTheDrainGoing's own remaining assertion (still true) already covers via

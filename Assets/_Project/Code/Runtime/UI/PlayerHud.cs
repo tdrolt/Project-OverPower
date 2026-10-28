@@ -837,7 +837,7 @@ namespace Overpower.UI
             canvasGo.transform.SetParent(transform, false);
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            // Below the F1 test panel, the death card and MatchUI's win/lose panels (UiLayers): the HUD must never cover any of
+            // Below the F1 test panel, the death card and MatchUi's win/lose panels (UiLayers): the HUD must never cover any of
             // them. overrideSorting makes that true whatever the creation order.
             canvas.overrideSorting = true;
             canvas.sortingOrder = UiLayers.Hud;

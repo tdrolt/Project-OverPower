@@ -12,7 +12,7 @@ namespace Overpower.Tests
     /// </summary>
     public class ShotSoundPrefabTests
     {
-        private const string PrefabPath = "Assets/_Project/Shared/Audio/Prefabs/AudioSourcePrefab.prefab";
+        private const string PrefabPath = "Assets/_Project/Shared/Audio/Prefabs/Audio Source.prefab";
 
         private static AudioSource Source()
         {

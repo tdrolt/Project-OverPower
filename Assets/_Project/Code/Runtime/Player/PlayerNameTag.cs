@@ -6,7 +6,7 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 /// <summary>
 /// The name on the plate above one player (NameplateView), coloured friend or threat, with the plate's edge in the player's team
-/// colour. Player identity, not match state, so it is not part of MatchUI and must be right from the moment the player appears.
+/// colour. Player identity, not match state, so it is not part of MatchUi and must be right from the moment the player appears.
 ///
 /// The colours compare two Photon Custom Properties (this player's team and mine) and EITHER can
 /// arrive after the object spawns. Decided once in Start, a missing value gave a wrong colour that

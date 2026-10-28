@@ -24,7 +24,7 @@ namespace Overpower.Match
             return string.Format(template, name);
         }
 
-        /// <summary>A spectator has no body, so no MatchUI panel; their result card goes up once, as soon as the room names a
+        /// <summary>A spectator has no body, so no MatchUi panel; their result card goes up once, as soon as the room names a
         /// winner while they are watching.</summary>
         public static bool MustShowResult(bool watching, int winner, bool alreadyShown) => watching && winner >= 0 && !alreadyShown;
 

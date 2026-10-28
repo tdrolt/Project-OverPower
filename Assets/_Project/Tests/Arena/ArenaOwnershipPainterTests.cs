@@ -276,7 +276,7 @@ namespace Overpower.Tests
         [Test]
         public void MatchSystemsCarriesPainterWithTheme()
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Match/Prefabs/MatchSystems.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Match/Prefabs/Match Systems.prefab");
             Assert.IsNotNull(prefab);
             ArenaOwnershipPainter[] painters = prefab.GetComponentsInChildren<ArenaOwnershipPainter>(true);
             Assert.AreEqual(1, painters.Length, "exactly one painter");

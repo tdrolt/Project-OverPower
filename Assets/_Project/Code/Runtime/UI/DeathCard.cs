@@ -6,7 +6,7 @@ namespace Overpower.UI
 {
     /// <summary>
     /// What a dead player sees: a small card, RESPAWN IN n counting down (with the capital-under-attack note under it), or the waiting card with
-    /// its Quit button when no respawn is coming; and a light dark edge on the world. MatchUI shows and hides it (owner only, built on first use);
+    /// its Quit button when no respawn is coming; and a light dark edge on the world. MatchUi shows and hides it (owner only, built on first use);
     /// the seconds come from PlayerLifecycle. The card sorts under the shop and takes no clicks except the waiting card's Quit; every frame
     /// DeathCardRules.Place keeps it clear of the open shop, the Dominion HUD's top band, the HUD's toast and the ability bar, and while the shop
     /// is open it shrinks to fit between the shop and the ability bar. The vignette sorts under every panel.

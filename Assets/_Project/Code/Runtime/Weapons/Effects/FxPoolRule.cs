@@ -4,7 +4,7 @@ namespace Overpower.Weapons
 {
     public enum FxPoolAction { ReuseIdle, Instantiate, RecycleOldest }
 
-    /// <summary>How VFXManager gets a copy of an impact or muzzle flash: a finished copy first, a new one while fewer than the cap are
+    /// <summary>How VfxManager gets a copy of an impact or muzzle flash: a finished copy first, a new one while fewer than the cap are
     /// playing, else the oldest one still playing is restarted at the new spot. A cap below 1 still allows one copy. Also where a flash is drawn.</summary>
     public static class FxPoolRule
     {

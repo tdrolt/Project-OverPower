@@ -11,7 +11,7 @@ namespace Overpower.UI
     /// warning line and fired beam (Hitscan), and the reference resolution/match value that ThemedCanvasScaler
     /// applies to scene-built canvases that are not PlayerHud's (chat). Presentation only - no gameplay number here.
     /// </summary>
-    [CreateAssetMenu(menuName = "Overpower/UI Theme", fileName = "UiTheme")]
+    [CreateAssetMenu(menuName = "OverPower/UI Theme", fileName = "UiTheme")]
     public sealed class UiTheme : ScriptableObject
     {
         [Header("Canvas")]
@@ -568,7 +568,7 @@ namespace Overpower.UI
         [Tooltip("Trail width at its fading tail end, in metres - thinner than Trail Start Width so the " +
                  "trail reads as tapering off rather than a solid ribbon.")]
         public float trailEndWidth = 0.02f;
-        [Tooltip("Shared unlit material every shot trail renders with - Assets/_Project/Features/UI/ShotTrail.mat, built the " +
+        [Tooltip("Shared unlit material every shot trail renders with - Assets/_Project/Features/UI/Shot Trail.mat, built the " +
                  "same way as the Aim Cone Line Material (URP Particles/Unlit, alpha transparent, no shadows). Its " +
                  "own colour stays white: every trail tints itself through TrailRenderer.colorGradient, which is what " +
                  "lets one material serve every team.")]

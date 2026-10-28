@@ -39,31 +39,31 @@ namespace Overpower.Tests
             Vector3 near = FxPoolRule.Placed(hit, hit + Vector3.up, 5f);
             Assert.LessOrEqual(Vector3.Distance(hit, near), 0.5f + 1e-4f, "never past halfway to a camera that is closer than the pull");
             Assert.AreEqual(hit, FxPoolRule.Placed(hit, hit, 1f), "a camera on the spot: no direction to pull in");
-            Assert.IsTrue(IlWiring.Uses(typeof(VFXManager), "PlayVFX", typeof(FxPoolRule).GetMethod(nameof(FxPoolRule.Placed))),
+            Assert.IsTrue(IlWiring.Uses(typeof(VfxManager), "PlayVFX", typeof(FxPoolRule).GetMethod(nameof(FxPoolRule.Placed))),
                 "every flash is placed by the tested rule");
         }
 
         [Test]
         public void ThePoolTakesItsCapAndPullFromTheArenaLook()
         {
-            Assert.IsTrue(IlWiring.Uses(typeof(VFXManager), "PlayVFX", typeof(ArenaLook).GetField(nameof(ArenaLook.fxPoolCap))),
+            Assert.IsTrue(IlWiring.Uses(typeof(VfxManager), "PlayVFX", typeof(ArenaLook).GetField(nameof(ArenaLook.fxPoolCap))),
                 "the cap handed to the rule is the Arena Look's Fx Pool Cap");
-            Assert.IsTrue(IlWiring.Uses(typeof(VFXManager), "PlayVFX", typeof(ArenaLook).GetField(nameof(ArenaLook.fxCameraPull))),
+            Assert.IsTrue(IlWiring.Uses(typeof(VfxManager), "PlayVFX", typeof(ArenaLook).GetField(nameof(ArenaLook.fxCameraPull))),
                 "the pull handed to the rule is the Arena Look's Fx Camera Pull");
         }
 
         [Test]
         public void VfxManagerPoolsThroughTheRuleAndNeverDestroysPerFlash()
         {
-            Assert.IsTrue(IlWiring.Uses(typeof(VFXManager), "PlayVFX", typeof(FxPoolRule).GetMethod(nameof(FxPoolRule.Take))),
+            Assert.IsTrue(IlWiring.Uses(typeof(VfxManager), "PlayVFX", typeof(FxPoolRule).GetMethod(nameof(FxPoolRule.Take))),
                 "every flash asks the tested rule whether to reuse, make or recycle");
             var destroy = typeof(Object).GetMethod(nameof(Object.Destroy), new[] { typeof(Object), typeof(float) });
             var destroyNow = typeof(Object).GetMethod(nameof(Object.Destroy), new[] { typeof(Object) });
-            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(VFXManager), "Awake", destroyNow), "the check sees a Destroy where there is one");
-            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VFXManager), "PlayVFX", destroy), "no timed Destroy per flash");
-            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VFXManager), "PlayVFX", destroyNow));
-            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VFXManager), "Update", destroy));
-            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VFXManager), "Update", destroyNow), "a finished flash is switched off and kept");
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(VfxManager), "Awake", destroyNow), "the check sees a Destroy where there is one");
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VfxManager), "PlayVFX", destroy), "no timed Destroy per flash");
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VfxManager), "PlayVFX", destroyNow));
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VfxManager), "Update", destroy));
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VfxManager), "Update", destroyNow), "a finished flash is switched off and kept");
         }
     }
 }

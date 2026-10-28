@@ -4,7 +4,7 @@ namespace Overpower.Match
 {
     /// <summary>
     /// captureFadeSpeed: unfinished capture progress slides back instead of snapping when nobody is
-    /// capturing/draining it. Pure C# so Building capture.cs's CalculateCaptureProgress (neutral zone)
+    /// capturing/draining it. Pure C# so BuildingCapture.cs's CalculateCaptureProgress (neutral zone)
     /// and HandleCapturedState (owned zone) can wire the same two ticks together and stay short.
     ///
     /// Two independent pieces: CapturingTeamAbsent decides WHETHER a neutral zone's claim should fade this tick

@@ -161,7 +161,7 @@ namespace Overpower.Tests
         public void TheChatManagerObjectStartsSwitchedOffInTheScene()
         {
             // The chat manager lives in the shared match systems prefab (Dominion Task 10), so every map's scene gets it switched off the same way.
-            string scene = System.IO.File.ReadAllText("Assets/_Project/Features/Match/Prefabs/MatchSystems.prefab").Replace("\r\n", "\n");
+            string scene = System.IO.File.ReadAllText("Assets/_Project/Features/Match/Prefabs/Match Systems.prefab").Replace("\r\n", "\n");
             int name = scene.IndexOf("value: chat manager\n", System.StringComparison.Ordinal);
             Assert.GreaterOrEqual(name, 0);
             int active = scene.IndexOf("propertyPath: m_IsActive", name, System.StringComparison.Ordinal);
@@ -173,7 +173,7 @@ namespace Overpower.Tests
         [Test]
         public void TheChatLookNumbersLiveInTheTheme()
         {
-            string source = System.IO.File.ReadAllText("Assets/_Project/Code/Runtime/Chat/chatmanager.cs");
+            string source = System.IO.File.ReadAllText("Assets/_Project/Code/Runtime/Chat/PhotonChat.cs");
             StringAssert.DoesNotContain("15f / 255f", source);
             StringAssert.DoesNotContain("new Vector2(18f, 0f)", source);
             StringAssert.DoesNotContain("new Vector2(1.5f, 1.5f)", source);

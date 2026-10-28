@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Overpower.Tests
 {
-    /// <summary>The mech's Animator graph against the bools animScript sets (idle is always !run): from any state, the graph settles on Shoot
+    /// <summary>The mech's Animator graph against the bools MechAnimator sets (idle is always !run): from any state, the graph settles on Shoot
     /// while shoot is on, else Run while running, else Idle, and never has two exits true at once (two at once makes the states loop).</summary>
     public class MechAnimatorGraphTests
     {
@@ -95,7 +95,7 @@ namespace Overpower.Tests
             Assert.IsFalse(clip.isLooping, "a looping shoot clip replays on its own between shots, out of step with them");
         }
 
-        // Only a shot that leaves (animScript.OnShotShown) may start the recoil. The bool alone can still turn on without one: a remote copy's
+        // Only a shot that leaves (MechAnimator.OnShotShown) may start the recoil. The bool alone can still turn on without one: a remote copy's
         // streamed bool landing before the shot's RPC, or a stun lifting inside a shot's pose.
         [Test]
         public void TheShootBoolOnlyRaisesTheGunAndNeverStartsTheRecoil()

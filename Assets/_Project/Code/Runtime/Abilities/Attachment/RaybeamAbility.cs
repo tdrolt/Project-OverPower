@@ -317,8 +317,8 @@ namespace Overpower.Abilities
 
             RaybeamLook.ScorchSpot(contactBuffer, normalBuffer, beam, end, aimDirection, out Vector3 scorchAt, out Quaternion scorchFacing);
             if (RaybeamLook.ShowsScorch(RaybeamLook.EndsOnSurface(beam), TeamSight.ShotShownAt(casterTeam, scorchAt)) &&
-                scorchVfx != null && VFXManager.Instance != null)
-                VFXManager.Instance.PlayVFX(scorchVfx, scorchAt, scorchFacing);
+                scorchVfx != null && VfxManager.Instance != null)
+                VfxManager.Instance.PlayVFX(scorchVfx, scorchAt, scorchFacing);
             return end;
         }
 

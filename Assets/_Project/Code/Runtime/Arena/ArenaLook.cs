@@ -6,7 +6,7 @@ namespace Overpower.Arena
 {
     /// <summary>The world-look numbers and the look of every ability, in one asset (UiTheme.arenaLook points here). The table is
     /// read by id, never by position; effects take their colour from it through LookColours as they are built.</summary>
-    [CreateAssetMenu(menuName = "Overpower/Arena Look", fileName = "ArenaLook")]
+    [CreateAssetMenu(menuName = "OverPower/Arena Look", fileName = "ArenaLook")]
     public sealed class ArenaLook : ScriptableObject
     {
         [Header("Look table")]

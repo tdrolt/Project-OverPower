@@ -495,8 +495,8 @@ namespace Overpower.Weapons
                 DispatchShots(fired, origin, shots);
 
             // A hidden shooter's muzzle flash is not shown (own team's always); the fire sound below is untouched. (D2)
-            if (fired.MuzzleVfx != null && VFXManager.Instance != null && TeamSight.ShotShownAt(shooterTeam, origin))
-                VFXManager.Instance.PlayVFX(fired.MuzzleVfx, origin);
+            if (fired.MuzzleVfx != null && VfxManager.Instance != null && TeamSight.ShotShownAt(shooterTeam, origin))
+                VfxManager.Instance.PlayVFX(fired.MuzzleVfx, origin);
             if (fired.FireSfx != null && AudioManager.Instance != null)
                 AudioManager.Instance.Play3D(fired.FireSfx, origin);
 

@@ -16,7 +16,7 @@ namespace Overpower.Tests
     {
         private const string SolidPath = "Assets/_Project/Features/Abilities/Materials/Ability Visual Solid.mat";
         private const string GlassPath = "Assets/_Project/Features/Abilities/Materials/Ability Visual Glass.mat";
-        private const string LinePath = "Assets/_Project/Features/UI/AimConeLine.mat";
+        private const string LinePath = "Assets/_Project/Features/UI/Aim Cone Line.mat";
         private const string ThemePath = "Assets/_Project/Design/Settings/UiTheme.asset";
         private const string MarkerPath = "Assets/_Project/Design/Weapons/Projectiles/Blast Marker.prefab";
         private const string PuckPath = "Assets/_Project/Shared/Art/MinePuck.fbx";

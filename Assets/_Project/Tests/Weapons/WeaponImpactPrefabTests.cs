@@ -9,7 +9,7 @@ namespace Overpower.Tests
 {
     /// <summary>Each gun family lands with its own impact and every gun fires the white muzzle flash; the old shared puff is gone from the
     /// guns. The Stun Gun and the Zip Gun have their own impacts. Impacts are timed particles only: no collider, no light, no loop
-    /// (VFXManager times each from its particle systems and reuses it).</summary>
+    /// (VfxManager times each from its particle systems and reuses it).</summary>
     public class WeaponImpactPrefabTests
     {
         private const string PuffPath = "Assets/_Project/Shared/FX/Legacy/FXBulletExplosion.prefab";
@@ -91,7 +91,7 @@ namespace Overpower.Tests
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                 Assert.IsNotNull(prefab, path);
                 ParticleSystem[] systems = prefab.GetComponentsInChildren<ParticleSystem>(true);
-                Assert.IsNotEmpty(systems, path + ": VFXManager times an effect from its particle systems");
+                Assert.IsNotEmpty(systems, path + ": VfxManager times an effect from its particle systems");
                 Assert.IsNotNull(prefab.GetComponent<ParticleSystem>(), path + ": a particle system on the root");
                 foreach (ParticleSystem system in systems)
                 {

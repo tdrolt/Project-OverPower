@@ -19,7 +19,7 @@ namespace Overpower.Weapons
     }
 
     /// <summary>
-    /// The Bounce shot's ricochet chevron: a short white chevron pointing off the wall at every bounce, pooled by VFXManager and gated like
+    /// The Bounce shot's ricochet chevron: a short white chevron pointing off the wall at every bounce, pooled by VfxManager and gated like
     /// every shot effect (a bounce in the fog shows nothing). Purely visual: it never changes whether the shot keeps flying. Must sit after
     /// BounceOffWalls on the prefab, so the bounce count it reads already includes this hit.
     /// </summary>
@@ -41,9 +41,9 @@ namespace Overpower.Weapons
         {
             int before = seen;
             seen = bounce.Bounces;
-            if (RicochetRule.Bounced(before, seen) && chevron != null && VFXManager.Instance != null
+            if (RicochetRule.Bounced(before, seen) && chevron != null && VfxManager.Instance != null
                 && TeamSight.ShotShownAt(context.ShooterTeamId, hit.point))
-                VFXManager.Instance.PlayVFX(chevron, hit.point, RicochetRule.Facing(hit.normal));
+                VfxManager.Instance.PlayVFX(chevron, hit.point, RicochetRule.Facing(hit.normal));
             return ProjectileHitResponse.Despawn; // no opinion: BounceOffWalls' KeepFlying wins
         }
 

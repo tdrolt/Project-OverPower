@@ -15,7 +15,7 @@ using Overpower.UI;
 ///
 /// Deliberately NOT IPunObservable - see PlayerNetSync.cs for why there can only be one.
 /// </summary>
-public class MatchUI : MonoBehaviour
+public class MatchUi : MonoBehaviour
 {
     [Header("Panels")]
     [SerializeField, Tooltip("Stays inactive: the death card's waiting card shows this state (dead, the team's capital lost).")]
@@ -77,7 +77,7 @@ public class MatchUI : MonoBehaviour
         // A missing panel or theme is silent at runtime (every call is null-guarded so one broken
         // Inspector reference cannot throw mid-match), so say so once at spawn.
         if (waitingPanel == null || youWonPanel == null || respawnPanel == null || youLostPanel == null || theme == null)
-            Debug.LogError($"[MatchUI] {name}: one or more match panels, or the UiTheme, are not " +
+            Debug.LogError($"[MatchUi] {name}: one or more match panels, or the UiTheme, are not " +
                             "assigned - this player will not be told when they win or lose, " +
                             "and the death card will draw in the default look.");
     }
@@ -189,7 +189,7 @@ public class MatchUI : MonoBehaviour
     {
         int myTeam = (int)PhotonNetwork.LocalPlayer.CustomProperties[PlayerTeam.TeamKey];
 
-        Debug.Log("[MatchUI] Show Winning Panel Entered");
+        Debug.Log("[MatchUi] Show Winning Panel Entered");
 
         if (myTeam == teamID)
         {
@@ -211,7 +211,7 @@ public class MatchUI : MonoBehaviour
     /// calls it the instant a death becomes a last-stand death. The RPC below only forwards here.</summary>
     public void ShowWaitingPanel()
     {
-        Debug.Log("[MatchUI] Show Waiting Panel Entered");
+        Debug.Log("[MatchUi] Show Waiting Panel Entered");
 
         // Never over "you lost" (elimination outranks waiting for a respawn that is not coming) nor
         // "you won": MatchOver covers both.
@@ -219,7 +219,7 @@ public class MatchUI : MonoBehaviour
         {
             waiting = true;
             EnsureCard()?.SetWaiting(true);
-            Debug.Log("[MatchUI] (local) Showing the waiting card.");
+            Debug.Log("[MatchUi] (local) Showing the waiting card.");
         }
     }
 
@@ -237,7 +237,7 @@ public class MatchUI : MonoBehaviour
     /// forwards here.</summary>
     public void ShowYouLost()
     {
-        Debug.Log("[MatchUI] ShowYouLost running");
+        Debug.Log("[MatchUi] ShowYouLost running");
 
         Debug.Log($"waitingPanel: {(waitingPanel == null ? "null" : waitingPanel.name)}, activeInHierarchy: {waitingPanel?.activeInHierarchy}");
         Debug.Log($"youLostPanel: {(youLostPanel == null ? "null" : youLostPanel.name)}, activeInHierarchy: {youLostPanel?.activeInHierarchy}");
@@ -247,7 +247,7 @@ public class MatchUI : MonoBehaviour
         if (youLostPanel != null && !IsWaitingForRespawn)
         {
             youLostPanel.SetActive(true);
-            Debug.Log("[MatchUI] youLostPanel.SetActive(true) called");
+            Debug.Log("[MatchUi] youLostPanel.SetActive(true) called");
         }
 
         Debug.Log($"waitingPanel: {(waitingPanel == null ? "null" : waitingPanel.name)}, activeInHierarchy: {waitingPanel?.activeInHierarchy}");
@@ -286,7 +286,7 @@ public class MatchUI : MonoBehaviour
         if (youLostPanel != null && !waitingPanel.activeSelf)
         {
             youLostPanel.SetActive(true);
-            Debug.Log("[MatchUI] youLostPanel.SetActive(true) called");
+            Debug.Log("[MatchUi] youLostPanel.SetActive(true) called");
         }
 
         Debug.Log($"waitingPanel: {(waitingPanel == null ? "null" : waitingPanel.name)}, activeInHierarchy: {waitingPanel?.activeInHierarchy}");

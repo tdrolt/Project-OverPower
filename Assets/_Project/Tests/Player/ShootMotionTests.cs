@@ -107,16 +107,16 @@ namespace Overpower.Tests
         [Test]
         public void TheMechRestartsItsShootMotionOnEveryShotShown()
         {
-            Assert.IsTrue(IlWiring.HandsOver(typeof(animScript), "OnEnable", Method(typeof(animScript), "OnShotShown")),
+            Assert.IsTrue(IlWiring.HandsOver(typeof(MechAnimator), "OnEnable", Method(typeof(MechAnimator), "OnShotShown")),
                 "the mech must listen for shots shown");
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "OnShotShown", Rule(nameof(ShootMotion.Speed))));
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "OnShotShown", Getter(typeof(GameplayConfig), nameof(GameplayConfig.ShootMotionMaxSpeed))));
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "OnShotShown", Getter(typeof(GameplayConfig), nameof(GameplayConfig.ShootMotionBlendSeconds))));
-            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(animScript), "OnShotShown", Getter(typeof(AnimationClip), nameof(AnimationClip.length))),
+            Assert.IsTrue(IlWiring.Uses(typeof(MechAnimator), "OnShotShown", Rule(nameof(ShootMotion.Speed))));
+            Assert.IsTrue(IlWiring.Uses(typeof(MechAnimator), "OnShotShown", Getter(typeof(GameplayConfig), nameof(GameplayConfig.ShootMotionMaxSpeed))));
+            Assert.IsTrue(IlWiring.Uses(typeof(MechAnimator), "OnShotShown", Getter(typeof(GameplayConfig), nameof(GameplayConfig.ShootMotionBlendSeconds))));
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(MechAnimator), "OnShotShown", Getter(typeof(AnimationClip), nameof(AnimationClip.length))),
                 "the speed-up must come from the real clip's length");
-            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(animScript), "OnShotShown",
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(MechAnimator), "OnShotShown",
                 typeof(Animator).GetMethod(nameof(Animator.SetFloat), new[] { typeof(int), typeof(float) })), "the speed must reach the Animator");
-            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(animScript), "OnShotShown",
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(MechAnimator), "OnShotShown",
                 typeof(Animator).GetMethod(nameof(Animator.CrossFadeInFixedTime), new[] { typeof(int), typeof(float), typeof(int), typeof(float) })),
                 "every shot must restart the motion from its first frame");
         }
@@ -124,20 +124,20 @@ namespace Overpower.Tests
         [Test]
         public void EveryShotSetsHowLongThePoseIsHeldOnEveryClient()
         {
-            FieldInfo hold = typeof(animScript).GetField("shotPoseSeconds", Any);
-            Assert.IsNotNull(hold, "animScript.shotPoseSeconds keeps the last shot's pose length");
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "OnShotShown", Rule(nameof(ShootMotion.HoldSeconds))));
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "OnShotShown", Getter(typeof(GameplayConfig), nameof(GameplayConfig.ShootPoseMinimumSeconds))));
-            Assert.IsTrue(IlWiring.Stores(typeof(animScript), "OnShotShown", hold), "the shot must remember its pose length");
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "ApplyParams", hold), "the shooter's own pose must last that long");
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "HoldRemoteShotPose", hold), "a remote copy's pose must last that long");
+            FieldInfo hold = typeof(MechAnimator).GetField("shotPoseSeconds", Any);
+            Assert.IsNotNull(hold, "MechAnimator.shotPoseSeconds keeps the last shot's pose length");
+            Assert.IsTrue(IlWiring.Uses(typeof(MechAnimator), "OnShotShown", Rule(nameof(ShootMotion.HoldSeconds))));
+            Assert.IsTrue(IlWiring.Uses(typeof(MechAnimator), "OnShotShown", Getter(typeof(GameplayConfig), nameof(GameplayConfig.ShootPoseMinimumSeconds))));
+            Assert.IsTrue(IlWiring.Stores(typeof(MechAnimator), "OnShotShown", hold), "the shot must remember its pose length");
+            Assert.IsTrue(IlWiring.Uses(typeof(MechAnimator), "ApplyParams", hold), "the shooter's own pose must last that long");
+            Assert.IsTrue(IlWiring.Uses(typeof(MechAnimator), "HoldRemoteShotPose", hold), "a remote copy's pose must last that long");
         }
 
         [Test]
         public void ARemoteCopyHoldsThePoseOnTheRulesAnswer()
         {
-            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(animScript), "HoldRemoteShotPose", Rule(nameof(ShootMotion.HoldsPose))));
-            Assert.IsTrue(IlWiring.Uses(typeof(animScript), "Update", Method(typeof(animScript), "HoldRemoteShotPose")),
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(MechAnimator), "HoldRemoteShotPose", Rule(nameof(ShootMotion.HoldsPose))));
+            Assert.IsTrue(IlWiring.Uses(typeof(MechAnimator), "Update", Method(typeof(MechAnimator), "HoldRemoteShotPose")),
                 "Update must run it every frame on a remote copy");
         }
 
@@ -145,7 +145,7 @@ namespace Overpower.Tests
         public void TheMechWritesItsBoolsAfterPhotonsAnimatorSyncHasWrittenItsOwn()
         {
             int Order(System.Type t) => t.GetCustomAttribute<DefaultExecutionOrder>()?.order ?? 0;
-            Assert.Greater(Order(typeof(animScript)), Order(typeof(PhotonAnimatorView)),
+            Assert.Greater(Order(typeof(MechAnimator)), Order(typeof(PhotonAnimatorView)),
                 "PhotonAnimatorView's Update writes the streamed shoot bool; a remote's held pose must be written after it");
         }
 
@@ -153,9 +153,9 @@ namespace Overpower.Tests
         public void ThePlayerPrefabsMechKnowsTheShootStatesClip()
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Resources/Multiplayer Player.prefab");
-            animScript script = prefab.GetComponentInChildren<animScript>(true);
+            MechAnimator script = prefab.GetComponentInChildren<MechAnimator>(true);
             Assert.IsNotNull(script);
-            var clip = typeof(animScript).GetField("shootClip", Any)?.GetValue(script) as AnimationClip;
+            var clip = typeof(MechAnimator).GetField("shootClip", Any)?.GetValue(script) as AnimationClip;
             Assert.IsNotNull(clip, "the mech has no shoot clip: a fast gun's motion would not speed up");
 
             var controller = (AnimatorController)prefab.GetComponentInChildren<Animator>(true).runtimeAnimatorController;

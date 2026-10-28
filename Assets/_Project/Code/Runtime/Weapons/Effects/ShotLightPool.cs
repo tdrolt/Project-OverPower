@@ -10,7 +10,7 @@ namespace Overpower.Weapons
     /// A few short, shadowless point lights hanging low over the floor under the shots this client can see, nearest to the camera first
     /// (ShotLightRule). The lights are made once and moved, never one per shot, so a nine-player SMG fight costs the same as one shot.
     /// Runs after every VisibleWhenSeen.LateUpdate: a Light is not a Renderer, so it is re-chosen every frame from the gates' fresh answer,
-    /// or a shot that just went into the fog would light the floor where its shooter hides. Lives on MatchSystems.prefab.
+    /// or a shot that just went into the fog would light the floor where its shooter hides. Lives on Match Systems.prefab.
     /// </summary>
     [DefaultExecutionOrder(1000)]
     [DisallowMultipleComponent]

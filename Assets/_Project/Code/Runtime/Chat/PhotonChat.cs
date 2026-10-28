@@ -18,7 +18,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     string privateReceiver = "";
 
     [SerializeField] GameObject chatPanel;
-    // Null in "chat manager.prefab" on purpose: it was once wired to the same GameObject as chatField's
+    // Null in "Chat Manager.prefab" on purpose: it was once wired to the same GameObject as chatField's
     // own text component, and Update() calls text.SetActive(false) the moment chat opens, which hid every
     // typed character. No other "closed-chat hint" object exists to point it at, so every use is null-guarded.
     [SerializeField] GameObject text;

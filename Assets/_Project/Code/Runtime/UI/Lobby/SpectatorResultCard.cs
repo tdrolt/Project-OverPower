@@ -6,7 +6,7 @@ namespace Overpower.UI
 {
     /// <summary>
     /// The result card a spectator sees when the match ends (spec section 11): who won, and the same "Back to the lobby list"
-    /// button the players' result screen has. A spectator has no body, so none of the MatchUI panels (which live on the player prefab) can
+    /// button the players' result screen has. A spectator has no body, so none of the MatchUi panels (which live on the player prefab) can
     /// show; this is built in code on its own overlay canvas like SpectatorBar, above the bar. The zip that runs when the card goes up
     /// raises the saved-log box only for a spectator who is the room's host (an ordinary spectator writes no log, by design). The look is
     /// LobbyUiKit.ResultCard; texts, colours and sizes are UiTheme fields (Spectator bar section).

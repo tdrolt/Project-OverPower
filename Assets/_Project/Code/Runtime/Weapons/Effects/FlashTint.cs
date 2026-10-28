@@ -6,7 +6,7 @@ namespace Overpower.Weapons
     /// <summary>
     /// Paints a gun's flash (an impact, the muzzle flash, the ricochet chevron) in the theme's Flash White times the Arena Look's Gun
     /// Flash Glow, through a property block so the shared FX material never changes. Above 1 the glow is what lets Bloom halo a hit past
-    /// the arena's own stripes. Applied once per copy as VFXManager makes it; the pool reuses the copy, so nothing is set per flash.
+    /// the arena's own stripes. Applied once per copy as VfxManager makes it; the pool reuses the copy, so nothing is set per flash.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class FlashTint : MonoBehaviour

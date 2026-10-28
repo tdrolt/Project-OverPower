@@ -98,7 +98,7 @@ GameObject:
   - component: {fileID: 2470173919787333431}
   - component: {fileID: 1359957883597251870}
   m_Layer: 0
-  m_Name: DummyTarget
+  m_Name: Dummy Target
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

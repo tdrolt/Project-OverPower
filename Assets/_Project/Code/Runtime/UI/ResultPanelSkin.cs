@@ -5,9 +5,9 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Gives the player prefab's YOU WIN / YOU LOSE panels the card look at runtime (MatchUI.Awake): a rounded dark card in the middle of the
+    /// Gives the player prefab's YOU WIN / YOU LOSE panels the card look at runtime (MatchUi.Awake): a rounded dark card in the middle of the
     /// screen, the title in the display font at its top, the purple Quit / lobby-list button at its bottom, the canvas scaled like the HUD.
-    /// Every object stays where the prefab has it (MatchUI, QuitButton and SpectateView find them by reference and by name); only looks change,
+    /// Every object stays where the prefab has it (MatchUi, QuitButton and SpectateView find them by reference and by name); only looks change,
     /// so nothing in the prefab is edited. The panel's one Image is the whole card (fill and edge), so SpectateView's bottom strip still hides it
     /// by that Image.
     /// </summary>

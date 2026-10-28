@@ -13,7 +13,7 @@ namespace Overpower.Tests
     /// Refactor 2026-09-26: the capture radius moved off each tower and into TerritoryConfig's per-tier rows (see
     /// BuildingCaptureRadiusTests for the wiring itself, and TierOf/ForTier for the read). Guards the RULES, never
     /// a tuning number (project rule since 91eceb4): every tier's radius must still clear the player's body
-    /// radius, or the capture trigger (Building capture.cs's ConfigureCollider) collapses to zero/negative, and
+    /// radius, or the capture trigger (BuildingCapture.cs's ConfigureCollider) collapses to zero/negative, and
     /// every tower in the real scene must actually point at a Territory Config, or it silently falls back to
     /// FallbackCaptureRadius (10 m) instead of reading its tier's real row. "Every zone of the same tier shares one
     /// radius" is deleted (not rewritten): it is true by construction now that the radius lives once per tier

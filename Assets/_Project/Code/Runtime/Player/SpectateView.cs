@@ -11,7 +11,7 @@ using Overpower.Net;
 /// player of the team that knocked this player out; each press moves to the next (SpectateRules.NextTarget).
 /// Watching only, nothing here touches input: a knocked-out player is dead and frozen, so the HUD actions,
 /// shop and shooting are already closed (alive gate, LoadoutScreen's MatchOver check).
-/// Built by MatchUI (owner only) as a copy of the panel's own button; the panel's existing button is
+/// Built by MatchUi (owner only) as a copy of the panel's own button; the panel's existing button is
 /// BackToNameScreenRules' business. When the match is over the button goes and the camera returns to this body.
 /// "The team that knocked you out" is not recorded by the room: it is the team behind this player's last lethal
 /// hit (PlayerLifecycle.LastKillerTeam), else the team holding their base (SpectateRules.KnockerTeam).
@@ -22,7 +22,7 @@ public sealed class SpectateView : MonoBehaviour
     /// <summary>The space between the Spectate button and the Quit button under it (ResultPanelSkin sizes the lose card for both).</summary>
     public const float ButtonGap = 10f;
 
-    private MatchUI ui;
+    private MatchUi ui;
     private GameObject panel;
     private Button button;
     private TMP_Text label;
@@ -42,7 +42,7 @@ public sealed class SpectateView : MonoBehaviour
     /// <summary>Tests and captures read it.</summary>
     public Button Button => button;
 
-    public void Init(MatchUI matchUi, GameObject losePanel)
+    public void Init(MatchUi matchUi, GameObject losePanel)
     {
         ui = matchUi;
         panel = losePanel;

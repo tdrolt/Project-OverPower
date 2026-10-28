@@ -7,7 +7,7 @@ namespace Overpower.Tests
     /// <summary>
     /// captureFadeSpeed (Tudor, 2026-09-24: "when someone is capturing and steps outside while the zone isnt fully
     /// captured the zone slowly becomes neutral/what it previously was instead of snapping to the previous state").
-    /// Pure math + the one decision (is the claiming team actually absent right now) Building capture.cs's
+    /// Pure math + the one decision (is the claiming team actually absent right now) BuildingCapture.cs's
     /// CalculateCaptureProgress/HandleCapturedState wire together - see their own comments for exactly where.
     /// Uses its own numbers throughout, never TerritoryConfig.asset's (the project rule since 91eceb4).
     /// </summary>

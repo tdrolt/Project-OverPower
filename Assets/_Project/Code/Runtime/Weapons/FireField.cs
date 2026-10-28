@@ -58,7 +58,7 @@ namespace Overpower.Weapons
                  "authored here.")]
         private ParticleSystem flames;
 
-        [SerializeField, Tooltip("The bright ring drawn at the fire's true edge - Assets/_Project/Features/UI/AimConeLine.mat. " +
+        [SerializeField, Tooltip("The bright ring drawn at the fire's true edge - Assets/_Project/Features/UI/Aim Cone Line.mat. " +
                  "It is in the SHOOTER's team colour, so a player can tell whose fire they are standing in; the flames say it is fire.")]
         private LineRenderer rim;
 

@@ -448,7 +448,7 @@ namespace Overpower.Tests
         [Test] public void BothResultPathsAskTheDominionHudBeforeTheirOwnPanel()
         {
             System.Reflection.MethodInfo show = typeof(Overpower.UI.DominionHud).GetMethod(nameof(Overpower.UI.DominionHud.ShowResult));
-            Assert.IsTrue(IlWiring.Uses(typeof(MatchUI), show), "a player's result");
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchUi), show), "a player's result");
             Assert.IsTrue(IlWiring.Uses(typeof(Overpower.Lobby.SpectatorSeatView), show), "a spectator's result");
         }
 

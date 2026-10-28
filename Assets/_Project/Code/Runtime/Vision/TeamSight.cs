@@ -462,7 +462,7 @@ namespace Overpower.Vision
             watchedTeam = -1;
             bool spectating = false;
             if (spectate == null)
-                spectate = GetComponent<SpectateView>(); // MatchUI adds it at runtime, on this same object
+                spectate = GetComponent<SpectateView>(); // MatchUi adds it at runtime, on this same object
             if (spectate != null && spectate.IsSpectating)
             {
                 spectating = true;

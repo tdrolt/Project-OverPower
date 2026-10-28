@@ -504,7 +504,7 @@ namespace Overpower.Match
             AnnounceResultToLocalClient(winner);
         }
 
-        /// <summary>This client's own result screen. A player's is the MatchUI panel on their body; a spectator has no
+        /// <summary>This client's own result screen. A player's is the MatchUi panel on their body; a spectator has no
         /// body (spec section 11: they see the same result), so theirs is the result card their view builds
         /// (SpectatorSeatView.ShowMatchResult). A client with neither yet is caught up when its body spawns (CatchUpLocalPlayer) or its
         /// spectator view begins.</summary>
@@ -512,7 +512,7 @@ namespace Overpower.Match
         {
             PhotonView localView = PhotonNetwork.LocalPlayer != null
                 ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
-            MatchUI ui = localView != null ? localView.GetComponent<MatchUI>() : null;
+            MatchUi ui = localView != null ? localView.GetComponent<MatchUi>() : null;
             if (ui != null)
             {
                 ui.ShowMatchResult(winner);
@@ -746,7 +746,7 @@ namespace Overpower.Match
         /// is no longer in), and the match-result panel once a winner exists. firstRead (OnJoinedRoom,
         /// including a late joiner) only ever applies the winner reaction - a joiner arriving mid-match
         /// should not be sent "home" or told the two-team rule "just" changed for a transition that
-        /// already happened before they connected; MatchUI.ShowMatchResult alone already answers a
+        /// already happened before they connected; MatchUi.ShowMatchResult alone already answers a
         /// late joiner reading Over and the winner, whether they were eliminated earlier or not.
         ///
         /// Two more edges, both !firstRead only (a joiner mid-countdown or mid-match gets the
@@ -840,7 +840,7 @@ namespace Overpower.Match
                 }
 
                 if (myTeamJustEliminated)
-                    localView?.GetComponent<MatchUI>()?.ShowYouLost();
+                    localView?.GetComponent<MatchUi>()?.ShowYouLost();
 
                 if (prevPhase == MatchPhase.ThreeTeams && phase == MatchPhase.TwoTeams && !myTeamJustEliminated)
                 {

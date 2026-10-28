@@ -148,7 +148,7 @@ namespace Overpower.UI
             button.transition = Selectable.Transition.None;
             button.targetGraphic = outer;
             // A code-built button keeps the default Automatic navigation, so a click SELECTS it and the Input System UI
-            // module maps Enter to Submit on it. Chat also opens on Enter (chatmanager.cs): without this, Enter right
+            // module maps Enter to Submit on it. Chat also opens on Enter (PhotonChat.cs): without this, Enter right
             // after clicking a node re-clicked the node. None on every button this screen builds.
             button.navigation = new Navigation { mode = Navigation.Mode.None };
 

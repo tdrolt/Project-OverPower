@@ -9,9 +9,9 @@ using UnityEngine;
 /// longest particle system (duration + start lifetime). Each flash is drawn a little toward the camera (FxPoolRule.Placed) so one on a
 /// wall is not half buried in it.
 /// </summary>
-public class VFXManager : MonoBehaviour
+public class VfxManager : MonoBehaviour
 {
-    public static VFXManager Instance;
+    public static VfxManager Instance;
 
     [SerializeField, Tooltip("Where the most copies of one flash on screen at once and how far a flash is drawn toward the camera come " +
              "from (its Arena Look's Fx Pool Cap and Fx Camera Pull): Assets/_Project/Design/Settings/UiTheme.asset.")]

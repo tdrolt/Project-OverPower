@@ -13,7 +13,7 @@ namespace Overpower.Telemetry
     /// <summary>
     /// Zips THIS client's own match-log files (its "{actor}_*.jsonl" and "bug_{actor}_*.png", see MatchLogZipRule) into
     /// "&lt;Match logs root&gt;/OverPower-log_&lt;match folder name&gt;_&lt;actor&gt;_&lt;nick&gt;.zip", directly in the root rather than the dated
-    /// per-match subfolder (see TryZip), so each tester finds and sends one file. Called from MatchUI.ShowMatchResult (the win/lose
+    /// per-match subfolder (see TryZip), so each tester finds and sends one file. Called from MatchUi.ShowMatchResult (the win/lose
     /// panel), GameQuit.Quit() (before it disconnects) and OnApplicationQuit, all through ZipNow, and fine to call more than once.
     ///
     /// Scene-level singleton next to MatchTelemetry/ConsoleTelemetry (the BuildingManager object); inherently "this client only"
@@ -97,7 +97,7 @@ namespace Overpower.Telemetry
         /// writes the buffer as normal.</summary>
         private void OnApplicationQuit() => ZipNow();
 
-        /// <summary>MatchUI.ShowMatchResult's and GameQuit.Quit()'s call. Always tries: naming the file after the match folder
+        /// <summary>MatchUi.ShowMatchResult's and GameQuit.Quit()'s call. Always tries: naming the file after the match folder
         /// (MatchLogZipRule.ZipFileName) makes every call idempotent, so a "skip if already zipped" variant would only risk missing a
         /// line logged between two calls.</summary>
         public void ZipNow() => TryZip();

@@ -356,8 +356,8 @@ namespace Overpower.Weapons
                 bool flashShown = blast != null
                     ? TeamSight.BlastShownAt(context.ShooterTeamId, at, blast.SplashRadius)
                     : TeamSight.ShotShownAt(context.ShooterTeamId, at);
-                if (vfx != null && VFXManager.Instance != null && flashShown)
-                    VFXManager.Instance.PlayVFX(vfx, at);
+                if (vfx != null && VfxManager.Instance != null && flashShown)
+                    VfxManager.Instance.PlayVFX(vfx, at);
 
                 if (impactSfx != null && AudioManager.Instance != null)
                     AudioManager.Instance.Play3D(impactSfx, at);

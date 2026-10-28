@@ -7,7 +7,7 @@ namespace Overpower.Match
     /// What happens to an owned zone's drain each frame: an enemy standing in the zone alone drains it towards neutral.
     ///
     /// - A defender standing in the zone, or every attacker of the draining team leaving, stops the drain. The zone
-    ///   then refills toward full at captureFadeSpeed (Building capture.cs's HandleCapturedState), and the next
+    ///   then refills toward full at captureFadeSpeed (BuildingCapture.cs's HandleCapturedState), and the next
     ///   drain starts from wherever that refill has gotten to, not necessarily full.
     /// - An attacker whose team may not capture the zone right now (its only way in is a zone of its own that is under
     ///   attack) doesn't drain. A drain already running pauses and carries on from where it was once the way in is

@@ -10,7 +10,7 @@ namespace Overpower.UI
     /// <summary>
     /// The match result (board DomResult): "DOMINION 2v2", "PURPLE WINS 2–1" in the winner's colour, a table of points per round with each round's
     /// winner in bold (a tied round has none), a note, and Back to the lobby list. LobbyUiKit.ResultCard's look (so it matches the spectator card)
-    /// with the table between the title and the button; in Dominion it replaces Conquest's YOU WIN / YOU LOSE panel. MatchUI.ShowMatchResult and
+    /// with the table between the title and the button; in Dominion it replaces Conquest's YOU WIN / YOU LOSE panel. MatchUi.ShowMatchResult and
     /// SpectatorSeatView both ask DominionHud, which builds it from the room (the round wins and dHist). Words, sizes, colours are UiTheme fields.
     /// </summary>
     public sealed class DominionResultPanel

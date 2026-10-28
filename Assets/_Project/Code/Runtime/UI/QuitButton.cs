@@ -52,7 +52,7 @@ public class QuitButton : MonoBehaviour
     /// <summary>The label follows what the button will do; the wording comes from UiTheme.</summary>
     void Update()
     {
-        MatchUI ui = GetComponentInParent<MatchUI>();
+        MatchUi ui = GetComponentInParent<MatchUi>();
         if (ui == null || ui.Theme == null)
             return;
         if (label == null)

@@ -20,7 +20,7 @@ namespace Overpower.UI
     /// paths and ability cards on two tabs ("Weapons", "Abilities & Armor"), reopening on the page last used
     /// (ShopPageMemory). OWNER ONLY, built in code like PlayerHud (every listener sits on its button's line), dormant on
     /// remote copies. SORT ORDER (UiLayers): modal canvas at Shop, above PlayerHud and the death card (a dead player sees and clicks the
-    /// whole shop) but below the F1 panel and MatchUI's win/lose panels, which must show over an open shop; the "Loadout (P)" button has its
+    /// whole shop) but below the F1 panel and MatchUi's win/lose panels, which must show over an open shop; the "Loadout (P)" button has its
     /// own canvas at HUD depth.
     /// INPUT: PlayerInputRouter's Shop action / ShopToggled (own emit gate, see ShopSuppressed); while open it claims tool
     /// focus (SetToolFocus), keyed by owner so it and the F1 panel can be open together. Hover pop-up: LoadoutScreen.Tooltip.cs.
@@ -85,7 +85,7 @@ namespace Overpower.UI
         private WeaponFiring weaponFiring;
         private PlayerInputRouter inputRouter;
         private PlayerLifecycle lifecycle;
-        private MatchUI matchUI;
+        private MatchUi matchUI;
         private AbilityRunner abilityRunner;
 
         // ---- weapon tree ------------------------------------------------------------------------
@@ -292,7 +292,7 @@ namespace Overpower.UI
             abilityRunner = GetComponent<AbilityRunner>();
             goldWallet = GetComponent<GoldWallet>();
             // Optional: nothing here needs it besides the match-over gate.
-            matchUI = GetComponent<MatchUI>();
+            matchUI = GetComponent<MatchUi>();
             playerHud = GetComponent<PlayerHud>();
 
             if (playerHealth == null || playerLoadout == null || weaponFiring == null || inputRouter == null || abilityRunner == null)
@@ -396,7 +396,7 @@ namespace Overpower.UI
             }
 
             // The match ending must close this screen though ShopSuppressed deliberately does not gate ShopToggled on it:
-            // MatchUI freezes movement but nothing else stops a living player re-picking after the result is decided.
+            // MatchUi freezes movement but nothing else stops a living player re-picking after the result is decided.
             if (matchOver)
             {
                 Close();

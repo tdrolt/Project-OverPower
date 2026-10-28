@@ -53,7 +53,7 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(FlashTint), "Apply", typeof(UiTheme).GetField(nameof(UiTheme.flashWhiteColor))), "from Flash White");
             Assert.IsTrue(IlWiring.Uses(typeof(FlashTint), "Apply", typeof(ArenaLook).GetField(nameof(ArenaLook.gunFlashGlow))), "times Gun Flash Glow");
             Assert.IsTrue(IlWiring.Uses(typeof(FlashTint), "Awake", typeof(FlashTint).GetMethod(nameof(FlashTint.Apply))),
-                "once per copy as it is made (VFXManager reuses copies, so nothing is set per flash)");
+                "once per copy as it is made (VfxManager reuses copies, so nothing is set per flash)");
         }
 
         [Test]
@@ -103,7 +103,7 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(RicochetChevronView), "OnHit", typeof(TeamSight).GetMethod(nameof(TeamSight.ShotShownAt))),
                 "gated like every other shot effect: a bounce in the fog shows nothing");
             Assert.IsTrue(IlWiring.Uses(typeof(RicochetChevronView), "OnHit",
-                typeof(VFXManager).GetMethod(nameof(VFXManager.PlayVFX), new[] { typeof(GameObject), typeof(Vector3), typeof(Quaternion) })),
+                typeof(VfxManager).GetMethod(nameof(VfxManager.PlayVFX), new[] { typeof(GameObject), typeof(Vector3), typeof(Quaternion) })),
                 "pooled like the impacts, pointing away from the wall");
 
             Quaternion away = RicochetRule.Facing(new Vector3(-1f, 0.2f, 0f));

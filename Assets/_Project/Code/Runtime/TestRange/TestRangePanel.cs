@@ -278,7 +278,7 @@ namespace Overpower.TestRange
             TMP_Dropdown dropdown = go.GetComponent<TMP_Dropdown>();
             // A code-built Selectable keeps Unity's default Automatic navigation, so a click selects it
             // and the Input System UI module maps Enter to Submit on it. Enter also opens chat
-            // (chatmanager.cs), so opening chat right after picking an option would re-submit the
+            // (PhotonChat.cs), so opening chat right after picking an option would re-submit the
             // dropdown. Same fix as LoadoutScreen's buttons.
             dropdown.navigation = new Navigation { mode = Navigation.Mode.None };
             return dropdown;

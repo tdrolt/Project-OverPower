@@ -634,7 +634,7 @@ GameObject:
   - component: {fileID: 2201164546991943351}
   - component: {fileID: 2560413150253137795}
   m_Layer: 0
-  m_Name: chat manager
+  m_Name: Chat Manager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

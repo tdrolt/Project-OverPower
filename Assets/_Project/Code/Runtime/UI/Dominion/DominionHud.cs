@@ -14,7 +14,7 @@ namespace Overpower.UI
     /// <summary>
     /// The round HUD's host. Added at runtime by DominionDirector, one per client including a spectator seat (a spectator has no body, so none of
     /// this can live on the player prefab). Owns one overlay canvas and draws RoundHud, BreakCard, CentrePayoutLabel (3v3v3), ScoreBars (spectators
-    /// too), SuddenDeathOverlay and, built on request from MatchUI (players) or SpectatorSeatView (spectators), DominionResultPanel. It reads the ROOM
+    /// too), SuddenDeathOverlay and, built on request from MatchUi (players) or SpectatorSeatView (spectators), DominionResultPanel. It reads the ROOM
     /// alone (DominionRoomState and the server clock), so every screen shows the same numbers, and only Room Properties (no networking of its own).
     /// Hidden until the match is live in a Dominion room: nothing in Conquest, the warm-up or the lobby screens. The canvas sorts under the shop (UiLayers)
     /// and over the player HUD and minimap, so the shop opens on top of the break card.
@@ -252,7 +252,7 @@ namespace Overpower.UI
         /// <summary>Takes the result card down (a spectator who leaves the room: the card is DominionHud's, so the spectator view cannot destroy it itself).</summary>
         public void HideResult() => result?.Destroy();
 
-        /// <summary>Shows the Dominion result card. Called by MatchUI (a player) and SpectatorSeatView (a spectator). False when the HUD cannot be built
+        /// <summary>Shows the Dominion result card. Called by MatchUi (a player) and SpectatorSeatView (a spectator). False when the HUD cannot be built
         /// (no theme yet), so the caller falls back to its own panel. Safe to call twice.</summary>
         public bool ShowResult(int winner, Action onBack)
         {

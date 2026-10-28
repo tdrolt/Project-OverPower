@@ -87,9 +87,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     // the root returns null.
     private WeaponFiring weaponFiring;
 
-    // The death and respawn panels belong to MatchUI; this class tells it what happened rather
-    // than holding panel references of its own. See MatchUI.cs.
-    private MatchUI matchUI;
+    // The death and respawn panels belong to MatchUi; this class tells it what happened rather
+    // than holding panel references of its own. See MatchUi.cs.
+    private MatchUi matchUI;
 
     // The HUD toast shown after respawning at T2 because the capital was under attack. Fetched the
     // same way matchUI is - a sibling component on this same player root.
@@ -129,7 +129,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// <summary>Seconds until the running respawn wait ends (game time, as the wait counts), or 0 when none runs. The death card counts down from it.</summary>
     public float RespawnSecondsLeft => Overpower.UI.DeathCardRules.SecondsLeft(respawnRoutine != null, respawnWaitLeft);
 
-    // Caches the last value shown on the respawn note so UpdateRespawnNote only touches MatchUI's
+    // Caches the last value shown on the respawn note so UpdateRespawnNote only touches MatchUi's
     // text when the under-attack state actually flips, not every frame it is polled.
     private bool respawnNoteShowing = false;
 
@@ -174,7 +174,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         rigidbody = GetComponent<Rigidbody>();
         capsuleCollider = GetComponent<CapsuleCollider>();
         weaponFiring = GetComponentInChildren<WeaponFiring>(true);
-        matchUI = GetComponent<MatchUI>();
+        matchUI = GetComponent<MatchUi>();
         playerHud = GetComponent<PlayerHud>();
         if (playerHud == null)
             Debug.LogError($"[PlayerLifecycle] {name}: no PlayerHud on this player - the capital-under-" +
@@ -459,7 +459,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     }
 
     /// The second way back into the match: your team lost its capital, you are sitting on the
-    /// waiting card, and a teammate recaptures it. MatchUI.IsWaitingForRespawn (what the card is
+    /// waiting card, and a teammate recaptures it. MatchUi.IsWaitingForRespawn (what the card is
     /// shown from) is the flag for "I am stuck waiting" - no second piece of state here that
     /// could disagree with what the player can see on screen.
     void CheckForCathedralCapture()
@@ -822,7 +822,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         matchUI?.SetRespawnNote("");
         respawnNoteShowing = false;
 
-        // Null-guarded inside MatchUI: an NRE here would kill the coroutine after the wait but
+        // Null-guarded inside MatchUi: an NRE here would kill the coroutine after the wait but
         // BEFORE SetAlive(true) below, leaving the player hidden on every client forever.
         matchUI?.HideWaitingPanel();
 
@@ -967,7 +967,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// RespawnPlayer's wait (the countdown is up: an ordinary death, capital still owned but possibly under
     /// attack). NOT also called from CheckForCathedralCapture's waiting poll: the waiting card shows no note,
     /// so writing it there would be invisible. Only
-    /// writes MatchUI's text when the bool flips, and only trusts IsUnderAttack while this team still owns the
+    /// writes MatchUi's text when the bool flips, and only trusts IsUnderAttack while this team still owns the
     /// capital (the race in ChooseSpawnPoint).</summary>
     private void UpdateRespawnNote(int teamID)
     {

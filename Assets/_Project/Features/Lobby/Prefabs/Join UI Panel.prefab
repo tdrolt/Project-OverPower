@@ -515,7 +515,7 @@ GameObject:
   - component: {fileID: 3637919369592785613}
   - component: {fileID: 2851696852642958287}
   m_Layer: 5
-  m_Name: JoinUIPanel
+  m_Name: Join UI Panel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
