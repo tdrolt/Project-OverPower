@@ -13,8 +13,9 @@ namespace Overpower.Telemetry
     /// <summary>
     /// Zips THIS client's own match-log files (its "{actor}_*.jsonl" and "bug_{actor}_*.png", see MatchLogZipRule) into
     /// "&lt;Match logs root&gt;/OverPower-log_&lt;match folder name&gt;_&lt;actor&gt;_&lt;nick&gt;.zip", directly in the root rather than the dated
-    /// per-match subfolder (see TryZip), so each tester finds and sends one file. Called from MatchUi.ShowMatchResult (the win/lose
-    /// panel), GameQuit.Quit() (before it disconnects) and OnApplicationQuit, all through ZipNow, and fine to call more than once.
+    /// per-match subfolder (see TryZip), so each tester finds and sends one file; and sends an anonymous copy of the .jsonl to the
+    /// collector (TryUpload, TelemetryConfig > Upload). Called from MatchUi.ShowMatchResult (the win/lose panel), the lobby-list return,
+    /// GameQuit.Quit() (before it disconnects) and OnApplicationQuit, all through ZipNow, and fine to call more than once.
     ///
     /// Scene-level singleton next to MatchTelemetry/ConsoleTelemetry (the BuildingManager object); inherently "this client only"
     /// because every step touches only PhotonNetwork.LocalPlayer's actor and MatchTelemetry.Instance's folder. Every step is
@@ -100,7 +101,51 @@ namespace Overpower.Telemetry
         /// <summary>MatchUi.ShowMatchResult's and GameQuit.Quit()'s call. Always tries: naming the file after the match folder
         /// (MatchLogZipRule.ZipFileName) makes every call idempotent, so a "skip if already zipped" variant would only risk missing a
         /// line logged between two calls.</summary>
-        public void ZipNow() => TryZip();
+        public void ZipNow()
+        {
+            TryZip();
+            TryUpload();
+        }
+
+        private string lastSentName;
+        private long lastSentLength;
+
+        /// <summary>Sends the anonymous copy of this client's own .jsonl to the collector (TelemetryConfig > Upload), on every platform;
+        /// same folder and actor fall-backs as TryZip, since the second send runs after the leave has cleared them.</summary>
+        private void TryUpload()
+        {
+            try
+            {
+                MatchTelemetry mt = MatchTelemetry.Instance;
+                Overpower.Data.TelemetryConfig config = mt != null ? mt.Config : null;
+                if (config == null)
+                    return;
+                string folder = MatchLogZipRule.ResolveZipFolder(mt.CurrentFolder, lastKnownFolder);
+                if (!MatchLogZipRule.ShouldAttemptZip(folder))
+                    return;
+                int actor = MatchLogZipRule.ResolveActor(PhotonNetwork.LocalPlayer != null ? PhotonNetwork.LocalPlayer.ActorNumber : -1, lastKnownActor);
+                mt.FlushNow();
+
+                string logName = MatchLogZipRule.SelectOwnFiles(Directory.GetFiles(folder).Select(Path.GetFileName), actor)
+                    .FirstOrDefault(name => name.EndsWith(".jsonl", StringComparison.OrdinalIgnoreCase));
+                string text = logName != null ? File.ReadAllText(Path.Combine(folder, logName)) : "";
+                if (!MatchLogUploadRules.ShouldUpload(config.Enabled, config.UploadEnabled, config.UploadUrl, Debug.isDebugBuild,
+                        config.UploadFromDevelopmentBuilds, text.Length > 0))
+                    return;
+
+                string remoteName = MatchLogUploadRules.RemoteFileName(Path.GetFileName(folder), actor);
+                if (!MatchLogUploadRules.SendsAgain(lastSentName, lastSentLength, remoteName, text.Length))
+                    return;
+                lastSentName = remoteName;
+                lastSentLength = text.Length;
+                MatchLogUpload.Send(config.UploadUrl, MatchLogUploadRules.Payload(config.UploadKey, remoteName, MatchLogUploadRules.Anonymize(text)),
+                    config.UploadTimeoutSeconds);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[MatchLogUpload] could not send this client's match log: {e.Message}");
+            }
+        }
 
         private void TryZip()
         {

@@ -1473,6 +1473,9 @@ namespace Overpower.UI
         public string escapeMenuTitleText = "Sound";
         [Tooltip("The close button of that browser pop-up (same effect as pressing Escape again).")]
         public string escapeMenuCloseText = "Close";
+        [Tooltip("One muted line under the name screen's buttons, shown only when this build sends match logs " +
+                 "(TelemetryConfig > Upload has an address): it tells players that anonymous match data is collected.")]
+        public string matchDataNoticeText = "Anonymous match data is collected to help improve the game.";
         [Tooltip("Escape pop-up's confirm button, for both questions: it closes the game, or during a match leaves it.")]
         public string quitYesText = "Yes";
         [Tooltip("QuitConfirmPanel's cancel button - same effect as pressing Escape again.")]

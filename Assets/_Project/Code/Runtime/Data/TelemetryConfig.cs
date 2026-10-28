@@ -67,6 +67,33 @@ namespace Overpower.Data
         [SerializeField, Min(1)] private int consoleMessageMaxChars = 500;
         public int ConsoleMessageMaxChars => consoleMessageMaxChars;
 
+        [Header("Upload (every platform; desktop builds keep their files too)")]
+        [Tooltip("At the end of every match (the result screen) and again once the player is back on the lobby list, each " +
+                 "client sends an anonymous copy of its own match log to the address below: names become \"Player 3\", " +
+                 "chat text is left out. Off = nothing is sent and the name screen shows no notice.")]
+        [SerializeField] private bool uploadEnabled = true;
+        public bool UploadEnabled => uploadEnabled;
+
+        [Tooltip("The collector's web-app address: the Google Apps Script deployment's /exec address (see the setup notes). " +
+                 "Empty = nothing is sent. Only an https address is used.")]
+        [SerializeField] private string uploadUrl = "";
+        public string UploadUrl => uploadUrl;
+
+        [Tooltip("A short word the collector script checks before it saves anything (the UPLOAD_KEY line in the script must " +
+                 "match). It keeps random traffic out; it is not a secret, since every build carries it.")]
+        [SerializeField] private string uploadKey = "overpower-playtest";
+        public string UploadKey => uploadKey;
+
+        [Tooltip("Seconds a send may take before it is given up. A send never holds up the game: it runs on its own and a " +
+                 "failure is only written to the console.")]
+        [SerializeField, Min(1)] private int uploadTimeoutSeconds = 30;
+        public int UploadTimeoutSeconds => uploadTimeoutSeconds;
+
+        [Tooltip("Also send from development runs (Play Mode in the Editor and the Dev test clients). Off by default, so test " +
+                 "sessions do not fill the collector's folder; turn it on only to try the collector from the Editor.")]
+        [SerializeField] private bool uploadFromDevelopmentBuilds;
+        public bool UploadFromDevelopmentBuilds => uploadFromDevelopmentBuilds;
+
         [Header("Bug mark key (playtest extras)")]
         [Tooltip("The key that marks 'a bug just happened' - a screenshot plus a note the reporter's " +
                  "next chat line supplies (see BugMarkerKey). Default B. In the EDITOR's own Play " +

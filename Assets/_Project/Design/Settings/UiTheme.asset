@@ -558,6 +558,7 @@ MonoBehaviour:
   leaveMatchPromptText: Leave the match?
   escapeMenuTitleText: Sound
   escapeMenuCloseText: Close
+  matchDataNoticeText: Anonymous match data is collected to help improve the game.
   quitYesText: Yes
   quitNoText: No
   matchLogSavedText: 'Your match log is saved.

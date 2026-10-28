@@ -20,5 +20,10 @@ MonoBehaviour:
   recordConsole: 1
   consoleMaxLinesPerSecond: 50
   consoleMessageMaxChars: 500
+  uploadEnabled: 1
+  uploadUrl: 
+  uploadKey: overpower-playtest
+  uploadTimeoutSeconds: 30
+  uploadFromDevelopmentBuilds: 0
   bugMarkKey: 16
   bugMarkNeedsCtrl: 1

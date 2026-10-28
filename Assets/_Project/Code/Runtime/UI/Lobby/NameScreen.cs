@@ -184,6 +184,14 @@ namespace Overpower.UI
             // Kept in the layout but invisible while no match holds a place, so the column does not jump when the offer appears.
             rejoinGroup = rejoinButton.Root.AddComponent<CanvasGroup>();
             SetRejoinOffered(false);
+
+            Overpower.Data.TelemetryConfig telemetry = Overpower.Telemetry.MatchTelemetry.Instance != null ? Overpower.Telemetry.MatchTelemetry.Instance.Config : null;
+            if (telemetry == null)
+                return;
+            if (Overpower.Telemetry.MatchLogUploadRules.ShowsNotice(telemetry.Enabled, telemetry.UploadEnabled, telemetry.UploadUrl,
+                    Debug.isDebugBuild, telemetry.UploadFromDevelopmentBuilds))
+                kit.Text(column.transform, "Match data notice", theme.matchDataNoticeText, kit.Body, theme.nameScreenHintSize, theme.lobbyDimColor,
+                    TextAlignmentOptions.Midline);
         }
 
         private string NameHint() => string.Format(theme.nameScreenHintFormat, MinLength, MaxLength);

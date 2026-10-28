@@ -100,6 +100,8 @@ namespace Overpower.Telemetry
         /// F1 "Open telemetry folder" button.</summary>
         public string CurrentFolder { get; private set; }
 
+        public TelemetryConfig Config => config;
+
         /// <summary>How many lines are actually on disk so far - the F1 status label reads this.</summary>
         public int LineCount => writer.LineCount;
 
