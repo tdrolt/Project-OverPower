@@ -160,7 +160,7 @@ namespace Overpower.UI
             note = PopupCard.Line(kit, noteStrip.transform, "Text", "", kit.Body, theme.capitalUnderAttackNoteFontSize, theme.capitalUnderAttackNoteColor, true);
 
             quitRow = PopupCard.ButtonRow(card, 0f).gameObject;
-            quit = PopupCard.Primary(kit, quitRow.transform, theme.resultButtonQuit, null);
+            quit = PopupCard.Primary(kit, quitRow.transform, theme.resultButtonLeaveMatch, null);
             quit.Root.AddComponent<QuitButton>(); // the panels' own Quit: wires itself, and its label follows what it will do
         }
 

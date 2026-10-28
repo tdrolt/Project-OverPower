@@ -4,13 +4,10 @@ using Overpower.Match;
 using TMPro;
 
 /// <summary>
-/// Quits the game when its Button is clicked. Put this on a Button; it wires itself, so there is no inspector
-/// reference to forget (the win, lose and waiting panel buttons it replaces sat for months with **no onClick
-/// handler at all**: they looked like working buttons and did nothing).
-///
-/// There is no main menu scene to return to, so Quit is the honest action. The sequence lives in GameQuit.Quit()
-/// (also used by the Escape pop-up's Yes); Quit() stays public because the win/lose/waiting panel buttons are
-/// wired to it by name.
+/// The win, lose, waiting and death-card button: Leave match while the match runs, Back to the lobby list once it is over; both
+/// go through RoomManager.ReturnToLobbyList (BackToNameScreenRules). It wires itself in Start (AddListener), so there is no
+/// inspector reference to forget: those buttons once sat for months with no onClick handler at all. GameQuit.Quit is only the
+/// fallback when no RoomManager is found.
 /// </summary>
 [RequireComponent(typeof(Button))]
 public class QuitButton : MonoBehaviour
@@ -23,11 +20,9 @@ public class QuitButton : MonoBehaviour
     private TMP_Text label;
     private RoomManager manager;
 
-    /// <summary>Once the MATCH is over (the room's phase) this leads back to the lobby list for a fresh start; on the
-    /// waiting panel, or on a knocked-out player's lose panel while the match still runs, it closes the game (D22).</summary>
     public void Quit()
     {
-        if (CurrentAction() == ResultButtonAction.BackToLobbyList)
+        if (BackToNameScreenRules.LeadsToLobbyList(CurrentAction()))
         {
             if (manager == null)
                 manager = FindFirstObjectByType<RoomManager>();
@@ -40,8 +35,8 @@ public class QuitButton : MonoBehaviour
         GameQuit.Quit();
     }
 
-    public static string LabelFor(bool matchOver, MatchPhase phase, string lobbyListLabel, string quitLabel) =>
-        BackToNameScreenRules.ButtonLabel(matchOver ? BackToNameScreenRules.ButtonAction(phase) : ResultButtonAction.CloseGame, lobbyListLabel, quitLabel);
+    public static string LabelFor(bool matchOver, MatchPhase phase, string lobbyListLabel, string leaveLabel) =>
+        BackToNameScreenRules.ButtonLabel(matchOver ? BackToNameScreenRules.ButtonAction(phase) : ResultButtonAction.LeaveMatch, lobbyListLabel, leaveLabel);
 
     private static ResultButtonAction CurrentAction()
     {
@@ -61,7 +56,7 @@ public class QuitButton : MonoBehaviour
             return;
         MatchDirector director = MatchDirector.Instance;
         string wanted = LabelFor(ui.MatchOver, director != null ? director.Phase : MatchPhase.Warmup,
-            ui.Theme.resultButtonLobbyList, ui.Theme.resultButtonQuit);
+            ui.Theme.resultButtonLobbyList, ui.Theme.resultButtonLeaveMatch);
         if (label.text != wanted)
             label.text = wanted;
     }

@@ -3,26 +3,36 @@ using Photon.Realtime;
 
 namespace Overpower.Match
 {
-    /// <summary>What the result panel's button does: close the game, or lead back to the lobby list.</summary>
-    public enum ResultButtonAction { CloseGame, BackToLobbyList }
+    /// <summary>What an exit button does: close the game, lead back to the lobby list after a match, or leave a running match.</summary>
+    public enum ResultButtonAction { CloseGame, BackToLobbyList, LeaveMatch }
 
     /// <summary>What the return-to-the-lobby-list sequence does next while it waits for the connection.</summary>
     public enum ReturnStep { Wait, ReloadScene, Reconnect }
 
-    /// <summary>After a match (D22) the result screen's button starts a fresh game on the name screen instead of
-    /// closing the game. The pieces that are pure: which action a panel button takes, when the leave has finished far enough to
-    /// rebuild the scene, and which of two own bodies a rejoining player keeps.</summary>
+    /// <summary>Every exit during a match leads back to the lobby list (RoomManager.ReturnToLobbyList, a real leave: the seat is
+    /// freed and the match carries on for the others); closing the game is offered only outside a match, and never in the browser.
+    /// Also pure: when the leave has finished far enough to rebuild the scene, and which of two own bodies a rejoining player keeps.</summary>
     public static class BackToNameScreenRules
     {
-        /// <summary>The result panel's button leads back to the name screen only when the MATCH is really over (the room's phase). A
-        /// knocked-out player sees their lose panel mid-match: their button stays a plain Quit, so they cannot re-join the running
-        /// room as a fresh player on another team. The waiting panel's button is a Quit too.</summary>
+        /// <summary>The result, waiting and death-card button: back to the lobby list once the match is over (the room's phase),
+        /// Leave match while it still runs (a knocked-out player's lose panel, the waiting panel).</summary>
         public static ResultButtonAction ButtonAction(MatchPhase phase) =>
-            phase == MatchPhase.Over ? ResultButtonAction.BackToLobbyList : ResultButtonAction.CloseGame;
+            phase == MatchPhase.Over ? ResultButtonAction.BackToLobbyList : ResultButtonAction.LeaveMatch;
+
+        public static bool LeadsToLobbyList(ResultButtonAction action) => action != ResultButtonAction.CloseGame;
+
+        /// <summary>A match runs from the warm-up on (lobby stage 1 and later); a lobby before its start is not a match.</summary>
+        public static bool IsMatchRunning(bool inRoom, int lobbyStage) => inRoom && lobbyStage >= 1;
+
+        /// <summary>Escape's Yes during a match leaves it (back to the lobby list) instead of closing the game.</summary>
+        public static bool EscapeLeavesTheMatch(bool matchRunning) => matchRunning;
+
+        /// <summary>"Close the game?" only outside a match, and not in the browser: a web page cannot close itself.</summary>
+        public static bool OffersQuitGame(bool matchRunning, bool webPlayer) => !matchRunning && !webPlayer;
 
         /// <summary>The button's label follows what it will do (UiTheme texts).</summary>
-        public static string ButtonLabel(ResultButtonAction action, string lobbyListLabel, string quitLabel) =>
-            action == ResultButtonAction.BackToLobbyList ? lobbyListLabel : quitLabel;
+        public static string ButtonLabel(ResultButtonAction action, string lobbyListLabel, string leaveLabel) =>
+            action == ResultButtonAction.BackToLobbyList ? lobbyListLabel : leaveLabel;
 
         /// <summary>The wait for the leave timed out: unless the client is on the master server, disconnect before the scene is rebuilt so
         /// the new scene's Start connects from a clean state (it only connects when not connected).</summary>

@@ -7,25 +7,17 @@ namespace Overpower.Tests
     /// <summary>Task 9f (Tudor D22): the result screen leads back to the name screen; and the rejoin body choice (9e-3 review).</summary>
     public class BackToNameScreenRulesTests
     {
-        // ---- the panel button (decided by the match PHASE: a knocked-out player's lose panel shows mid-match)
+        // ---- the panel button (decided by the match PHASE; the mid-match half is in LeaveMatchRulesTests)
 
         [Test]
         public void WhenTheMatchIsReallyOverTheButtonGoesBackToTheLobbyList() =>
             Assert.AreEqual(ResultButtonAction.BackToLobbyList, BackToNameScreenRules.ButtonAction(MatchPhase.Over));
 
         [Test]
-        public void TheQuitButtonTakesItsLabelFromTheRule()
-        {
-            Assert.AreEqual("Back to the lobby list", QuitButton.LabelFor(true, MatchPhase.Over, "Back to the lobby list", "Quit"));
-            Assert.AreEqual("Quit", QuitButton.LabelFor(true, MatchPhase.TwoTeams, "Back to the lobby list", "Quit"), "a knocked-out player's panel mid-match closes the game");
-            Assert.AreEqual("Quit", QuitButton.LabelFor(false, MatchPhase.Over, "Back to the lobby list", "Quit"), "the waiting panel (match not over for this panel) closes the game");
-        }
-
-        [Test]
         public void TheLabelFollowsTheActionFromTheThemeFields()
         {
-            Assert.AreEqual("Back to the lobby list", BackToNameScreenRules.ButtonLabel(ResultButtonAction.BackToLobbyList, "Back to the lobby list", "Quit"));
-            Assert.AreEqual("Quit", BackToNameScreenRules.ButtonLabel(ResultButtonAction.CloseGame, "Back to the lobby list", "Quit"));
+            Assert.AreEqual("Back to the lobby list", BackToNameScreenRules.ButtonLabel(ResultButtonAction.BackToLobbyList, "Back to the lobby list", "Leave match"));
+            Assert.AreEqual("Leave match", BackToNameScreenRules.ButtonLabel(ResultButtonAction.LeaveMatch, "Back to the lobby list", "Leave match"));
         }
 
         [Test]
@@ -37,12 +29,6 @@ namespace Overpower.Tests
             Assert.IsTrue(Overpower.Lobby.LobbyReturn.Consume(), "the rebuilt name screen opens on the list");
             Assert.IsFalse(Overpower.Lobby.LobbyReturn.Consume(), "and only once");
         }
-
-        [TestCase(MatchPhase.Warmup)]
-        [TestCase(MatchPhase.ThreeTeams)]
-        [TestCase(MatchPhase.TwoTeams)]
-        public void WhileTheMatchStillRunsTheButtonStillClosesTheGame(MatchPhase phase) =>
-            Assert.AreEqual(ResultButtonAction.CloseGame, BackToNameScreenRules.ButtonAction(phase));
 
         // ---- giving up on the wait
 

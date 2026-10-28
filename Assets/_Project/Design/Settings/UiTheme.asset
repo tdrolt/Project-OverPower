@@ -555,6 +555,9 @@ MonoBehaviour:
   spawnTowerColumnRadius: 0.35
   bugMarkedText: Bug marked - type what happened in chat
   quitPromptText: Close the game?
+  leaveMatchPromptText: Leave the match?
+  escapeMenuTitleText: Sound
+  escapeMenuCloseText: Close
   quitYesText: Yes
   quitNoText: No
   matchLogSavedText: 'Your match log is saved.
@@ -613,7 +616,7 @@ MonoBehaviour:
   rejoinFailedOkButton: OK
   rejoinMatchButton: Rejoin your match
   resultButtonLobbyList: Back to the lobby list
-  resultButtonQuit: Quit
+  resultButtonLeaveMatch: Leave match
   connectionLostPanelWidth: 640
   connectionLostTitleColor: {r: 1, g: 0.55, b: 0.35, a: 1}
   connectionLostTitleSize: 34

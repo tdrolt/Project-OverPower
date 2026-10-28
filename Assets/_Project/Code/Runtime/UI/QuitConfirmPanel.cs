@@ -1,3 +1,4 @@
+using Overpower.Match;
 using Photon.Pun;
 using TMPro;
 using UnityEngine;
@@ -7,9 +8,10 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Escape asks "Close the game?": a scene-level runtime component (one instance, like TestRangePanel and
-    /// ConnectionLostPanel), a clickable overlay canvas with a GraphicRaycaster built in code. A raw Keyboard.current
-    /// poll, not an InputAction (a tool key, like every other Escape consumer here).
+    /// Escape's pop-up: "Leave the match?" during a match (back to the lobby list), "Close the game?" outside one on a desktop
+    /// build, and only the volume in the browser outside a match (BackToNameScreenRules). A scene-level runtime component (one
+    /// instance, like TestRangePanel and ConnectionLostPanel), a clickable overlay canvas with a GraphicRaycaster built in code.
+    /// A raw Keyboard.current poll, not an InputAction (a tool key, like every other Escape consumer here).
     /// OWNERSHIP: LoadoutScreen and the chat panel close THEMSELVES on Escape in the same frame and Update() order
     /// is not fixed, so this asks EscapeOwnershipRule (this frame OR the last). While open it claims tool focus on the
     /// local player's PlayerInputRouter (no moving or shooting while deciding; the match keeps running), the
@@ -19,7 +21,8 @@ namespace Overpower.UI
     [DisallowMultipleComponent]
     public class QuitConfirmPanel : MonoBehaviour
     {
-        [Tooltip("Read for the pop-up's words (quitPromptText, quitYesText, quitNoText, the master volume row) and its card look.")]
+        [Tooltip("Read for the pop-up's words (quitPromptText, leaveMatchPromptText, escapeMenuTitleText, quitYesText, quitNoText, " +
+                 "escapeMenuCloseText, the master volume row) and its card look.")]
         [SerializeField] private UiTheme theme;
 
         private LobbyUiKit kit;
@@ -27,7 +30,10 @@ namespace Overpower.UI
         private TextMeshProUGUI promptLabel;
         private TextMeshProUGUI volumeLabel;
         private Slider volumeSlider;
+        private LobbyButton yesButton;
+        private LobbyButton noButton;
         private bool visible;
+        private bool leaving; // the leave is under way: the scene is about to be rebuilt, Escape no longer opens anything
 
         private bool shopOpenLastFrame;
         private bool chatOpenLastFrame;
@@ -51,6 +57,8 @@ namespace Overpower.UI
 
         private void Update()
         {
+            if (leaving)
+                return;
             bool shopOpenNow = LoadoutScreen.IsOpen;
             bool chatOpenNow = PhotonChat.IsOpen;
             bool pageOpenNow = Overpower.UI.LobbyOverlayPanel.AnyPageOpen; // How to play / mode info close themselves on Escape
@@ -74,8 +82,23 @@ namespace Overpower.UI
         private void Open()
         {
             visible = true;
-            if (promptLabel != null && theme != null)
-                promptLabel.text = theme.quitPromptText;
+            bool matchRunning = BackToNameScreenRules.IsMatchRunning(PhotonNetwork.InRoom, LobbyStageOfRoom());
+            string prompt;
+            bool showYes = true;
+            if (BackToNameScreenRules.EscapeLeavesTheMatch(matchRunning))
+                prompt = theme.leaveMatchPromptText;
+            else if (BackToNameScreenRules.OffersQuitGame(matchRunning, Application.platform == RuntimePlatform.WebGLPlayer))
+                prompt = theme.quitPromptText;
+            else
+            {
+                prompt = theme.escapeMenuTitleText;
+                showYes = false;
+            }
+            if (promptLabel != null)
+                promptLabel.text = prompt;
+            yesButton?.Root.SetActive(showYes);
+            if (noButton != null)
+                noButton.Label.text = showYes ? theme.quitNoText : theme.escapeMenuCloseText;
             if (volumeSlider != null)
             {
                 volumeSlider.SetValueWithoutNotify(AudioListener.volume);
@@ -115,11 +138,39 @@ namespace Overpower.UI
 
         // ---- Yes / No ----
 
-        /// <summary>NEVER call this from an automated verification pass - it stops Play Mode in the
-        /// Editor (or quits the built Player). Check this wiring by reading it instead.</summary>
-        private void OnYesClicked() => GameQuit.Quit();
+        /// <summary>During a match: back to the lobby list. Otherwise GameQuit.Quit, which stops Play Mode in the Editor (or quits the
+        /// built Player): NEVER press Yes outside a match in an automated check.</summary>
+        private void OnYesClicked()
+        {
+            if (BackToNameScreenRules.EscapeLeavesTheMatch(BackToNameScreenRules.IsMatchRunning(PhotonNetwork.InRoom, LobbyStageOfRoom())))
+            {
+                LeaveMatch();
+                return;
+            }
+            GameQuit.Quit();
+        }
+
+        /// <summary>The pop-up hides but keeps the player's input claimed: the leave can take seconds before the scene is rebuilt,
+        /// and the body must not move or shoot meanwhile.</summary>
+        private void LeaveMatch()
+        {
+            leaving = true;
+            visible = false;
+            uiRoot.SetActive(false);
+            RoomManager manager = FindFirstObjectByType<RoomManager>();
+            if (manager != null)
+                manager.ReturnToLobbyList();
+            else
+                Debug.LogWarning("[LEAVE] no RoomManager in the scene - cannot go back to the lobby list");
+        }
 
         private void OnNoClicked() => Close();
+
+        private static int LobbyStageOfRoom()
+        {
+            if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null) return 0;
+            return PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(Overpower.Lobby.LobbyKeys.Stage, out object stage) && stage is int value ? value : 0;
+        }
 
         // ---- master volume ----
 
@@ -168,8 +219,8 @@ namespace Overpower.UI
             volumeSlider.gameObject.AddComponent<PointerUpRelay>().Released = OnVolumeReleased;
 
             Transform buttons = PopupCard.ButtonRow(card, theme.lobbyListColumnGap);
-            PopupCard.Primary(kit, buttons, theme.quitYesText, OnYesClicked);
-            PopupCard.Secondary(kit, buttons, theme.quitNoText, OnNoClicked);
+            yesButton = PopupCard.Primary(kit, buttons, theme.quitYesText, OnYesClicked);
+            noButton = PopupCard.Secondary(kit, buttons, theme.quitNoText, OnNoClicked);
 
             uiRoot.SetActive(false);
         }

@@ -1462,11 +1462,18 @@ namespace Overpower.UI
                  "saved next to this client's own telemetry log, and its own `bug` line is written. " +
                  "Uses the same transient toast label every other HUD toast shares (PlayerHud.ShowToast).")]
         public string bugMarkedText = "Bug marked - type what happened in chat";
-        [Tooltip("Escape's pop-up question (QuitConfirmPanel), shown only when neither the shop nor " +
-                 "chat claimed the key this frame or the frame before.")]
+        [Tooltip("Escape's pop-up question outside a match on a desktop build (the name screen, the lobby list, a lobby before " +
+                 "its start). Yes closes the game. The browser build never offers it: a web page cannot close itself.")]
         public string quitPromptText = "Close the game?";
-        [Tooltip("QuitConfirmPanel's confirm button - runs the shared GameQuit.Quit() (zips this " +
-                 "client's own match log if needed, then disconnects and quits).")]
+        [Tooltip("Escape's pop-up question during a match (from the warm-up on). Yes takes this player back to the lobby list; " +
+                 "the match carries on for everyone else and the seat is freed.")]
+        public string leaveMatchPromptText = "Leave the match?";
+        [Tooltip("Escape's pop-up title in the browser outside a match, where there is nothing to quit: the pop-up then only " +
+                 "holds the master volume and a close button.")]
+        public string escapeMenuTitleText = "Sound";
+        [Tooltip("The close button of that browser pop-up (same effect as pressing Escape again).")]
+        public string escapeMenuCloseText = "Close";
+        [Tooltip("Escape pop-up's confirm button, for both questions: it closes the game, or during a match leaves it.")]
         public string quitYesText = "Yes";
         [Tooltip("QuitConfirmPanel's cancel button - same effect as pressing Escape again.")]
         public string quitNoText = "No";
@@ -1546,8 +1553,9 @@ namespace Overpower.UI
         [Tooltip("Label of the result screen's button once the match is really over: it leads back to the lobby list.")]
         [UnityEngine.Serialization.FormerlySerializedAs("resultButtonMainMenu")]
         public string resultButtonLobbyList = "Back to the lobby list";
-        [Tooltip("Label of the same button while the match is still running (a knocked-out player's lose screen): it closes the game.")]
-        public string resultButtonQuit = "Quit";
+        [Tooltip("Label of the same button while the match is still running (a knocked-out player's lose screen, the waiting card, " +
+                 "the death card): it takes this player back to the lobby list and the match carries on for the others.")]
+        public string resultButtonLeaveMatch = "Leave match";
         [Tooltip("Width of the connection lost panel, in reference pixels.")]
         public float connectionLostPanelWidth = 640f;
         [Tooltip("Colour of the connection lost title.")]
