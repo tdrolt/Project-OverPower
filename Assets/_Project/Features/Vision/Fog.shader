@@ -39,7 +39,12 @@ Shader "Overpower/Fog"
             {
                 float2 screenUV = i.positionCS.xy * rcp(_ScaledScreenParams.xy);
                 float depth = SampleSceneDepth(screenUV);
-                float3 world = ComputeWorldSpacePosition(screenUV, depth, UNITY_MATRIX_I_VP);
+                // GL (the browser build) has clip-space depth -1..1 while the texture holds 0..1; Direct3D's reversed 0..1 needs no remap.
+                float depthForPosition = depth;
+            #if !UNITY_REVERSED_Z
+                depthForPosition = lerp(UNITY_NEAR_CLIP_VALUE, 1, depth);
+            #endif
+                float3 world = ComputeWorldSpacePosition(screenUV, depthForPosition, UNITY_MATRIX_I_VP);
                 float2 sightUV = (world.xz - _VisionSightRect.xy) / _VisionSightRect.zw;
                 bool inside = all(sightUV >= 0.0) && all(sightUV <= 1.0);
 
