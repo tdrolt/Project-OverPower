@@ -105,9 +105,9 @@ namespace Overpower.TestRange
                 return;
             }
 
-            if (!gameplayConfig.TestRangeEnabled)
+            if (!DevelopmentTools.TestRangeOn(gameplayConfig.TestRangeEnabled, Debug.isDebugBuild))
             {
-                enabled = false; // The whole point: flip the asset's checkbox and this never wakes up.
+                enabled = false; // Off by the asset's checkbox, and always off in a player's build.
                 return;
             }
 

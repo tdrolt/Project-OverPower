@@ -13,7 +13,7 @@ namespace Overpower.Telemetry
     /// <summary>
     /// Zips THIS client's own match-log files (its "{actor}_*.jsonl" and "bug_{actor}_*.png", see MatchLogZipRule) into
     /// "&lt;Match logs root&gt;/OverPower-log_&lt;match folder name&gt;_&lt;actor&gt;_&lt;nick&gt;.zip", directly in the root rather than the dated
-    /// per-match subfolder (see TryZip), so each tester finds and sends one file; and sends an anonymous copy of the .jsonl to the
+    /// per-match subfolder (see TryZip), so each tester finds and sends one file; and sends a copy (no chat) of the .jsonl to the
     /// collector (TryUpload, TelemetryConfig > Upload). Called from MatchUi.ShowMatchResult (the win/lose panel), the lobby-list return,
     /// GameQuit.Quit() (before it disconnects) and OnApplicationQuit, all through ZipNow, and fine to call more than once.
     ///
@@ -110,7 +110,7 @@ namespace Overpower.Telemetry
         private string lastSentName;
         private long lastSentLength;
 
-        /// <summary>Sends the anonymous copy of this client's own .jsonl to the collector (TelemetryConfig > Upload), on every platform;
+        /// <summary>Sends the copy (no chat) of this client's own .jsonl to the collector (TelemetryConfig > Upload), on every platform;
         /// same folder and actor fall-backs as TryZip, since the second send runs after the leave has cleared them.</summary>
         private void TryUpload()
         {
@@ -138,8 +138,8 @@ namespace Overpower.Telemetry
                     return;
                 lastSentName = remoteName;
                 lastSentLength = text.Length;
-                MatchLogUpload.Send(config.UploadUrl, MatchLogUploadRules.Payload(config.UploadKey, remoteName, MatchLogUploadRules.Anonymize(text)),
-                    config.UploadTimeoutSeconds);
+                MatchLogUpload.Send(config.UploadUrl, MatchLogUploadRules.Payload(config.UploadKey, remoteName, Path.GetFileName(folder),
+                    MatchLogUploadRules.MatchIdOf(text), MatchLogUploadRules.SentCopy(text)), config.UploadTimeoutSeconds);
             }
             catch (Exception e)
             {

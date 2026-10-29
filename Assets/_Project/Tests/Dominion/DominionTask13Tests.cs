@@ -25,7 +25,7 @@ namespace Overpower.Tests
 
         // The titles of the designer's cards, in the order of his notes ("Dominion info cards" in lobby-dominion-design-notes.md).
         private static readonly string[] CardTitles2v2 = { "Rounds", "Zones and points", "Bounties", "Your build each round", "Respawns", "Sudden death" };
-        private static readonly string[] CardTitles3v3v3 = { "Rounds", "Zones and points", "The centre", "Bounties", "Your build each round", "Respawns", "Sudden death" };
+        private static readonly string[] CardTitles3v3v3 = { "Rounds", "Zones and points", "The centre zone", "Bounties", "Your build each round", "Respawns", "Sudden death" };
 
         // ---------------------------------------------------------------- the modes are on, with their cards
 
@@ -48,8 +48,8 @@ namespace Overpower.Tests
 
         [Test] public void OnlyTheThreeTeamModeHasTheCentreCard()
         {
-            Assert.IsFalse(Mode("Dominion 2v2").InfoCards.Any(c => c.title == "The centre"), "2v2 has no centre");
-            Assert.IsTrue(Mode("Dominion 3v3v3").InfoCards.Any(c => c.title == "The centre"));
+            Assert.IsFalse(Mode("Dominion 2v2").InfoCards.Any(c => c.title == "The centre zone"), "2v2 has no centre");
+            Assert.IsTrue(Mode("Dominion 3v3v3").InfoCards.Any(c => c.title == "The centre zone"));
         }
 
         [Test] public void EveryDominionCardHasATextAndAnOpaqueAccent()
@@ -67,9 +67,9 @@ namespace Overpower.Tests
             string two = Mode("Dominion 2v2").InfoCards.First(c => c.title == "Zones and points").text;
             string three = Mode("Dominion 3v3v3").InfoCards.First(c => c.title == "Zones and points").text;
             StringAssert.DoesNotContain("centre", two);
-            StringAssert.Contains("apart from the centre", three);
-            StringAssert.Contains("can't be captured", two, "both keep the sentence about the spawn");
-            StringAssert.Contains("can't be captured", three);
+            StringAssert.Contains("except the centre zone", three);
+            StringAssert.Contains("cannot be captured", two, "both keep the sentence about the spawn");
+            StringAssert.Contains("cannot be captured", three);
         }
 
         [Test] public void TheMatchLogFolderOfADominionMatchNamesTheMode()

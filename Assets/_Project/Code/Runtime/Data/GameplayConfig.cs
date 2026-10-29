@@ -287,7 +287,8 @@ namespace Overpower.Data
 
         [Header("Debug")]
         [Tooltip("Turns the whole practice range and all of its dummy targets on or off in one " +
-                 "click. Handy while tuning weapons; switch it off for a real match.")]
+                 "click. Handy while tuning weapons. Only the Editor and development builds have it; a " +
+                 "player's build never spawns the dummies, whatever this says.")]
         [SerializeField] private bool testRangeEnabled = true;
         public bool TestRangeEnabled => testRangeEnabled;
     }

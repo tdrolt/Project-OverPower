@@ -69,7 +69,7 @@ namespace Overpower.Data
 
         [Header("Upload (every platform; desktop builds keep their files too)")]
         [Tooltip("At the end of every match (the result screen) and again once the player is back on the lobby list, each " +
-                 "client sends an anonymous copy of its own match log to the address below: names become \"Player 3\", " +
+                 "client sends a copy of its own match log to the address below: player names stay, " +
                  "chat text is left out. Off = nothing is sent and the name screen shows no notice.")]
         [SerializeField] private bool uploadEnabled = true;
         public bool UploadEnabled => uploadEnabled;

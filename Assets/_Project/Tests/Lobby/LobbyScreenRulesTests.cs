@@ -148,5 +148,14 @@ namespace Overpower.Tests
         [Test]
         public void AnEmptyPlayerNameStillGivesAnUsableName() =>
             Assert.AreEqual("Lobby", LobbyScreenRules.LobbyNamePrefill("", "{0}'s lobby", 24, "Lobby"));
+
+        // Tudor, 29 Oct: the create screen offers the three-team size first in both families.
+        [TestCase(GameModeFamily.Conquest, "Conquest 3v3v3")]
+        [TestCase(GameModeFamily.Dominion, "Dominion 3v3v3")]
+        public void EachFamilyOffersThreeTeamsFirst(GameModeFamily family, string expected)
+        {
+            var catalogue = UnityEditor.AssetDatabase.LoadAssetAtPath<GameModeCatalogue>("Assets/_Project/Design/Modes/GameModeCatalogue.asset");
+            Assert.AreEqual(expected, LobbyScreenRules.SizesOf(catalogue.Modes, family)[0].name);
+        }
     }
 }

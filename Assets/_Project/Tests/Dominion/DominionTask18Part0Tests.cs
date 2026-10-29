@@ -290,7 +290,7 @@ namespace Overpower.Tests
                     Assert.AreEqual(1, cards.Count, $"{mode}: one card titled {title}");
                     string text = cards[0].text;
                     Assert.IsFalse(string.IsNullOrWhiteSpace(text), $"{mode} {title}: has words");
-                    bool namesTheLead = mode == "Dominion 3v3v3" && title == "Rounds"; // the one card that states the overtime lead in points
+                    bool namesTheLead = title == "Rounds"; // the Rounds card states the overtime lead in points (Tudor's text, 29 Oct: both modes)
                     if (!namesTheLead) Assert.IsFalse(text.Any(char.IsDigit), $"{mode} {title}: no exact numbers on a card (A54): {text}");
                 }
         }

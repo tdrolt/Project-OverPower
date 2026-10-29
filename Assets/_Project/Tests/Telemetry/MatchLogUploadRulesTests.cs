@@ -7,7 +7,8 @@ namespace Overpower.Tests
     /// <summary>
     /// Every client sends its own match log to Tudor's collector (a Google Apps Script web app) when a match ends, on every platform;
     /// desktop builds keep their files too. The send is fire and forget: plain text (no browser permission check), a time-out,
-    /// failures only logged. The sent copy is anonymous: names become "Player 3", chat text is emptied, Windows user names are cut.
+    /// failures only logged. The sent copy keeps player names (Tudor, 29 Oct) but no chat text, and Windows user names are cut. Each
+    /// copy also says which match it belongs to, so the collector puts one match's files in one folder named after its date and time.
     /// </summary>
     public class MatchLogUploadRulesTests
     {
@@ -58,25 +59,18 @@ namespace Overpower.Tests
             Assert.AreEqual("a_b_c_1.jsonl", MatchLogUploadRules.RemoteFileName("a/b\\c", 1));
 
         [Test]
-        public void TheSentCopyNamesNoPlayer()
+        public void TheSentCopyKeepsPlayerNames()
         {
             string log = "{\"e\":\"session\",\"t\":1,\"a\":1,\"nick\":\"Tudor\",\"tm\":0}\n" +
                          "{\"e\":\"join\",\"t\":2,\"a\":2,\"tm\":1,\"nick\":\"Radu\"}\n" +
-                         "{\"e\":\"console\",\"t\":3,\"msg\":\"[TEAM] Tudor team=0 isMine=True\"}\n" +
                          "{\"e\":\"marker\",\"t\":4,\"note\":\"host changed to 2 Radu\"}\n";
-            string sent = MatchLogUploadRules.Anonymize(log);
-            StringAssert.DoesNotContain("Tudor", sent);
-            StringAssert.DoesNotContain("Radu", sent);
-            StringAssert.Contains("\"nick\":\"Player 1\"", sent);
-            StringAssert.Contains("\"nick\":\"Player 2\"", sent);
-            StringAssert.Contains("[TEAM] Player 1 team=0", sent);
-            StringAssert.Contains("host changed to 2 Player 2", sent);
+            Assert.AreEqual(log, MatchLogUploadRules.SentCopy(log));
         }
 
         [Test]
         public void TheSentCopyHasNoChatText()
         {
-            string sent = MatchLogUploadRules.Anonymize("{\"e\":\"chat\",\"t\":5,\"a\":1,\"text\":\"my number is 0612345678\"}\n");
+            string sent = MatchLogUploadRules.SentCopy("{\"e\":\"chat\",\"t\":5,\"a\":1,\"text\":\"my number is 0612345678\"}\n");
             StringAssert.Contains("\"e\":\"chat\"", sent, "the chat line stays, so the report still sees when people talked");
             StringAssert.Contains("\"text\":\"\"", sent);
             StringAssert.DoesNotContain("0612345678", sent);
@@ -85,25 +79,33 @@ namespace Overpower.Tests
         [Test]
         public void TheSentCopyHasNoWindowsUserName()
         {
-            string sent = MatchLogUploadRules.Anonymize("{\"e\":\"console\",\"t\":3,\"msg\":\"saved to C:\\\\Users\\\\tudor.oltean\\\\Documents\\\\OverPower\"}\n");
+            string sent = MatchLogUploadRules.SentCopy("{\"e\":\"console\",\"t\":3,\"msg\":\"saved to C:\\\\Users\\\\tudor.oltean\\\\Documents\\\\OverPower\"}\n");
             StringAssert.DoesNotContain("tudor.oltean", sent);
             StringAssert.Contains("C:\\\\Users\\\\user\\\\Documents", sent);
         }
 
         [Test]
-        public void AShortNameInsideALongerWordIsLeftAlone()
+        public void TheMatchIdComesFromTheSessionLine()
         {
-            string sent = MatchLogUploadRules.Anonymize("{\"e\":\"session\",\"a\":1,\"nick\":\"Base\"}\n{\"e\":\"console\",\"msg\":\"Baseline fired\"}\n");
-            StringAssert.Contains("Baseline fired", sent);
+            string log = "{\"e\":\"marker\",\"t\":0,\"m\":\"not-this\"}\n" +
+                         "{\"e\":\"session\",\"t\":1,\"schema\":1,\"m\":\"a1b2c3\",\"a\":1,\"nick\":\"Tudor\"}\n";
+            Assert.AreEqual("a1b2c3", MatchLogUploadRules.MatchIdOf(log));
         }
 
+        [TestCase("", TestName = "an empty log")]
+        [TestCase(null, TestName = "no log")]
+        [TestCase("{\"e\":\"join\",\"t\":2,\"a\":2}\n", TestName = "no session line")]
+        public void NoMatchIdWithoutASessionLine(string log) => Assert.AreEqual("", MatchLogUploadRules.MatchIdOf(log));
+
         [Test]
-        public void ThePayloadCarriesTheKeyTheFileNameAndTheText()
+        public void ThePayloadCarriesTheKeyTheFileTheMatchAndTheText()
         {
-            string payload = MatchLogUploadRules.Payload("k", "m_1.jsonl", "line1\nline2");
+            string payload = MatchLogUploadRules.Payload("k", "m_1.jsonl", "2026-10-29_2210_Conquest-3v3v3_Tudors-lobby", "a1b2c3", "line1\nline2");
             var back = UnityEngine.JsonUtility.FromJson<MatchLogUploadRules.UploadMessage>(payload);
             Assert.AreEqual("k", back.key);
             Assert.AreEqual("m_1.jsonl", back.file);
+            Assert.AreEqual("2026-10-29_2210_Conquest-3v3v3_Tudors-lobby", back.match);
+            Assert.AreEqual("a1b2c3", back.matchId);
             Assert.AreEqual("line1\nline2", back.body);
         }
 
@@ -141,8 +143,24 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(MatchLogZip), "TryUpload", typeof(MatchLogUploadRules).GetMethod(nameof(MatchLogUploadRules.ShouldUpload))));
 
         [Test]
-        public void TheSentTextIsTheAnonymousCopy() =>
-            Assert.IsTrue(IlWiring.Uses(typeof(MatchLogZip), "TryUpload", typeof(MatchLogUploadRules).GetMethod(nameof(MatchLogUploadRules.Anonymize))));
+        public void TheSentTextIsTheCopyWithoutChat() =>
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchLogZip), "TryUpload", typeof(MatchLogUploadRules).GetMethod(nameof(MatchLogUploadRules.SentCopy))));
+
+        [Test]
+        public void TheSendSaysWhichMatchItBelongsTo() =>
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchLogZip), "TryUpload", typeof(MatchLogUploadRules).GetMethod(nameof(MatchLogUploadRules.MatchIdOf))));
+
+        [Test]
+        public void TheNoticeDoesNotCallTheDataAnonymous()
+        {
+            string theme = System.IO.File.ReadAllText("Assets/_Project/Design/Settings/UiTheme.asset");
+            string line = theme.Substring(theme.IndexOf("matchDataNoticeText:", System.StringComparison.Ordinal));
+            line = line.Substring(0, line.IndexOf('\n'));
+            StringAssert.DoesNotContain("nonymous", line, "names are sent now");
+            var fresh = UnityEngine.ScriptableObject.CreateInstance<UiTheme>();
+            try { StringAssert.DoesNotContain("nonymous", fresh.matchDataNoticeText); }
+            finally { UnityEngine.Object.DestroyImmediate(fresh); }
+        }
 
         [Test]
         public void TheNameScreenAsksWhetherToShowTheNotice() =>

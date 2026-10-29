@@ -21,7 +21,7 @@ MonoBehaviour:
   consoleMaxLinesPerSecond: 50
   consoleMessageMaxChars: 500
   uploadEnabled: 1
-  uploadUrl: 
+  uploadUrl: https://script.google.com/macros/s/AKfycbyeQA5JOHTX-kdKoeaKjLhLghuEc3KKlHyEczNwijbXIO4-SckAY1_rV4wmL21W6c4cnA/exec
   uploadKey: overpower-playtest
   uploadTimeoutSeconds: 30
   uploadFromDevelopmentBuilds: 0
