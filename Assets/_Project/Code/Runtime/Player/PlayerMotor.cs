@@ -3,8 +3,10 @@ using Photon.Pun;
 using UnityEngine;
 using Overpower.Abilities;
 using Overpower.Arena;
+using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Net;
+using Overpower.Weapons;
 
 /// <summary>
 /// Ground movement, remote-player interpolation and the fall-through-the-floor safety net for
@@ -38,6 +40,10 @@ public class PlayerMotor : MonoBehaviour
     private Rigidbody rb;
     private PhotonView photonView;
     private PlayerInputRouter router;
+    private PlayerAim aim;
+    private WeaponFiring weaponFiring;
+    private float backpedalApplied = 1f;
+    private static readonly object BackpedalKey = new object();
 
     // Logged once, not every frame.
     private bool loggedMissingRouter;
@@ -111,6 +117,8 @@ public class PlayerMotor : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         photonView = GetComponent<PhotonView>();
         router = GetComponent<PlayerInputRouter>();
+        aim = GetComponent<PlayerAim>();
+        weaponFiring = GetComponent<WeaponFiring>();
 
         // Fall back to a hardcoded value: a silent null would let a player fall forever, and
         // killHeight left at C#'s default 0 would return anyone standing at ground level.
@@ -139,6 +147,36 @@ public class PlayerMotor : MonoBehaviour
             return; // only the local player's own keyboard drives this
 
         IsMoving = MovementInput() != Vector3.zero;
+        UpdateBackpedal();
+    }
+
+    /// <summary>Walking away from the aim is slower, more so while shooting (BackpedalRule, tuned in GameplayConfig). Pushed into
+    /// the multiplier stack only when it changes, like the status slows.</summary>
+    private void UpdateBackpedal()
+    {
+        float kept = 1f;
+        if (gameplayConfig != null && aim != null)
+        {
+            MoveHeading heading = BackpedalRule.HeadingOf(MovementInput(), aim.AimDirection,
+                gameplayConfig.BackSliceDegrees, gameplayConfig.StrafeSliceDegrees);
+            bool shooting = weaponFiring != null && BackpedalRule.IsShooting(Time.time - weaponFiring.LastShotTime,
+                weaponFiring.LastShotInterval, gameplayConfig.ShootingSlowGraceSeconds);
+            kept = BackpedalRule.SpeedMultiplier(heading, shooting, new BackpedalRule.Settings
+            {
+                backSlow = gameplayConfig.BackpedalSlow,
+                backDiagonalSlow = gameplayConfig.BackDiagonalSlow,
+                shootingAwaySlow = gameplayConfig.ShootingAwaySlow,
+                backSliceDegrees = gameplayConfig.BackSliceDegrees,
+                strafeSliceDegrees = gameplayConfig.StrafeSliceDegrees,
+            });
+        }
+        if (Mathf.Approximately(kept, backpedalApplied))
+            return;
+        backpedalApplied = kept;
+        if (kept < 1f)
+            AddSpeedMultiplier(BackpedalKey, kept);
+        else
+            RemoveSpeedMultiplier(BackpedalKey);
     }
 
     private void FixedUpdate()

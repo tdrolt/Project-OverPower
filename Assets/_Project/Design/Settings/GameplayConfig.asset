@@ -13,6 +13,12 @@ MonoBehaviour:
   m_Name: GameplayConfig
   m_EditorClassIdentifier: 
   baseMoveSpeed: 5
+  backpedalSlow: 0.1
+  backDiagonalSlow: 0.05
+  shootingAwaySlow: 0.1
+  backSliceDegrees: 45
+  strafeSliceDegrees: 45
+  shootingSlowGraceSeconds: 0.1
   maxHealth: 100
   respawnBaseSeconds: 5
   respawnPerDeathSeconds: 2

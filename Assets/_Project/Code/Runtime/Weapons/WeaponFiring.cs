@@ -368,6 +368,7 @@ namespace Overpower.Weapons
                            direction, targetPoint, coneAngle, seed, chargeFraction,
                            damageMultiplier, rangeMultiplier);
             LastShotTime = Time.time;
+            LastShotInterval = interval;
             RaiseShotShown(interval);
             return true;
         }
@@ -446,6 +447,9 @@ namespace Overpower.Weapons
         /// <summary>Time.time of this owner's last committed trigger pull, stamped before the RPC goes out so it does not wait for the server
         /// echo. Owner-only, like ChargeHeld.</summary>
         public float LastShotTime { get; private set; } = float.NegativeInfinity;
+
+        /// <summary>The fire interval (rate buffs included) of that last trigger pull. Owner-only, like LastShotTime.</summary>
+        public float LastShotInterval { get; private set; }
 
         /// <summary>Raised on every client when this player's shot shows there, with the gun's fire interval in seconds: on the shooter's
         /// own client when TryFire commits it, elsewhere when RPC_FireWeapon arrives (the muzzle flash). A local event; the mech's shoot

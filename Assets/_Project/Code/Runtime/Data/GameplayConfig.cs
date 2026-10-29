@@ -19,6 +19,36 @@ namespace Overpower.Data
         [SerializeField] private float baseMoveSpeed = 5f;
         public float BaseMoveSpeed => baseMoveSpeed;
 
+        [Tooltip("How much slower a player walks straight away from where they aim (0.1 = 10% slower). Straight back is " +
+                 "the slice set by Back Slice Degrees, centred behind the aim.")]
+        [SerializeField, Range(0f, 1f)] private float backpedalSlow = 0.10f;
+        public float BackpedalSlow => backpedalSlow;
+
+        [Tooltip("How much slower a player walks on a back diagonal: away from the aim, but outside the straight-back " +
+                 "slice and outside the strafe slice (0.05 = 5% slower).")]
+        [SerializeField, Range(0f, 1f)] private float backDiagonalSlow = 0.05f;
+        public float BackDiagonalSlow => backDiagonalSlow;
+
+        [Tooltip("Added on top of the two slows above while the gun is shooting and the player steps back or back-" +
+                 "diagonally (0.1 = 10% more). Strafing and walking forward are never slowed by shooting.")]
+        [SerializeField, Range(0f, 1f)] private float shootingAwaySlow = 0.10f;
+        public float ShootingAwaySlow => shootingAwaySlow;
+
+        [Tooltip("How wide the straight-back slice is, in degrees, centred directly behind the aim. 45 means only the " +
+                 "back key (with the aim straight ahead) counts as straight back; the back diagonals count as diagonals.")]
+        [SerializeField, Range(0f, 180f)] private float backSliceDegrees = 45f;
+        public float BackSliceDegrees => backSliceDegrees;
+
+        [Tooltip("How wide each strafe slice is, in degrees, centred on straight left and straight right of the aim. " +
+                 "Steps inside it are never slowed.")]
+        [SerializeField, Range(0f, 180f)] private float strafeSliceDegrees = 45f;
+        public float StrafeSliceDegrees => strafeSliceDegrees;
+
+        [Tooltip("After each shot the gun counts as shooting for one shot's gap plus this many seconds, so holding fire " +
+                 "keeps the shooting slow on between shots instead of flickering.")]
+        [SerializeField, Min(0f)] private float shootingSlowGraceSeconds = 0.1f;
+        public float ShootingSlowGraceSeconds => shootingSlowGraceSeconds;
+
         [Header("Health")]
         [Tooltip("The health pool every player spawns with. Armor is a separate pool stacked on " +
                  "top of this one and is tuned in the Armor Config asset, so raising this does " +
