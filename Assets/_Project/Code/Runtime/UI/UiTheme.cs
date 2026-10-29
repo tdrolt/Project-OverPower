@@ -312,14 +312,14 @@ namespace Overpower.UI
         [Tooltip("Width of one divider line on the health-and-armour bar over every head, in overhead-canvas units. The lines fall " +
                  "every Bar Segment Size hit points: health's under the shield, armour's on the shield where it is filled.")]
         public float nameplateSegmentLineWidth = 0.15f;
-        [Tooltip("Size of one armour-upgrade mark on the plate (an Absorb square, or the room a Recharge \"v\" stack takes), in " +
-                 "overhead-canvas units. The marks sit at the plate's left in the name's row, just above the bar.")]
-        public float nameplateArmourMarkSize = 2.6f;
-        [Tooltip("Gap between two armour-upgrade marks side by side (the two squares of the second Absorb level), in overhead-canvas units.")]
-        public float nameplateArmourMarkGap = 0.4f;
-        [Tooltip("Gap between the armour-upgrade marks and the name, in overhead-canvas units. The name keeps the same room on its " +
-                 "other side, so it stays centred over the player.")]
-        public float nameplateArmourMarkNameGap = 0.4f;
+        [Tooltip("Size of the armour-upgrade mark on the plate (the outer Absorb square, or the room a Recharge \"v\" stack takes), in " +
+                 "overhead-canvas units. The mark sits in the middle of the shield bar, so keep it no taller than the bar (Nameplate Bar Size).")]
+        public float nameplateArmourMarkSize = 2f;
+        [Tooltip("How big the second Absorb square is next to the first: it sits inside it, centred (0.5 = half as wide).")]
+        [Range(0.1f, 0.95f)] public float nameplateArmourNestedScale = 0.5f;
+        [Tooltip("Gap between the shield bar and the HP bar on your own plate, in overhead-canvas units. Your own plate shows no name " +
+                 "(the scoreboard has it): shield on top, HP below, like the bars under the ability slots.")]
+        public float nameplateOwnRowGap = 0.3f;
         [Tooltip("Thickness of an Absorb square's outline on the plate, in overhead-canvas units.")]
         public float nameplateArmourSquareLine = 0.25f;
         [Tooltip("Width of one Recharge \"v\" on the plate, in overhead-canvas units; it is half as tall as it is wide. Keep it " +
@@ -329,7 +329,8 @@ namespace Overpower.UI
         public float nameplateArmourChevronLine = 0.3f;
         [Tooltip("Height between the two stacked \"v\"s of the second Recharge level, in overhead-canvas units.")]
         public float nameplateArmourChevronStep = 0.65f;
-        [Tooltip("Colour of the armour-upgrade marks on every plate (Absorb squares and Recharge \"v\"s).")]
+        [Tooltip("Colour of the armour-upgrade marks on every plate (Absorb squares and Recharge \"v\"s). They sit on the shield bar " +
+                 "and show only while the shield holds any armour, so pick a colour that reads on the shield's blue.")]
         public Color nameplateArmourMarkColor = new Color(0.55f, 0.8f, 1f, 1f);
         [Header("Shield wasted text (Invulnerability ultimate)")]
         [Tooltip("Text that pops over a player's head when their armed shield window ran out and nobody hit them.")]
@@ -738,9 +739,12 @@ namespace Overpower.UI
         public Color captureRingTrackColor = new Color(0f, 0f, 0f, 0.4f);
 
         [Header("Minimap")]
-        [Tooltip("Size (bounding diameter) of the triangular minimap in the top-right corner, in canvas units.")]
+        [Tooltip("On: the corner minimap sits in the top-left corner, with Dominion's score bars to its right (between it and the timer) " +
+                 "and its lines under it. Off: the top-right corner, everything mirrored back.")]
+        public bool minimapOnLeft;
+        [Tooltip("Size (bounding diameter) of the triangular minimap in its corner, in canvas units.")]
         public float minimapCornerSize = 340f;
-        [Tooltip("Gap between the corner minimap's frame and the top and right screen edges, in canvas units.")]
+        [Tooltip("Gap between the corner minimap's frame and the top and side screen edges, in canvas units.")]
         public float minimapCornerMargin = 24f;
         [Tooltip("Diameter of the large map shown in the middle of the screen while M is toggled on, in canvas units. " +
                  "Everything on it (bubbles, lines, labels) scales up from the corner sizes by the same amount. Shrinks " +
@@ -992,6 +996,9 @@ namespace Overpower.UI
         [Tooltip("How full the overheat meter is, from 0 to 1, when the spread hexagon turns fully red. 0.8 matches the HUD bar's " +
                  "warning at 80 of 100 heat; lower warns earlier.")]
         [Range(0f, 1f)] public float crosshairHeatFullAt = 0.8f;
+        [Tooltip("The crosshair's colour while the vent window is open, the moment pressing R vents: it replaces the overheated red so the " +
+                 "window reads where the player is looking.")]
+        public Color crosshairVentWindowColor = new Color(0.25f, 1f, 0.35f, 1f);
         [Tooltip("Width of the hexagon around the centre that fills while you charge a charging gun, corner to corner, in canvas units.")]
         public float crosshairChargeHexSize = 30f;
         [Tooltip("Line thickness of the charge hexagon, in canvas units.")]

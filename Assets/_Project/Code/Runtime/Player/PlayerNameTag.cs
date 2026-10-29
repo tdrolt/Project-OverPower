@@ -39,7 +39,10 @@ public class PlayerNameTag : MonoBehaviourPunCallbacks
             Debug.LogError($"[PlayerNameTag] {name}: no plate - the player needs a PlayerHealth with a UiTheme, an overhead " +
                             "canvas and its bar, or they will have no name and no friend-or-enemy colour.");
         else
+        {
+            plate.SetOwnPlate(NameplateRules.ShowsOwnBars(photonView.IsMine));
             plate.SetName(photonView.Owner != null ? photonView.Owner.NickName : string.Empty);
+        }
 
         UpdateNameTagColour();
         teamAppearance?.Apply();   // no-op if the team has not arrived yet

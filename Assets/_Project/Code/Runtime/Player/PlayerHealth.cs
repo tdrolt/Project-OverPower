@@ -119,6 +119,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     public RectTransform OverheadBar => healthFillImage != null ? healthFillImage.transform.parent as RectTransform : null;
     public Image OverheadHealthFill => healthFillImage;
     public Image OverheadShieldFill => shieldFillImage;
+    public Image OverheadTrack => overheadTrackImage;
 
     private PhotonView photonView;
     private PlayerLifecycle lifecycle; // the replicated alive state, read by IsAlive
@@ -252,10 +253,12 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         RectTransform frameRect = frameGo.GetComponent<RectTransform>();
         RectTransform sourceRect = healthFillImage.rectTransform;
-        frameRect.anchorMin = sourceRect.anchorMin;
-        frameRect.anchorMax = sourceRect.anchorMax;
-        frameRect.offsetMin = sourceRect.offsetMin;
-        frameRect.offsetMax = sourceRect.offsetMax;
+        // Your own plate splits the fills into two rows, so the frame goes round the whole bar instead of the HP row.
+        bool wholeBar = nameplate != null && nameplate.OwnPlate;
+        frameRect.anchorMin = wholeBar ? Vector2.zero : sourceRect.anchorMin;
+        frameRect.anchorMax = wholeBar ? Vector2.one : sourceRect.anchorMax;
+        frameRect.offsetMin = wholeBar ? Vector2.zero : sourceRect.offsetMin;
+        frameRect.offsetMax = wholeBar ? Vector2.zero : sourceRect.offsetMax;
         frameRect.pivot = sourceRect.pivot;
 
         // Built FIRST (so it sits UNDER the frame edges below in draw order) - a non-zero Immune Bar
@@ -406,7 +409,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (nameplate != null)
         {
             nameplate.ShowSegments(MaxHealth, armor.Capacity, shieldFraction);
-            nameplate.ShowArmourMarks(absorbLevel, rechargeLevel);
+            nameplate.ShowArmourMarks(absorbLevel, rechargeLevel, armor.Current);
+            nameplate.ShowShieldRow(bar.armourShown);
         }
     }
 

@@ -240,8 +240,9 @@ namespace Overpower.Match
                 rect = default;
                 return false;
             }
+            bool left = theme.minimapOnLeft;
             rect = BountyLabelPlacement.CornerRectInCanvas(canvasRect.rect,
-                HudScreenLayout.CornerMinimapRect(theme.minimapCornerMargin, theme.minimapFrameWidth, theme.minimapCornerSize));
+                HudScreenLayout.CornerMinimapRect(theme.minimapCornerMargin, theme.minimapFrameWidth, theme.minimapCornerSize, left), left);
             return true;
         }
 

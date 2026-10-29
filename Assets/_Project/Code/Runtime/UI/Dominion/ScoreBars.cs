@@ -135,12 +135,15 @@ namespace Overpower.UI
             var go = new GameObject("Score Bars", typeof(RectTransform));
             go.transform.SetParent(parent, false);
             root = (RectTransform)go.transform;
-            root.anchorMin = root.anchorMax = root.pivot = Vector2.one; // scales toward the top right, so the gap to the minimap holds at any HUD scale
+            bool left = theme.minimapOnLeft;
+            // Pivoted on the minimap's side, so it scales away from the map and the gap to it holds at any HUD scale.
+            root.anchorMin = root.anchorMax = HudScreenLayout.CornerAnchor(left);
+            root.pivot = left ? new Vector2(0f, 1f) : Vector2.one;
             root.sizeDelta = new Vector2(width, height);
             root.localScale = Vector3.one * theme.hudScale; // the HUD's size, like the Gold Corner
-            Rect minimap = HudScreenLayout.CornerMinimapRect(theme.minimapCornerMargin, theme.minimapFrameWidth, theme.minimapCornerSize);
-            Rect block = ScoreBarLayout.Block(minimap, theme.dominionScoreBarsMinimapGap, theme.dominionScoreBarsTop, width * theme.hudScale, height * theme.hudScale);
-            root.anchoredPosition = new Vector2(block.xMax, block.yMax);
+            Rect minimap = HudScreenLayout.CornerMinimapRect(theme.minimapCornerMargin, theme.minimapFrameWidth, theme.minimapCornerSize, left);
+            Rect block = ScoreBarLayout.Block(minimap, theme.dominionScoreBarsMinimapGap, theme.dominionScoreBarsTop, width * theme.hudScale, height * theme.hudScale, left);
+            root.anchoredPosition = new Vector2(left ? block.xMin : block.xMax, block.yMax);
 
             for (int i = 0; i < teams.Length; i++)
                 rows.Add(BuildRow(teams[i], i * (rowHeight + theme.dominionScoreBarGap), rowHeight, dotCount));

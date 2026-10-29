@@ -4,8 +4,9 @@ namespace Overpower.UI
 {
     /// <summary>
     /// Where everything over a player's head goes, in overhead-canvas units (y up, x centred on the player): the plate with the
-    /// name above the health-and-armour bar, and above the plate the STUNNED / SLOWED countdown bar, its label and the shield's
-    /// "Wasted" text. Pure: NameplateView, StatusLabelOverhead and the shield all place their pieces from one Frame.
+    /// name above the health-and-armour bar (your own plate: no name, the shield bar above a separate HP bar), and above the plate
+    /// the STUNNED / SLOWED countdown bar, its label and the shield's "Wasted" text. Pure: NameplateView, StatusLabelOverhead and
+    /// the shield all place their pieces from one Frame.
     /// </summary>
     public static class NameplateLayout
     {
@@ -25,8 +26,7 @@ namespace Overpower.UI
             public float statusLabelGap;
             public float wastedTextSize;
             public float markSize;
-            public float markGap;
-            public float markNameGap;
+            public float ownRowGap;
         }
 
         /// <summary>Rects in overhead-canvas units (Rect.center is the anchored position of a centre-pivoted child).</summary>
@@ -38,7 +38,10 @@ namespace Overpower.UI
             public Rect statusBar;
             public Rect statusLabel;
             public Rect wasted;
-            /// <summary>The armour-upgrade marks: at the plate's left in the name's row; empty with no marks or no bar.</summary>
+            /// <summary>Your own plate's two rows inside the bar (shield on top); on anyone else's plate both are the bar itself.</summary>
+            public Rect shieldRow;
+            public Rect healthRow;
+            /// <summary>The armour-upgrade mark's room: centred on the shield; empty with no bar.</summary>
             public Rect marks;
             public float edge;
         }
@@ -58,45 +61,57 @@ namespace Overpower.UI
             statusLabelGap = theme.nameplateStatusLabelGap,
             wastedTextSize = theme.shieldWastedTextSize,
             markSize = theme.nameplateArmourMarkSize,
-            markGap = theme.nameplateArmourMarkGap,
-            markNameGap = theme.nameplateArmourMarkNameGap,
+            ownRowGap = theme.nameplateOwnRowGap,
         };
 
         /// <summary>The plate is as wide as the longer of its bar and the name (plus padding), up to the widest allowed, and never
         /// narrower than its bar. Its top is fixed by a living player's full height, so a corpse's plate (barShown false) loses the
-        /// bar row from the bottom and the name and everything above it stay put. Armour-upgrade marks (markCells of them, side by
-        /// side) take the name row's left end; the name keeps the same room free on its right, so it stays centred over the player.
-        /// A corpse shows no marks.</summary>
-        public static Frame Compute(Settings s, float nameWidth, bool barShown, int markCells = 0)
+        /// bar row from the bottom and the name and everything above it stay put. Your own plate (ownPlate) has no name: under the
+        /// same top it holds the shield row, then the HP row, and a corpse's own plate is empty. The armour mark is centred on the
+        /// shield row (the whole bar on anyone else's plate).</summary>
+        public static Frame Compute(Settings s, float nameWidth, bool barShown, bool ownPlate = false)
         {
-            int cells = barShown ? Mathf.Max(0, markCells) : 0;
-            float marksWidth = cells > 0 ? cells * s.markSize + (cells - 1) * s.markGap : 0f;
-            float reserve = cells > 0 ? marksWidth + s.markNameGap : 0f;
-
             float barOnly = s.barSize.x + 2f * s.padding.x;
-            float width = Mathf.Max(barOnly, Mathf.Min(Mathf.Max(s.barSize.x, nameWidth + 2f * reserve) + 2f * s.padding.x, s.maxWidth));
-
             float top = s.bottomY + s.padding.y + s.barSize.y + s.rowGap + s.nameSize + s.padding.y;
-            float nameBottom = top - s.padding.y - s.nameSize;
-            float bottom = barShown ? s.bottomY : nameBottom - s.padding.y;
 
             float statusBarBottom = top + s.statusGap;
             float labelBottom = statusBarBottom + s.statusBarSize.y + s.statusLabelGap;
             float wastedBottom = labelBottom + s.statusTextSize + s.statusGap;
 
-            return new Frame
+            var f = new Frame
             {
-                plate = Centred(width, bottom, top - bottom),
-                name = Centred(Mathf.Max(0f, width - 2f * s.padding.x - 2f * reserve), nameBottom, s.nameSize),
-                marks = cells > 0
-                    ? new Rect(-width * 0.5f + s.padding.x, nameBottom + (s.nameSize - s.markSize) * 0.5f, marksWidth, s.markSize)
-                    : default,
-                bar = Centred(s.barSize.x, s.bottomY + s.padding.y, s.barSize.y),
                 statusBar = Centred(s.statusBarSize.x, statusBarBottom, s.statusBarSize.y),
                 statusLabel = Centred(s.statusBarSize.x, labelBottom, s.statusTextSize),
                 wasted = Centred(s.statusBarSize.x, wastedBottom, s.wastedTextSize),
                 edge = s.edge,
             };
+
+            if (ownPlate)
+            {
+                float shieldBottom = top - s.padding.y - s.barSize.y;
+                float healthBottom = shieldBottom - s.ownRowGap - s.barSize.y;
+                float bottom = barShown ? healthBottom - s.padding.y : top;
+                f.plate = Centred(barOnly, bottom, top - bottom);
+                f.name = Centred(0f, top, 0f);
+                f.shieldRow = Centred(s.barSize.x, shieldBottom, s.barSize.y);
+                f.healthRow = Centred(s.barSize.x, healthBottom, s.barSize.y);
+                f.bar = Centred(s.barSize.x, healthBottom, 2f * s.barSize.y + s.ownRowGap);
+            }
+            else
+            {
+                float width = Mathf.Max(barOnly, Mathf.Min(Mathf.Max(s.barSize.x, nameWidth) + 2f * s.padding.x, s.maxWidth));
+                float nameBottom = top - s.padding.y - s.nameSize;
+                float bottom = barShown ? s.bottomY : nameBottom - s.padding.y;
+                f.plate = Centred(width, bottom, top - bottom);
+                f.name = Centred(width - 2f * s.padding.x, nameBottom, s.nameSize);
+                f.bar = Centred(s.barSize.x, s.bottomY + s.padding.y, s.barSize.y);
+                f.shieldRow = f.bar;
+                f.healthRow = f.bar;
+            }
+
+            if (barShown)
+                f.marks = new Rect(f.shieldRow.center.x - s.markSize * 0.5f, f.shieldRow.center.y - s.markSize * 0.5f, s.markSize, s.markSize);
+            return f;
         }
 
         private static Rect Centred(float width, float bottom, float height) => new Rect(-width * 0.5f, bottom, width, height);

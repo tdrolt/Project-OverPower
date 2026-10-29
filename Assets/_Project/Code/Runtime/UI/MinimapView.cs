@@ -654,7 +654,7 @@ namespace Overpower.UI
         private void SetLarge(bool open)
         {
             largeOpen = open;
-            Vector2 anchor = open ? new Vector2(0.5f, 0.5f) : Vector2.one;
+            Vector2 anchor = open ? new Vector2(0.5f, 0.5f) : HudScreenLayout.CornerAnchor(theme.minimapOnLeft);
             root.anchorMin = anchor;
             root.anchorMax = anchor;
             root.pivot = anchor;
@@ -671,7 +671,7 @@ namespace Overpower.UI
             else
             {
                 float inset = theme.minimapCornerMargin + theme.minimapFrameWidth;
-                root.anchoredPosition = new Vector2(-inset, -inset);
+                root.anchoredPosition = HudScreenLayout.CornerInset(inset, theme.minimapOnLeft);
                 root.localScale = Vector3.one;
             }
         }
@@ -687,7 +687,7 @@ namespace Overpower.UI
                 theme.minimapCornerSize * GeneratedSprites.CentredTriangleRadiusFraction, view.viewport.localEulerAngles.z);
         }
 
-        /// <summary>The corner map's drawn frame (a rectangle on the lane map, pinned to the box's top right), or the whole box with no map built.</summary>
+        /// <summary>The corner map's drawn frame (a rectangle on the lane map, pinned to the box's top corner on the screen's side), or the whole box with no map built.</summary>
         public static Vector2 CornerFrameSize(UiTheme theme)
         {
             MinimapView view = Local;

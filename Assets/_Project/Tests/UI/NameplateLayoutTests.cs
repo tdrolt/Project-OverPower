@@ -23,8 +23,7 @@ namespace Overpower.Tests
             statusLabelGap = 0.5f,
             wastedTextSize = 3f,
             markSize = 2f,
-            markGap = 0.5f,
-            markNameGap = 0.5f,
+            ownRowGap = 0.5f,
         };
 
         [Test]
@@ -131,45 +130,59 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ArmourMarksSitAtThePlatesLeftInTheNamesRow()
+        public void TheArmourMarkIsCentredOnTheBar()
         {
-            NameplateLayout.Frame f = NameplateLayout.Compute(S(), 5f, true, 2);
-            Assert.AreEqual(-10f, f.marks.xMin, 1e-4f, "inside the plate's left padding, above the bar's left end");
-            Assert.AreEqual(4.5f, f.marks.width, 1e-4f, "two marks and the gap between them");
+            NameplateLayout.Frame f = NameplateLayout.Compute(S(), 5f, true);
+            Assert.AreEqual(f.bar.center, f.marks.center);
+            Assert.AreEqual(2f, f.marks.width, 1e-4f);
             Assert.AreEqual(2f, f.marks.height, 1e-4f);
-            Assert.AreEqual(f.name.center.y, f.marks.center.y, 1e-4f);
-            Assert.Greater(f.marks.yMin, f.bar.yMax, "above the bar");
         }
 
         [Test]
-        public void TheNameStaysCentredAndClearOfTheMarks()
-        {
-            foreach (float width in new[] { 0f, 5f, 14f, 40f })
-            {
-                NameplateLayout.Frame f = NameplateLayout.Compute(S(), width, true, 2);
-                Assert.AreEqual(0f, f.name.center.x, 1e-4f);
-                Assert.GreaterOrEqual(f.name.xMin, f.marks.xMax + 0.5f - 1e-4f, "name width " + width);
-                Assert.GreaterOrEqual(f.marks.xMin, f.plate.xMin + 1f - 1e-4f, "marks inside the padding, name width " + width);
-            }
-        }
-
-        [Test]
-        public void ANameThatMeetsTheMarksWidensThePlate()
+        public void TheNameNoLongerMakesRoomForMarks()
         {
             Assert.AreEqual(22f, NameplateLayout.Compute(S(), 16f, true).plate.width, 1e-4f);
-            // One mark (2) and its gap (0.5) are kept free on both sides of the name: 16 + 2 x 2.5 + padding 2.
-            Assert.AreEqual(23f, NameplateLayout.Compute(S(), 16f, true, 1).plate.width, 1e-4f);
+            Assert.AreEqual(0f, NameplateLayout.Compute(S(), 16f, true).name.center.x, 1e-4f);
         }
 
         [Test]
-        public void NoMarksOrNoBarLeavesThePlateAsBefore()
+        public void ACorpseHasNoMarkRoom() =>
+            Assert.AreEqual(0f, NameplateLayout.Compute(S(), 16f, false).marks.width, 1e-4f);
+
+        [Test]
+        public void YourOwnPlateHasTheShieldRowOverTheHealthRowAndNoName()
         {
-            NameplateLayout.Frame plain = NameplateLayout.Compute(S(), 16f, true);
-            Assert.AreEqual(0f, plain.marks.width, 1e-4f);
-            NameplateLayout.Frame dead = NameplateLayout.Compute(S(), 16f, false, 2);
-            Assert.AreEqual(NameplateLayout.Compute(S(), 16f, false).plate, dead.plate);
-            Assert.AreEqual(NameplateLayout.Compute(S(), 16f, false).name, dead.name);
-            Assert.AreEqual(0f, dead.marks.width, 1e-4f, "a corpse's plate shrinks to the name, marks too");
+            NameplateLayout.Frame other = NameplateLayout.Compute(S(), 5f, true);
+            NameplateLayout.Frame own = NameplateLayout.Compute(S(), 5f, true, true);
+            Assert.AreEqual(0f, own.name.width, 1e-4f, "no name");
+            Assert.AreEqual(other.plate.yMax, own.plate.yMax, 1e-4f, "same top, so the status rows above line up");
+            Assert.AreEqual(22f, own.plate.width, 1e-4f, "as wide as the bar plus padding");
+            Assert.AreEqual(own.plate.yMax - 0.5f, own.shieldRow.yMax, 1e-4f);
+            Assert.AreEqual(3f, own.shieldRow.height, 1e-4f);
+            Assert.AreEqual(3f, own.healthRow.height, 1e-4f);
+            Assert.AreEqual(own.shieldRow.yMin - 0.5f, own.healthRow.yMax, 1e-4f, "the row gap between them");
+            Assert.AreEqual(own.healthRow.yMin - 0.5f, own.plate.yMin, 1e-4f);
+            Assert.AreEqual(own.healthRow.yMin, own.bar.yMin, 1e-4f);
+            Assert.AreEqual(own.shieldRow.yMax, own.bar.yMax, 1e-4f);
+            Assert.AreEqual(own.shieldRow.center, own.marks.center, "the mark sits on the shield");
+            Assert.AreEqual(other.statusBar, own.statusBar);
+            Assert.AreEqual(other.wasted, own.wasted);
+        }
+
+        [Test]
+        public void AnyoneElsesPlateKeepsOneBarForBoth()
+        {
+            NameplateLayout.Frame f = NameplateLayout.Compute(S(), 5f, true);
+            Assert.AreEqual(f.bar, f.shieldRow);
+            Assert.AreEqual(f.bar, f.healthRow);
+        }
+
+        [Test]
+        public void YourOwnCorpseHasAnEmptyPlate()
+        {
+            NameplateLayout.Frame f = NameplateLayout.Compute(S(), 5f, false, true);
+            Assert.AreEqual(0f, f.plate.height, 1e-4f);
+            Assert.AreEqual(0f, f.marks.width, 1e-4f);
         }
 
         [Test]
@@ -191,8 +204,7 @@ namespace Overpower.Tests
                 theme.nameplateStatusLabelGap = 2.5f;
                 theme.shieldWastedTextSize = 2.6f;
                 theme.nameplateArmourMarkSize = 2.7f;
-                theme.nameplateArmourMarkGap = 2.8f;
-                theme.nameplateArmourMarkNameGap = 2.9f;
+                theme.nameplateOwnRowGap = 2.8f;
 
                 NameplateLayout.Settings s = NameplateLayout.From(theme);
                 Assert.AreEqual(1.1f, s.nameSize);
@@ -208,8 +220,7 @@ namespace Overpower.Tests
                 Assert.AreEqual(2.5f, s.statusLabelGap);
                 Assert.AreEqual(2.6f, s.wastedTextSize);
                 Assert.AreEqual(2.7f, s.markSize);
-                Assert.AreEqual(2.8f, s.markGap);
-                Assert.AreEqual(2.9f, s.markNameGap);
+                Assert.AreEqual(2.8f, s.ownRowGap);
             }
             finally
             {
@@ -221,6 +232,13 @@ namespace Overpower.Tests
         private static readonly Color Mate = new Color(0.1f, 0.8f, 0.1f, 1f);
         private static readonly Color Enemy = new Color(0.8f, 0.1f, 0.1f, 1f);
         private static readonly Color Unknown = new Color(0.5f, 0.5f, 0.5f, 1f);
+
+        [Test]
+        public void OnlyYourOwnPlateSplitsItsBars()
+        {
+            Assert.IsTrue(NameplateRules.ShowsOwnBars(true));
+            Assert.IsFalse(NameplateRules.ShowsOwnBars(false));
+        }
 
         [Test]
         public void YourOwnNameIsYourColourEvenBeforeTheTeamsArrive()

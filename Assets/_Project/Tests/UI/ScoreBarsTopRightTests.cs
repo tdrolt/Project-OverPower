@@ -41,19 +41,23 @@ namespace Overpower.Tests
             Assert.AreEqual(90f, block.height, 1e-3f);
         }
 
-        [TestCase(1920, 1080, 2)]
-        [TestCase(1920, 1080, 3)]
-        [TestCase(1280, 720, 2)]
-        [TestCase(1280, 720, 3)]
-        public void TheBarsClearTheMinimapItsLinesAndTheRoundClock(int screenWidth, int screenHeight, int teams)
+        [TestCase(1920, 1080, 2, false)]
+        [TestCase(1920, 1080, 3, false)]
+        [TestCase(1280, 720, 2, false)]
+        [TestCase(1280, 720, 3, false)]
+        [TestCase(1920, 1080, 2, true)]
+        [TestCase(1920, 1080, 3, true)]
+        [TestCase(1280, 720, 2, true)]
+        [TestCase(1280, 720, 3, true)]
+        public void TheBarsClearTheMinimapItsLinesAndTheRoundClock(int screenWidth, int screenHeight, int teams, bool left)
         {
             const float hudScale = 0.8f;
             float factor = HudScreenLayout.CanvasScaleFactor(new Vector2(1920f, 1080f), 0.5f, screenWidth, screenHeight);
             var canvas = new Vector2(screenWidth / factor, screenHeight / factor);
 
-            Rect minimap = HudScreenLayout.CornerMinimapRect(24f, 5f, 340f);
+            Rect minimap = HudScreenLayout.CornerMinimapRect(24f, 5f, 340f, left);
             // Lines under the map: hung from the lowest a turned triangle can reach (its circumradius, at most half the box), two lines of text.
-            Vector2 linesTop = MinimapLabelPlacement.LabelTop(minimap, new Vector2(340f, 340f), 170f, 6f);
+            Vector2 linesTop = MinimapLabelPlacement.LabelTop(minimap, new Vector2(340f, 340f), 170f, 6f, left);
             float linesHeight = (20f + 14f) * 1.5f;
             var lines = new Rect(linesTop.x - 170f, linesTop.y - linesHeight, 340f, linesHeight);
 
@@ -61,17 +65,20 @@ namespace Overpower.Tests
             float clockWidth = teams == 3 ? 200f : 190f;
             float flashWidth = clockWidth * 1.5f;
             float clockBottom = 30f + 80f + 6f + 36f * 1.5f;
-            var clockBand = new Rect(-canvas.x / 2f - flashWidth / 2f, -clockBottom, flashWidth, clockBottom - 30f);
+            // Measured from the minimap's corner: the screen's middle is half a canvas in from either side.
+            float middle = left ? canvas.x / 2f : -canvas.x / 2f;
+            var clockBand = new Rect(middle - flashWidth / 2f, -clockBottom, flashWidth, clockBottom - 30f);
 
             float width = ScoreBarLayout.RowWidth(75f, 255f, 9f, ScoreBarLayout.DotsWidth(2, 18f, 9f)) * hudScale;
             float height = ScoreBarLayout.StackHeight(teams, 33f, 9f) * hudScale;
-            Rect block = ScoreBarLayout.Block(minimap, 24f, 30f, width, height);
+            Rect block = ScoreBarLayout.Block(minimap, 24f, 30f, width, height, left);
 
             Assert.Greater(block.width, 0f);
             Assert.IsFalse(block.Overlaps(minimap), "clear of the minimap");
             Assert.IsFalse(block.Overlaps(lines), "clear of the lines under it");
             Assert.IsFalse(block.Overlaps(clockBand), "clear of the round clock and its flash");
-            Assert.GreaterOrEqual(block.xMin, -canvas.x, "on screen on the left");
+            Assert.GreaterOrEqual(block.xMin, left ? 0f : -canvas.x, "on screen on the left");
+            Assert.LessOrEqual(block.xMax, left ? canvas.x : 0f, "on screen on the right");
             Assert.GreaterOrEqual(block.yMin, -canvas.y, "on screen at the bottom");
             Assert.LessOrEqual(block.yMax, 0f, "on screen at the top");
         }
@@ -153,12 +160,13 @@ namespace Overpower.Tests
             Assert.Greater(y1, y2);
         }
 
-        [Test] public void TheBarsHangFromTheTopRightCorner()
+        [Test] public void TheBarsHangFromTheMinimapsCornerAndScaleAwayFromIt()
         {
             var root = (RectTransform)Draw(new[] { 0, 1 }, new[] { 0, 0, 0 }, true);
-            Assert.AreEqual(Vector2.one, root.anchorMin);
-            Assert.AreEqual(Vector2.one, root.anchorMax);
-            Assert.AreEqual(Vector2.one, root.pivot);
+            Vector2 corner = HudScreenLayout.CornerAnchor(theme.minimapOnLeft);
+            Assert.AreEqual(corner, root.anchorMin);
+            Assert.AreEqual(corner, root.anchorMax);
+            Assert.AreEqual(corner, root.pivot);
         }
 
         [Test] public void WithoutPointsOnlyTheDotsShowAndThePointsComeBack()

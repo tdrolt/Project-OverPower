@@ -260,30 +260,80 @@ namespace Overpower.Tests
         [Test]
         public void TheArmourMarksAreDrawnAsTheRuleComposesThem()
         {
+            theme.nameplateArmourMarkSize = 2f;
+            theme.nameplateArmourNestedScale = 0.5f;
             NameplateView plate = NameplateView.Ensure(health);
             plate.SetName("Ana");
-            plate.ShowArmourMarks(2, 1);
+            plate.ShowArmourMarks(2, 1, 10f);
             Assert.AreEqual(2, Active(plate.MarkSquares), "two Absorb squares");
             Assert.AreEqual(1, Active(plate.MarkChevrons), "one Recharge v");
 
-            Image first = plate.MarkSquares[0];
-            Vector3 v = first.rectTransform.InverseTransformPoint(plate.MarkChevrons[0].rectTransform.position);
-            Assert.IsTrue(first.rectTransform.rect.Contains(v), "the v sits inside the first square");
-            Assert.Less(first.rectTransform.position.x, plate.MarkSquares[1].rectTransform.position.x, "the squares sit side by side");
+            RectTransform outer = plate.MarkSquares[0].rectTransform, inner = plate.MarkSquares[1].rectTransform;
+            Assert.AreEqual(outer.position, inner.position, "the second square is centred inside the first");
+            Assert.AreEqual(2f, outer.rect.width, 1e-4f);
+            Assert.AreEqual(1f, inner.rect.width, 1e-4f);
+            Vector3 v = inner.InverseTransformPoint(plate.MarkChevrons[0].rectTransform.position);
+            Assert.IsTrue(inner.rect.Contains(v), "the v sits inside the innermost square");
             foreach (Image i in plate.MarkSquares.Concat(plate.MarkChevrons))
                 Assert.IsFalse(i.raycastTarget, i.name + " would swallow a shot aimed past a player's head");
 
             float width = plate.NameText.GetPreferredValues("Ana").x;
-            NameplateLayout.Frame f = NameplateLayout.Compute(NameplateLayout.From(theme), width, true, 2);
+            NameplateLayout.Frame f = NameplateLayout.Compute(NameplateLayout.From(theme), width, true);
             AssertPlaced(f.marks, plate.Marks, "marks");
             AssertPlaced(f.name, plate.NameText.rectTransform, "name");
+            Assert.IsTrue(plate.Marks.gameObject.activeSelf);
+        }
+
+        [Test]
+        public void TheMarkGoesWithTheShieldAndComesBackAsItRecharges()
+        {
+            NameplateView plate = NameplateView.Ensure(health);
+            plate.ShowArmourMarks(1, 1, 10f);
+            Assert.IsTrue(plate.Marks.gameObject.activeSelf);
+            plate.ShowArmourMarks(1, 1, 0f);
+            Assert.IsFalse(plate.Marks.gameObject.activeSelf, "shield at zero: the bar shows green HP and no mark");
+            plate.ShowArmourMarks(1, 1, 0.2f);
+            Assert.IsTrue(plate.Marks.gameObject.activeSelf, "back as soon as the shield recharges");
+        }
+
+        [Test]
+        public void YourOwnPlateHasNoNameAndSplitsTheBar()
+        {
+            theme.nameplateOwnRowGap = 0.5f;
+            NameplateView plate = NameplateView.Ensure(health);
+            plate.SetName("Ana");
+            plate.SetOwnPlate(true);
+            Assert.IsFalse(plate.NameText.gameObject.activeSelf);
+
+            NameplateLayout.Frame f = NameplateLayout.Compute(NameplateLayout.From(theme), 0f, true, true);
+            AssertPlaced(f.bar, plate.Bar, "bar");
+            RectTransform shield = health.OverheadShieldFill.rectTransform, hp = health.OverheadHealthFill.rectTransform;
+            Assert.Greater(shield.anchorMin.y, hp.anchorMax.y, "shield row above the HP row, with a gap");
+            Assert.AreEqual(1f, shield.anchorMax.y, 1e-4f);
+            Assert.AreEqual(0f, hp.anchorMin.y, 1e-4f);
+            Assert.AreEqual(hp.anchorMax.y, health.OverheadTrack.rectTransform.anchorMax.y, 1e-4f, "the HP row keeps the old track");
+            Image shieldTrack = plate.Bar.Find("Shield Track").GetComponent<Image>();
+            Assert.AreEqual(shield.anchorMin.y, shieldTrack.rectTransform.anchorMin.y, 1e-4f);
+            Assert.Less(shieldTrack.transform.GetSiblingIndex(), health.OverheadHealthFill.transform.GetSiblingIndex(), "tracks under the fills");
+
+            plate.ShowShieldRow(false);
+            Assert.IsFalse(shieldTrack.enabled, "no armour to hold: no shield row, as on the HUD");
+        }
+
+        [Test]
+        public void YourOwnCorpseShowsNoPlate()
+        {
+            NameplateView plate = NameplateView.Ensure(health);
+            plate.SetOwnPlate(true);
+            plate.SetBarShown(false);
+            Assert.IsFalse(plate.Backing.enabled);
         }
 
         [Test]
         public void TwoRechargeLevelsStackTwoVsInOneMark()
         {
             NameplateView plate = NameplateView.Ensure(health);
-            plate.ShowArmourMarks(0, 2);
+            plate.ShowArmourMarks(0, 2, 10f);
             Assert.AreEqual(0, Active(plate.MarkSquares));
             Assert.AreEqual(2, Active(plate.MarkChevrons));
             Vector3 a = plate.MarkChevrons[0].rectTransform.position, b = plate.MarkChevrons[1].rectTransform.position;
@@ -296,8 +346,8 @@ namespace Overpower.Tests
         {
             NameplateView plate = NameplateView.Ensure(health);
             plate.SetName("Ana");
-            plate.ShowArmourMarks(2, 2);
-            plate.ShowArmourMarks(0, 0);
+            plate.ShowArmourMarks(2, 2, 10f);
+            plate.ShowArmourMarks(0, 0, 10f);
             Assert.AreEqual(0, Active(plate.MarkSquares));
             Assert.AreEqual(0, Active(plate.MarkChevrons));
             float width = plate.NameText.GetPreferredValues("Ana").x;
@@ -344,6 +394,17 @@ namespace Overpower.Tests
         [Test]
         public void TheNameTagFindsThePlate() =>
             Assert.IsTrue(IlWiring.Uses(typeof(PlayerNameTag), "Start", M(typeof(NameplateView), nameof(NameplateView.Ensure))));
+
+        [Test]
+        public void TheNameTagTellsThePlateWhetherItIsYours()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(PlayerNameTag), "Start", M(typeof(NameplateRules), nameof(NameplateRules.ShowsOwnBars))));
+            Assert.IsTrue(IlWiring.Uses(typeof(PlayerNameTag), "Start", M(typeof(NameplateView), nameof(NameplateView.SetOwnPlate))));
+        }
+
+        [Test]
+        public void TheShieldRowFollowsWhetherThereIsArmourToHold() =>
+            Assert.IsTrue(IlWiring.Uses(typeof(PlayerHealth), "UpdateOverheadBar", M(typeof(NameplateView), nameof(NameplateView.ShowShieldRow))));
 
         [Test]
         public void TheNameTagNamesThePlate() =>

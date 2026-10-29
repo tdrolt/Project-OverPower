@@ -102,6 +102,7 @@ public class CrosshairView : MonoBehaviourPun
         float heat = overheat != null ? CrosshairRules.HeatShown(overheat.Normalised, overheat.IsSilenced) : 0f;
         Color ringColour = CrosshairRules.HeatColor(heat, theme.crosshairHeatColdColor, theme.crosshairHeatWarmColor,
                                                     theme.crosshairHeatHotColor, theme.crosshairHeatFullColor, theme.crosshairHeatFullAt);
+        ringColour = CrosshairRules.RingColour(ringColour, overheat != null && overheat.IsVentWindowOpen, theme.crosshairVentWindowColor);
         DrawSpreadRing(parts, radius, spinAngle, ringColour, theme.crosshairRingLineWidth, Mathf.Max(0f, theme.crosshairOutlineWidth));
 
         bool charging = CrosshairRules.IsCharging(weaponFiring.ChargeHeld, weapon.MaxChargeSeconds);

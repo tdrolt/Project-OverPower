@@ -23,20 +23,26 @@ namespace Overpower.UI
             return Mathf.Pow(2f, Mathf.Lerp(logWidth, logHeight, Mathf.Clamp01(match)));
         }
 
-        /// <summary>The corner minimap's box in canvas units, measured from the canvas's top right corner (x and y grow right and up, so both are negative
-        /// inside the screen): margin + frame band in from the edge, then the map's size.</summary>
-        public static Rect CornerMinimapRect(float cornerMargin, float frameWidth, float cornerSize)
+        /// <summary>The screen corner the minimap and everything hung on it are anchored to: top left or top right.</summary>
+        public static Vector2 CornerAnchor(bool left) => left ? new Vector2(0f, 1f) : Vector2.one;
+
+        /// <summary>Where the corner map's own anchor point sits from its corner: the inset in from the side and the top.</summary>
+        public static Vector2 CornerInset(float inset, bool left) => new Vector2(left ? inset : -inset, -inset);
+
+        /// <summary>The corner minimap's box in canvas units, measured from its corner (CornerAnchor; x and y grow right and up, so y is negative
+        /// inside the screen, and x too on the right): margin + frame band in from the edge, then the map's size.</summary>
+        public static Rect CornerMinimapRect(float cornerMargin, float frameWidth, float cornerSize, bool left = false)
         {
             float inset = cornerMargin + frameWidth;
-            return new Rect(-(inset + cornerSize), -(inset + cornerSize), cornerSize, cornerSize);
+            return new Rect(left ? inset : -(inset + cornerSize), -(inset + cornerSize), cornerSize, cornerSize);
         }
 
         /// <summary>Pixels down from the screen top where the corner minimap's reserved band ends. Frame width is in
         /// the sum because it is part of the map's inset from the screen edge (MinimapView: "inset = cornerMargin +
         /// frameWidth"), not just an inward border; without it the log overlaps the frame on screens above 1920x1080.</summary>
         public static float MinimapBandBottomPixels(float cornerMargin, float frameWidth, float cornerSize,
-                                                     float scaleFactor) =>
-            Mathf.Max(0f, (cornerMargin + frameWidth + cornerSize) * Mathf.Max(0f, scaleFactor));
+                                                     float scaleFactor, bool minimapOnLeft = false) =>
+            minimapOnLeft ? 0f : Mathf.Max(0f, (cornerMargin + frameWidth + cornerSize) * Mathf.Max(0f, scaleFactor));
 
         /// <summary>The debug log's rectangle in GUI space (y grows DOWNWARD, which is what GUI.Box wants): along
         /// the right edge inside margin, starting gap pixels below the minimap band, never taller than

@@ -140,7 +140,7 @@ public class DebugOverlay : MonoBehaviour
         float scale = HudScreenLayout.CanvasScaleFactor(theme.referenceResolution, theme.matchWidthOrHeight,
                                                         Screen.width, Screen.height);
         float band = HudScreenLayout.MinimapBandBottomPixels(theme.minimapCornerMargin, theme.minimapFrameWidth,
-                                                             theme.minimapCornerSize, scale);
+                                                             theme.minimapCornerSize, scale, theme.minimapOnLeft);
         return HudScreenLayout.DebugLogRect(Screen.width, Screen.height, band, theme.debugLogWidthPixels,
                                             theme.debugLogMaxHeightFraction, theme.debugLogScreenMarginPixels,
                                             theme.debugLogGapBelowMinimapPixels);

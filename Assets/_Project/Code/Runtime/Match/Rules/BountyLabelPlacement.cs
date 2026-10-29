@@ -10,8 +10,8 @@ namespace Overpower.Match
         public static float LabelHeight(float fontSize) => fontSize * HeightPerFontSize;
 
         /// <summary>The corner minimap's rectangle in canvas coordinates, from its rectangle measured from the canvas's top right corner.</summary>
-        public static Rect CornerRectInCanvas(Rect canvas, Rect fromTopRight) =>
-            new Rect(canvas.xMax + fromTopRight.x, canvas.yMax + fromTopRight.y, fromTopRight.width, fromTopRight.height);
+        public static Rect CornerRectInCanvas(Rect canvas, Rect fromCorner, bool left = false) =>
+            new Rect((left ? canvas.xMin : canvas.xMax) + fromCorner.x, canvas.yMax + fromCorner.y, fromCorner.width, fromCorner.height);
 
         /// <summary>The label's centre after keeping it inside the canvas by <paramref name="margin"/>; a label over the minimap rectangle is first pushed
         /// to just below it, one over the HUD panel just above it (then kept inside again). A label wider or taller than the room left is centred on that axis.</summary>

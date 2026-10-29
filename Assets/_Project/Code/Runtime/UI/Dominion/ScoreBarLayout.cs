@@ -3,10 +3,10 @@ using UnityEngine;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Where Dominion's score bars go: top right, left of the corner minimap, one row per team in team order, each row the points box, the bar, then
-    /// the team's round-win dots. Rects are in canvas units from the canvas's top right corner (HudScreenLayout.CornerMinimapRect's convention), so
-    /// the block keeps its distance to the minimap at every 16:9 resolution. Left of the map rather than under it: the lines under the map move with
-    /// the frame's turn, the space beside it does not.
+    /// Where Dominion's score bars go: beside the corner minimap on the timer's side (left of a top-right map, right of a top-left one), one row
+    /// per team in team order, each row the points box, the bar, then the team's round-win dots. Rects are in canvas units from the minimap's
+    /// corner (HudScreenLayout.CornerMinimapRect's convention), so the block keeps its distance to the minimap at every 16:9 resolution. Beside
+    /// the map rather than under it: the lines under the map move with the frame's turn, the space beside it does not.
     /// </summary>
     public static class ScoreBarLayout
     {
@@ -22,9 +22,9 @@ namespace Overpower.UI
         public static float StackHeight(int rows, float rowHeight, float rowGap) =>
             rows <= 0 ? 0f : rows * rowHeight + (rows - 1) * rowGap;
 
-        /// <summary>The bars' block: its right edge gapToMinimap left of the minimap's box, its top edge top below the screen's top. width and height
-        /// are the block's size on the canvas (already scaled by the HUD scale).</summary>
-        public static Rect Block(Rect minimapBox, float gapToMinimap, float top, float width, float height) =>
-            new Rect(minimapBox.xMin - gapToMinimap - width, -top - height, width, height);
+        /// <summary>The bars' block: gapToMinimap beside the minimap's box toward the screen's middle, its top edge top below the screen's top.
+        /// width and height are the block's size on the canvas (already scaled by the HUD scale).</summary>
+        public static Rect Block(Rect minimapBox, float gapToMinimap, float top, float width, float height, bool minimapOnLeft = false) =>
+            new Rect(minimapOnLeft ? minimapBox.xMax + gapToMinimap : minimapBox.xMin - gapToMinimap - width, -top - height, width, height);
     }
 }

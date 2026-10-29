@@ -68,6 +68,9 @@ namespace Overpower.UI
         /// until the meter has cooled all the way down.</summary>
         public static float HeatShown(float normalisedHeat, bool silenced) => silenced ? 1f : Mathf.Clamp01(normalisedHeat);
 
+        /// <summary>While the vent window is open (R would vent now) the ring takes the vent colour instead of the heat's.</summary>
+        public static Color RingColour(Color heatColour, bool ventWindowOpen, Color ventColour) => ventWindowOpen ? ventColour : heatColour;
+
         /// <summary>Cold, warm, hot, full in equal steps from no heat to <paramref name="fullAt"/>, full beyond it.</summary>
         public static Color HeatColor(float heat, Color cold, Color warm, Color hot, Color full, float fullAt)
         {

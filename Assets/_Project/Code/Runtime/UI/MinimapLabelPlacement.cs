@@ -7,7 +7,7 @@ namespace Overpower.UI
     /// The spot and the look shared by every line under the corner minimap: the scan countdown, Dominion's centre payout and the sudden-death circle
     /// countdown. They hang from the lowest point of the DRAWN frame (the triangle's base, a rectangle's lower edge on the lane map), not from the
     /// square box the frame sits in: the triangle's base is about a quarter of the box above the box's bottom. Gap and font: UiTheme > 'Under the minimap: all lines'.
-    /// Positions are in canvas units from the canvas's top right corner (HudScreenLayout.CornerMinimapRect).
+    /// Positions are in canvas units from the minimap's corner (HudScreenLayout.CornerMinimapRect).
     /// </summary>
     public static class MinimapLabelPlacement
     {
@@ -28,10 +28,12 @@ namespace Overpower.UI
         }
 
         /// <summary>The middle of the label's top edge: centred on the drawn frame, gap below the frame's lowest point.</summary>
-        public static Vector2 LabelTop(Rect cornerBox, Vector2 frameSize, float shapeBottomBelowCentre, float gap)
+        public static Vector2 LabelTop(Rect cornerBox, Vector2 frameSize, float shapeBottomBelowCentre, float gap, bool left = false)
         {
-            // The frame is pinned to the box's top right, so a lane map's rectangle centres above the box's centre (and right of it when tall).
-            var frameCentre = new Vector2(cornerBox.xMax - frameSize.x / 2f, cornerBox.yMax - frameSize.y / 2f);
+            // The frame is pinned to the box's top corner on the screen's side, so a lane map's rectangle centres above the box's centre (and
+            // toward that side when tall).
+            float x = left ? cornerBox.xMin + frameSize.x / 2f : cornerBox.xMax - frameSize.x / 2f;
+            var frameCentre = new Vector2(x, cornerBox.yMax - frameSize.y / 2f);
             return new Vector2(frameCentre.x, frameCentre.y - shapeBottomBelowCentre - gap);
         }
 
@@ -39,9 +41,10 @@ namespace Overpower.UI
         /// camera after the label is built, so callers place again on each refresh.</summary>
         public static void PlaceUnder(RectTransform rect, UiTheme theme, float width, float height)
         {
-            Rect box = HudScreenLayout.CornerMinimapRect(theme.minimapCornerMargin, theme.minimapFrameWidth, theme.minimapCornerSize);
-            Vector2 top = LabelTop(box, MinimapView.CornerFrameSize(theme), MinimapView.CornerShapeBottomBelowCentre(theme), theme.minimapLinesGap);
-            rect.anchorMin = rect.anchorMax = Vector2.one;
+            bool left = theme.minimapOnLeft;
+            Rect box = HudScreenLayout.CornerMinimapRect(theme.minimapCornerMargin, theme.minimapFrameWidth, theme.minimapCornerSize, left);
+            Vector2 top = LabelTop(box, MinimapView.CornerFrameSize(theme), MinimapView.CornerShapeBottomBelowCentre(theme), theme.minimapLinesGap, left);
+            rect.anchorMin = rect.anchorMax = HudScreenLayout.CornerAnchor(left);
             rect.pivot = new Vector2(0.5f, 1f);
             var size = new Vector2(width, height);
             if (rect.sizeDelta != size) rect.sizeDelta = size;

@@ -69,6 +69,8 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Getter(typeof(PlayerOverheat), nameof(PlayerOverheat.IsSilenced))));
             Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Rule(nameof(CrosshairRules.HeatShown))));
             Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Rule(nameof(CrosshairRules.HeatColor))));
+            Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", Rule(nameof(CrosshairRules.RingColour))));
+            Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", typeof(PlayerOverheat).GetProperty(nameof(PlayerOverheat.IsVentWindowOpen)).GetGetMethod()));
             Assert.IsTrue(IlWiring.Uses(typeof(CrosshairView), "LateUpdate", typeof(CrosshairView).GetMethod(nameof(CrosshairView.DrawSpreadRing), Any)));
         }
 

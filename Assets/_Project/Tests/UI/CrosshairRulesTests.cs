@@ -209,5 +209,13 @@ namespace Overpower.Tests
                 Assert.AreEqual(HexRingGraphic.Corner(0, apothem).magnitude, HexRingGraphic.Corner(3, apothem).magnitude, 1e-3f);
             }
         }
+
+        [Test]
+        public void TheRingTurnsTheVentColourWhileRWouldVent()
+        {
+            Color heat = new Color(1f, 0.1f, 0.1f, 1f), vent = new Color(0.2f, 1f, 0.3f, 1f);
+            SameColour(vent, CrosshairRules.RingColour(heat, true, vent), "the vent window is open");
+            SameColour(heat, CrosshairRules.RingColour(heat, false, vent), "any other time the heat colour");
+        }
     }
 }
