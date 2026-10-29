@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 21
   displayName: Flame
-  description: Set enemies in front of you on fire.
+  description: Set enemies in front of you on fire dealing damage to them over time.
   slot: 1
   icon: {fileID: 21300000, guid: 24503d77bd13f4f499b8ba9222374e0f, type: 3}
   goldCost: 640

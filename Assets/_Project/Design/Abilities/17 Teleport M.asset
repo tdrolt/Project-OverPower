@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 17
   displayName: Portal
-  description: Place two portals; stand in one to travel to the other.
+  description: Place two portals. Stand in one for a few seconds to activate it and
+    travel to the other.
   slot: 3
   icon: {fileID: 21300000, guid: 74a159395684f214fa7d05afc3940b6b, type: 3}
   goldCost: 640

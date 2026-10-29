@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 19
   displayName: Mines
-  description: Drop mines that damage and slow enemies.
+  description: Drop mines that damage and slow enemies. Takes a few seconds for them
+    to prime
   slot: 1
   icon: {fileID: 21300000, guid: c2d3e69b588755540a8e885aa59474ef, type: 3}
   goldCost: 640

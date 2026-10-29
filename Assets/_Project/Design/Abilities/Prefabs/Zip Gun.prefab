@@ -46,8 +46,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cooldownSeconds: 15
   charges: 1
-  range: 15
-  projectileSpeed: 40
+  range: 18
+  projectileSpeed: 50
   projectileRadius: 0.225
   projectilePrefab: {fileID: 6878105816844376405, guid: 660b1e8a46ceadb4daf99ccdd72cf425, type: 3}
   pullSpeed: 25

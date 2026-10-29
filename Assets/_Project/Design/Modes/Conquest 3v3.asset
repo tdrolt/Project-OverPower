@@ -25,32 +25,35 @@ MonoBehaviour:
   lobbyModeValue: 2
   infoCards:
   - title: Goal
-    text: Be the last team standing. Take the enemy capitals, then finish off their
-      players.
+    text: Be the last team standing. Take control of the enemy capitals, then finish
+      off their players.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Zones
-    text: You can only capture a zone next to one your team holds. Tier 3 zones fall
-      fastest. Your capital heals you quickest; Tier 2 zones heal you more slowly.
+    text: You can only capture a zone next to one your team holds. Tier 3 zones are
+      the fastest to capture. The Tier 2 and Tier 1 (capital/base) heal you, but
+      Tier 2 heals less.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Gold and upgrades
-    text: Every zone you hold outside your capital pays your whole team gold while
-      you keep it. Spend it in the shop inside your own territory when you're out
-      of combat, or while you wait to respawn. Hold a zone long enough and it builds
-      a bounty; whoever takes it from you collects it. Your first attachment and
-      movement ability are free.
+    text: 'Your first attachment and movement ability are free. Every zone you hold
+      except capitals pay your whole team gold while you have control. Spend it in
+      the shop inside your own territories when you''re out of combat, or while are
+      dead. Holding a zone long enough builds a bounty and the next owner gets a
+      bonus when they capture the zone. '
     accent: {r: 0.9098039, g: 0.7254902, b: 0.19215687, a: 1}
   - title: Last stand
-    text: Lose your capital and your team stops respawning. Win it back, or take
-      an enemy capital, before the last of you falls.
+    text: Lose your capital and your team stops respawning. Win it back or take an
+      enemy capital before the last of you falls.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
-  - title: The map shrinks
-    text: When the first team is knocked out, its corner of the map closes and the
+  - title: Map shrink
+    text: When the first team is eliminated, its corner of the map closes and the
       remaining teams fight in a smaller arena.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Centre scan
-    text: The centre sends out a scan on a fixed clock. If your team holds the centre
-      when a scan starts, you see every enemy it passes over.
+    text: The centre sends out a scan at an interval. If your team holds the centre
+      when a scan starts it pings every enemy it passes over.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Two teams
     text: Only two teams play. The third corner of the map is closed from the start.
+      This game mode is just the second phase of the 3v3v3 conquest mode.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
+  infoColumns: 0

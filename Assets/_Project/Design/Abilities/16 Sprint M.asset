@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 16
   displayName: Sprint
-  description: Run faster, but it builds overheat.
+  description: Run faster at the cost of generating overheat when using it.
   slot: 3
   icon: {fileID: 21300000, guid: f2020be2dc655344bbe1253f7d73e8cb, type: 3}
   goldCost: 640

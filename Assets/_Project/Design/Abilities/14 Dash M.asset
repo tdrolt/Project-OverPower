@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 14
   displayName: Dash
-  description: Two quick hops toward your cursor.
+  description: Three short distance dashes toward your cursor. Using up all the charges
+    will prevent you from dashing again before reaching 2 charges again,
   slot: 3
   icon: {fileID: 21300000, guid: 436f3fe3026685c458dbb9b343e3cb00, type: 3}
   goldCost: 640

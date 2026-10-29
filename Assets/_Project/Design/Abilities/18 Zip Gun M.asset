@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 18
   displayName: Zip
-  description: Fire a hook that pulls you to what it hits.
+  description: Fire a hook that pulls you towards the first thing it hits.
   slot: 3
   icon: {fileID: 21300000, guid: 56eaae853ab355c46b3e39c2d8a4e5c0, type: 3}
   goldCost: 640

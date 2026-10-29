@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b6ece7837f0e6c14ebcad7cfc05bc72e, type: 3}
   m_Name: Dominion 3v3v3
   m_EditorClassIdentifier: 
-  id: 4
+  id: 3
   displayName: Dominion 3v3v3
   family: 1
   familyName: Dominion
@@ -25,24 +25,39 @@ MonoBehaviour:
   lobbyModeValue: 3
   infoCards:
   - title: Rounds
-    text: "Three rounds against the clock. The team with the most points when time runs out wins the round. If the top teams finish close, every team enters overtime: the first to get a 200-point lead on every other team wins the round. If no one manages it, each team within 200 points of the leading team gets a round win. Win two rounds, or lead on round wins after the third, to win the match."
+    text: 'Three rounds with a fixed time limit. The team with the most points when
+      time runs out wins the round. If the top teams finish close, every team enters
+      overtime the first to get a 200 point lead on every other team wins the round.
+      If no one manages it, each team within 200 points of the leading team gets
+      a round win. The team who reaches two won rounds first or who has the most
+      rounds after the 3rd round wins the game. '
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Zones and points
-    text: "Every zone your team holds, apart from the centre, earns points every second. Your spawn heals you, but it can't be captured and earns nothing."
+    text: Every zone your team holds, except the centre zone, earns points every
+      second. Spawns zones heal their allies but dont grant points and cannot be
+      captured.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
-  - title: The centre
-    text: "The centre earns nothing by the second. Instead it pays a big lump of points on a fixed clock to whoever holds it when the clock hits zero."
+  - title: The centre zone
+    text: The centre pays a big lump of points on a fixed clock to whoever holds
+      it when the clock hits zero.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Bounties
-    text: "Hold a zone long enough and it builds a bounty; whoever takes it from you collects the points."
+    text: Hold a zone long enough and it builds a bounty granting whoever captures
+      it next a big bonus to their wallet.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Your build each round
-    text: "Every round starts from scratch. You pick your gear for free, in the break before it or at any time during the round, from anywhere. Round one is the pistol only, round two opens the weapon families and an armor upgrade, and round three opens the weapon upgrades and a second armor upgrade."
+    text: Every round starts from scratch. You pick your gear for free. Round one
+      is the pistol only, round two opens the weapon families and an armor upgrade,
+      and round three opens the weapon upgrades and a second armor upgrade.
     accent: {r: 0.9098039, g: 0.7254902, b: 0.19215687, a: 1}
   - title: Respawns
-    text: "You always come back after the same short wait, inside a shield that blocks all damage, stuns and pushes. It breaks when its time runs out, when you hit an enemy or when you leave your spawn, and you can't capture while it's up."
+    text: When you respawn a shield that blocks all incoming damage and status effects
+      will protect you for a few seconds. The shield breaks if you hit an enemy or
+      when you leave your spawn, and you can't capture while it's up.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Sudden death
-    text: "If a shared round would win a team the match, the teams that shared it play sudden death for that round instead. After the third round, teams level on round wins play it for the match. No respawns, and a shrinking circle hurts anyone outside it. The last team standing wins."
+    text: If a tie round would win a team the match, the teams that tied play sudden
+      death to declare the winner. No respawns and a circle shrinking towards the
+      center of the map. The last team standing wins.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   infoColumns: 4

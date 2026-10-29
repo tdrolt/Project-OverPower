@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 28
   displayName: Scope
-  description: Hold to pull your camera back and see further than usual.
+  description: Hold to pull zoom out and increase your range at the cost of tightening
+    your vision cone.
   slot: 1
   icon: {fileID: 21300000, guid: 9ba2a34b53bea7d46af53e79a84d3b29, type: 3}
   goldCost: 640

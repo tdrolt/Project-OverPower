@@ -49,7 +49,9 @@ MonoBehaviour:
   placementRange: 5
   maxPortals: 2
   portalPrefab: {fileID: 3657975748267795714, guid: e0a96adb3973ebc458b83adaf9856630, type: 3}
-  channelSeconds: 3
+  groundProbeDistance: 2
+  maxStepUp: 0.6
+  channelSeconds: 2
   channelVfxRadius: 0.6
   arrivalVfxRadius: 0.5
   arrivalVfxSeconds: 0.3
