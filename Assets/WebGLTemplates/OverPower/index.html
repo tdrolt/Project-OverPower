@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>{{{ PRODUCT_NAME }}}</title>
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0F1014; }
+      /* The UI is made for 16:9: the game fills the frame (itch.io's embed, or its fullscreen) as large as 16:9 allows. */
+      #unity-canvas {
+        position: absolute; top: 0; bottom: 0; left: 0; right: 0; margin: auto;
+        width: 100vw; height: 56.25vw; max-width: 177.78vh; max-height: 100vh;
+        display: block; outline: none; background: #1A1C22;
+      }
+      #loading { position: absolute; left: 50%; top: 50%; width: 30%; height: 6px; transform: translate(-50%, -50%); background: #262932; }
+      #loading-fill { width: 0; height: 100%; background: #2BB8C4; }
+      #warning { position: absolute; left: 50%; top: 5%; transform: translateX(-50%); display: none; font: 14px sans-serif; color: #0F1014; }
+      #warning div { padding: 10px; margin-bottom: 4px; }
+    </style>
+  </head>
+  <body>
+    <canvas id="unity-canvas" width={{{ WIDTH }}} height={{{ HEIGHT }}} tabindex="-1"></canvas>
+    <div id="loading"><div id="loading-fill"></div></div>
+    <div id="warning"></div>
+    <script>
+      // Unity's own warnings and errors (a short banner; an error stays).
+      function showBanner(message, type) {
+        var banner = document.querySelector("#warning");
+        var line = document.createElement("div");
+        line.textContent = message;
+        line.style.background = type == "error" ? "#E8B931" : "#F4F2ED";
+        banner.appendChild(line);
+        banner.style.display = "block";
+        if (type != "error")
+          setTimeout(function () {
+            banner.removeChild(line);
+            banner.style.display = banner.children.length ? "block" : "none";
+          }, 5000);
+      }
+
+      var script = document.createElement("script");
+      script.src = "Build/{{{ LOADER_FILENAME }}}";
+      script.onload = function () {
+        createUnityInstance(document.querySelector("#unity-canvas"), {
+          arguments: [],
+          dataUrl: "Build/{{{ DATA_FILENAME }}}",
+          frameworkUrl: "Build/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_THREADS
+          workerUrl: "Build/{{{ WORKER_FILENAME }}}",
+#endif
+#if USE_WASM
+          codeUrl: "Build/{{{ CODE_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+          symbolsUrl: "Build/{{{ SYMBOLS_FILENAME }}}",
+#endif
+          streamingAssetsUrl: "StreamingAssets",
+          companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+          productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+          productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+          showBanner: showBanner,
+        }, function (progress) {
+          document.querySelector("#loading-fill").style.width = 100 * progress + "%";
+        }).then(function () {
+          document.querySelector("#loading").style.display = "none";
+        }).catch(function (message) {
+          alert(message);
+        });
+      };
+      document.body.appendChild(script);
+    </script>
+  </body>
+</html>
