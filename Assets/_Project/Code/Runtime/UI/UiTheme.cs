@@ -330,8 +330,8 @@ namespace Overpower.UI
         [Tooltip("Height between the two stacked \"v\"s of the second Recharge level, in overhead-canvas units.")]
         public float nameplateArmourChevronStep = 0.65f;
         [Tooltip("Colour of the armour-upgrade marks on every plate (Absorb squares and Recharge \"v\"s). They sit on the shield bar " +
-                 "and show only while the shield holds any armour, so pick a colour that reads on the shield's blue.")]
-        public Color nameplateArmourMarkColor = new Color(0.55f, 0.8f, 1f, 1f);
+                 "and show only while the shield holds any armour: a light yellow reads on the shield's blue and stays apart from Invulnerability's gold.")]
+        public Color nameplateArmourMarkColor = new Color(1f, 1f, 0.45f, 1f);
         [Header("Shield wasted text (Invulnerability ultimate)")]
         [Tooltip("Text that pops over a player's head when their armed shield window ran out and nobody hit them.")]
         public string shieldWastedText = "Wasted";

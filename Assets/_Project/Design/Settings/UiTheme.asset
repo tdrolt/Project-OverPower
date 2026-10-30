@@ -112,14 +112,14 @@ MonoBehaviour:
   nameplateEnemyNameColor: {r: 1, g: 0, b: 0, a: 1}
   nameplateUnknownNameColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   nameplateSegmentLineWidth: 0.15
-  nameplateArmourMarkSize: 2
+  nameplateArmourMarkSize: 2.3
   nameplateArmourNestedScale: 0.5
   nameplateOwnRowGap: 0.3
-  nameplateArmourSquareLine: 0.22
-  nameplateArmourChevronWidth: 1.2
-  nameplateArmourChevronLine: 0.25
-  nameplateArmourChevronStep: 0.45
-  nameplateArmourMarkColor: {r: 0.04, g: 0.18, b: 0.38, a: 1}
+  nameplateArmourSquareLine: 0.32
+  nameplateArmourChevronWidth: 1.5
+  nameplateArmourChevronLine: 0.34
+  nameplateArmourChevronStep: 0.5
+  nameplateArmourMarkColor: {r: 1, g: 1, b: 0.45, a: 1}
   shieldWastedText: Wasted
   shieldWastedColor: {r: 0.75, g: 0.78, b: 0.85, a: 1}
   shieldWastedSeconds: 1.2

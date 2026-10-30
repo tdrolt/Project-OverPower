@@ -134,13 +134,9 @@ public class CameraTracking : MonoBehaviour
             return;
         }
 
-        if (DevelopmentTools.ScrollZoomOn(Debug.isDebugBuild, fixedYaw.HasValue))
-        {
-            float scroll = Input.GetAxis("Mouse ScrollWheel");
-            currentZoom = Mathf.Clamp(currentZoom - scroll * zoomSpeed, minZoomMultiplier, maxZoomMultiplier);
-        }
-        else
-            currentZoom = 1f;
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        float closest = DevelopmentTools.ClosestScrollZoom(Debug.isDebugBuild, fixedYaw.HasValue, minZoomMultiplier);
+        currentZoom = Mathf.Clamp(currentZoom - scroll * zoomSpeed, closest, maxZoomMultiplier);
 
         ResolveTeamYaw();
 
