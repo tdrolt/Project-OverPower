@@ -33,9 +33,9 @@ MonoBehaviour:
       the fastest to capture. The Tier 2 and Tier 1 (capital/base) heal you, but
       Tier 2 heals less.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
-  - title: Gold and upgrades
+  - title: Credits and upgrades
     text: 'Your first attachment and movement ability are free. Every zone you hold
-      except capitals pay your whole team gold while you have control. Spend it in
+      except capitals pay your whole team credits while you have control. Spend it in
       the shop inside your own territories when you''re out of combat, or while are
       dead. Holding a zone long enough builds a bounty and the next owner gets a
       bonus when they capture the zone. '

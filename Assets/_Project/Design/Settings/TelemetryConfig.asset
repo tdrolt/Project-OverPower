@@ -25,5 +25,5 @@ MonoBehaviour:
   uploadKey: overpower-playtest
   uploadTimeoutSeconds: 30
   uploadFromDevelopmentBuilds: 0
-  bugMarkKey: 16
-  bugMarkNeedsCtrl: 1
+  bugMarkKey: 26
+  bugMarkNeedsCtrl: 0

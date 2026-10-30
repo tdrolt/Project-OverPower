@@ -455,9 +455,9 @@ namespace Overpower.UI
         [Tooltip("Font size percentage for that swap line (smaller than Loadout Price Line Size Percent so it fits the node).")]
         [Range(10f, 100f)] public float loadoutSwapLineSizePercent = 55f;
         [Tooltip("Message after selling weapons with Reset Weapon. {0} = weapon name, {1} = gold refunded.")]
-        public string loadoutSoldWeaponFormat = "Sold {0}: +{1} gold";
+        public string loadoutSoldWeaponFormat = "Sold {0}: +{1} credits";
         [Tooltip("Message after selling armour upgrades with Reset Armor. {0} = gold refunded.")]
-        public string loadoutSoldArmorFormat = "Sold armour upgrades: +{0} gold";
+        public string loadoutSoldArmorFormat = "Sold armour upgrades: +{0} credits";
         [Tooltip("Seconds a 'Sold ...' message stays on the shop's status line.")]
         public float loadoutSoldMessageDurationSeconds = 3f;
         [Tooltip("Seconds the pointer must rest on a weapon node, ability card or armour row before its pop-up (name, what it does, numbers) appears next to the cursor. Moving off hides it at once; moving to another item restarts the wait.")]
@@ -805,11 +805,11 @@ namespace Overpower.UI
                  "e.g. \"BOUNTY {0}\" reads \"BOUNTY 150\".")]
         public string bountyLabelFormat = "BOUNTY {0}";
         [Tooltip("The same label in Conquest, where the bounty is gold. {0} is the gold each player of the team that takes the zone will get.")]
-        public string bountyLabelGoldFormat = "BOUNTY {0} GOLD";
+        public string bountyLabelGoldFormat = "BOUNTY {0} CREDITS";
         [Tooltip("The text that pops above a tower when its bounty is paid in Dominion. {0} is the points paid, e.g. \"+{0}\" reads \"+150\".")]
         public string bountyPopFormat = "+{0}";
         [Tooltip("The same pop in Conquest. {0} is the gold each player of the team got.")]
-        public string bountyPopGoldFormat = "+{0} GOLD";
+        public string bountyPopGoldFormat = "+{0} CREDITS";
         [Tooltip("The colour of the bounty label and of the pop when it is paid. A warm yellow that stands out from the team colours.")]
         public Color bountyLabelColour = new Color(1f, 0.85f, 0.1f, 1f);
         [Tooltip("Text size of the bounty label above a tower, in reference pixels (1080p). It is a HUD label, so it keeps the same size on screen however far the camera is zoomed out.")]
@@ -1050,7 +1050,7 @@ namespace Overpower.UI
                  "toast), or the two run into each other.")]
         public float warmupTopOffset = 130f;
         [Tooltip("Toast shown the instant the match goes live with all three teams - the ordinary case.")]
-        public string matchLiveToastText = "The match is live! Zones, gold, loadouts and respawn timers are reset.";
+        public string matchLiveToastText = "The match is live! Zones, credits, loadouts and respawn timers are reset.";
         [Tooltip("Toast shown the instant a host-started match goes live with two teams - lose your base and your " +
                  "team can't respawn until it retakes one. Two lines at most (about 52 characters), as the bounty " +
                  "toast.")]
@@ -1545,7 +1545,7 @@ namespace Overpower.UI
         [Tooltip("Title of the panel that appears when your connection to the match drops (ConnectionLostPanel).")]
         public string connectionLostTitle = "Connection lost";
         [Tooltip("The line under the title: what Rejoin does for you.")]
-        public string connectionLostBody = "Rejoin to come back to the same match as the same player - same team, gold and loadout. You respawn as after a death.";
+        public string connectionLostBody = "Rejoin to come back to the same match as the same player - same team, credits and loadout. You respawn as after a death.";
         [Tooltip("The button that reconnects and puts you back in the same match.")]
         public string connectionLostRejoinButton = "Rejoin";
         [Tooltip("The button that gives up your place and goes back to the name screen to join a new match.")]
@@ -1906,7 +1906,7 @@ namespace Overpower.UI
         [Tooltip("Written on a mode that cannot be created yet.")]
         public string createComingSoonText = "coming soon";
         [Tooltip("The line under the mode buttons, one per mode family in order (Conquest, Dominion).")]
-        public string[] createFamilyNotes = { "Capture territory for gold, take capitals, be the last team standing.", "Hold zones to score points over three rounds and out-score the other teams." };
+        public string[] createFamilyNotes = { "Capture territory for credits, take capitals, be the last team standing.", "Hold zones to score points over three rounds and out-score the other teams." };
         [Tooltip("The line under the team sizes about another family: {0} is its name, {1} its sizes.")]
         public string createOtherFamilyFormat = "{0} offers {1} here instead.";
         [Tooltip("Written between two sizes in that line.")]

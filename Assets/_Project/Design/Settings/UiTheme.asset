@@ -177,8 +177,8 @@ MonoBehaviour:
   loadoutBlockedReasonDurationSeconds: 2
   loadoutSwapFormat: Swap {0} (sell back +{1})
   loadoutSwapLineSizePercent: 55
-  loadoutSoldWeaponFormat: 'Sold {0}: +{1} gold'
-  loadoutSoldArmorFormat: 'Sold armour upgrades: +{0} gold'
+  loadoutSoldWeaponFormat: 'Sold {0}: +{1} credits'
+  loadoutSoldArmorFormat: 'Sold armour upgrades: +{0} credits'
   loadoutSoldMessageDurationSeconds: 3
   loadoutTooltipDelaySeconds: 0.5
   loadoutTooltipMaxWidth: 400
@@ -294,9 +294,9 @@ MonoBehaviour:
   scanCountdownFontSize: 28
   scanMinimapCountdownFontSize: 14.3
   bountyLabelFormat: BOUNTY {0}
-  bountyLabelGoldFormat: BOUNTY {0} GOLD
+  bountyLabelGoldFormat: BOUNTY {0} CREDITS
   bountyPopFormat: +{0}
-  bountyPopGoldFormat: +{0} GOLD
+  bountyPopGoldFormat: +{0} CREDITS
   bountyLabelColour: {r: 1, g: 0.85, b: 0.1, a: 1}
   bountyLabelFontSize: 30
   bountyPopFontSize: 44
@@ -377,7 +377,7 @@ MonoBehaviour:
   minimapCutWallWidth: 3
   matchCountdownText: MATCH STARTS IN {0}
   warmupTopOffset: 130
-  matchLiveToastText: The match is live! Zones, gold, loadouts and respawn timers
+  matchLiveToastText: The match is live! Zones, credits, loadouts and respawn timers
     are reset.
   matchLiveTwoTeamsToastText: 'Two teams: lose your base and you can''t respawn'
   showDamageNumbers: 1
@@ -607,7 +607,7 @@ MonoBehaviour:
   scoreboardUnknownTeamText: Joining
   connectionLostTitle: Connection lost
   connectionLostBody: Rejoin to come back to the same match as the same player -
-    same team, gold and loadout. You respawn as after a death.
+    same team, credits and loadout. You respawn as after a death.
   connectionLostRejoinButton: Rejoin
   connectionLostLeaveButton: Leave
   rejoinWorkingText: Reconnecting...
@@ -793,7 +793,7 @@ MonoBehaviour:
   createTeamsLabelText: TEAMS
   createComingSoonText: coming soon
   createFamilyNotes:
-  - Capture territory for gold, take capitals, be the last team standing.
+  - Capture territory for credits, take capitals, be the last team standing.
   - Hold zones to score points over three rounds and out-score the other teams.
   createOtherFamilyFormat: '{0} offers {1} here instead.'
   createSizeJoiner: ' and '

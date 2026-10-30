@@ -10,14 +10,10 @@ using Overpower.Weapons;
 namespace Overpower.Telemetry
 {
     /// <summary>
-    /// Ctrl+B marks "a bug just happened" - owner-only, on every player prefab and always on: unlike the F1 test range panel
+    /// The bug key (L, TelemetryConfig > Bug Mark Key; was Ctrl+B) marks "a bug just happened" - owner-only, on every player prefab and always on: unlike the F1 test range panel
     /// (which GameplayConfig.TestRangeEnabled can switch off) a tester who switched F1 off must still be able to report a bug. A raw
-    /// keyboard poll, like F1/Escape, not an InputAction: a tool key, never a rebindable gameplay control.
-    ///
-    /// EDITOR NOTE: Unity's own Editor binds Ctrl+B to File > Build And Run (ShortcutManagement).
-    /// That binding only fires from the Editor's OWN window having focus, never from a Player build,
-    /// and TelemetryConfig.BugMarkKey/BugMarkNeedsCtrl exist so the owner can move this key away from
-    /// B for comfortable in-Editor testing, with no code change.
+    /// keyboard poll, like F1/Escape, not an InputAction: a tool key, never a rebindable gameplay control. Ignored while typing in
+    /// chat (BugMarkRule), so an L in a message marks nothing.
     /// </summary>
     [DisallowMultipleComponent]
     public class BugMarkerKey : MonoBehaviourPun

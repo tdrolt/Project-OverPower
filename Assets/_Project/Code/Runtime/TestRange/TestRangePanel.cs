@@ -230,7 +230,7 @@ namespace Overpower.TestRange
             AddButton(buttonRow.transform, "Reset Cooldowns", res, OnResetCooldownsClicked);
             AddButton(buttonRow.transform, "Heal", res, OnHealClicked);
             AddButton(buttonRow.transform, "Fill Ultimate", res, OnFillUltimateClicked);
-            AddButton(buttonRow.transform, "+1000 Gold", res, OnAddGoldClicked);
+            AddButton(buttonRow.transform, "+1000 Credits", res, OnAddGoldClicked);
 
             GameObject armorButtonRow = new GameObject("Armor Buttons", typeof(RectTransform));
             armorButtonRow.transform.SetParent(panel.transform, false);

@@ -96,17 +96,13 @@ namespace Overpower.Data
 
         [Header("Bug mark key (playtest extras)")]
         [Tooltip("The key that marks 'a bug just happened' - a screenshot plus a note the reporter's " +
-                 "next chat line supplies (see BugMarkerKey). Default B. In the EDITOR's own Play " +
-                 "Mode, Ctrl+B is Unity's Build And Run shortcut (File menu) and may start a build - " +
-                 "it never fires from a Player build, only from the Editor's own window - change this " +
-                 "key here to test comfortably inside the Editor without touching code.")]
-        [SerializeField] private Key bugMarkKey = Key.B;
+                 "next chat line supplies (see BugMarkerKey). L since 30 Oct (was Ctrl+B, which in the " +
+                 "Editor is also Unity's Build And Run). It is ignored while the player types in chat.")]
+        [SerializeField] private Key bugMarkKey = Key.L;
         public Key BugMarkKey => bugMarkKey;
 
-        [Tooltip("Require Ctrl held together with Bug Mark Key above. On by default, matching Unity's " +
-                 "own Ctrl+B Build And Run binding in the Editor - turn this off only once Bug Mark " +
-                 "Key above is changed to a key that needs no modifier.")]
-        [SerializeField] private bool bugMarkNeedsCtrl = true;
+        [Tooltip("Require Ctrl held together with Bug Mark Key above. Off: plain L marks a bug.")]
+        [SerializeField] private bool bugMarkNeedsCtrl = false;
         public bool BugMarkNeedsCtrl => bugMarkNeedsCtrl;
     }
 }

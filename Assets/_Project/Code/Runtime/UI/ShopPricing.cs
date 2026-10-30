@@ -103,7 +103,7 @@ namespace Overpower.UI
             {
                 case PurchaseBlock.NotInOwnTerritory: return "Go to a zone your team owns";
                 case PurchaseBlock.InCombat: return $"Out of combat in {SecondsUntilOutOfCombat.ToString("0.0", CultureInfo.InvariantCulture)}s";
-                case PurchaseBlock.CannotAfford: return $"Need {price - Balance} more gold";
+                case PurchaseBlock.CannotAfford: return $"Need {price - Balance} more credits";
                 case PurchaseBlock.NotInBreak: return string.IsNullOrEmpty(closedText) ? "The shop is closed" : closedText;
                 case PurchaseBlock.LockedUntilBreak: return string.IsNullOrEmpty(lockedText) ? "Locked until the break" : lockedText;
                 default: return "";
@@ -218,7 +218,7 @@ namespace Overpower.UI
 
         /// <summary>"Gold 1234" in InvariantCulture, matching PlayerHud.UpdateGold, so the HUD and this header never
         /// disagree on a decimal/thousands separator on a non-English Windows locale.</summary>
-        public static string GoldLabel(int balance) => $"Gold {balance.ToString(CultureInfo.InvariantCulture)}";
+        public static string GoldLabel(int balance) => $"Credits {balance.ToString(CultureInfo.InvariantCulture)}";
 
         /// <summary>The HUD's two-line gold readout next to the shop button: the balance on top, this second's income
         /// under it at sizePercent of the balance's size. InvariantCulture on BOTH numbers, pinned by a test: with a

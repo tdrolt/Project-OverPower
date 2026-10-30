@@ -16,7 +16,7 @@ namespace Overpower.Tests
             string s = ShopPricing.GoldHudLabel(1234, 7.7, 75f);
             string[] lines = s.Split('\n');
             Assert.AreEqual(2, lines.Length);
-            Assert.AreEqual("Gold 1234", lines[0]);
+            Assert.AreEqual("Credits 1234", lines[0]);
             Assert.AreEqual("<size=75%>+7.7/s</size>", lines[1]);
         }
 
