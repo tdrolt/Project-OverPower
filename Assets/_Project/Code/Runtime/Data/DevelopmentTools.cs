@@ -11,5 +11,8 @@ namespace Overpower.Data
 
         /// <summary>The scroll-wheel zoom: any development run; in a player's build only a spectator seat, whose key bar offers it.</summary>
         public static bool ScrollZoomOn(bool developmentRun, bool spectatorSeat) => developmentRun || spectatorSeat;
+
+        /// <summary>The "F1: debug log" hint in the corner. F1 itself opens the log in every build.</summary>
+        public static bool ShowsDebugLogHint(bool developmentRun) => developmentRun;
     }
 }

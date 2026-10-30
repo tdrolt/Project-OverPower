@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using UnityEngine;
 
@@ -65,20 +66,41 @@ namespace Overpower.Telemetry
             return found.Success ? found.Groups[1].Value : "";
         }
 
-        /// <summary>The copy that leaves the PC: player names stay (Tudor, 29 Oct), chat lines keep their time but lose their text, and
-        /// a Windows user folder name in a path becomes "user". The local file is not changed.</summary>
+        /// <summary>How long after a Ctrl+B mark the reporter's chat counts as the bug's note (the report reads the same window).</summary>
+        public const double BugNoteSeconds = 60.0;
+
+        private static readonly Regex LineTime = new Regex("\"t\":(-?[0-9.eE+-]+)");
+
+        /// <summary>The copy that leaves the PC: player names stay (Tudor, 29 Oct), chat lines keep their time but lose their text
+        /// unless they are the player's note on their own Ctrl+B (within BugNoteSeconds of a bug line in this log, which holds only
+        /// this player's chat), and a Windows user folder name in a path becomes "user". The local file is not changed.</summary>
         public static string SentCopy(string log)
         {
             if (string.IsNullOrEmpty(log)) return log ?? "";
             string[] lines = log.Split('\n');
+            string chat = "\"e\":\"" + TelemetryKeys.Chat + "\"";
+            string bug = "\"e\":\"" + TelemetryKeys.Bug + "\"";
+
+            var marks = new List<double>();
+            foreach (string line in lines)
+                if (line.Contains(bug) && TimeOf(line, out double t)) marks.Add(t);
+
             for (int i = 0; i < lines.Length; i++)
             {
                 string line = lines[i];
-                if (line.Contains("\"e\":\"" + TelemetryKeys.Chat + "\""))
+                if (line.Contains(chat) && !(TimeOf(line, out double t) && marks.Exists(m => t >= m && t <= m + BugNoteSeconds)))
                     line = ChatText.Replace(line, "$1$2");
                 lines[i] = WindowsUser.Replace(line, "$1user");
             }
             return string.Join("\n", lines);
+        }
+
+        private static bool TimeOf(string line, out double t)
+        {
+            t = 0;
+            var found = LineTime.Match(line);
+            return found.Success && double.TryParse(found.Groups[1].Value, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out t);
         }
     }
 }

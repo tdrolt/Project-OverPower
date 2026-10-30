@@ -25,7 +25,17 @@ namespace Overpower.Tests
         public void TheWheelZoomsOnlyInDevelopmentRunsAndForSpectators(bool developmentRun, bool spectatorSeat, bool expected) =>
             Assert.AreEqual(expected, DevelopmentTools.ScrollZoomOn(developmentRun, spectatorSeat));
 
+        // Tudor, 30 Oct: the "F1: debug log" hint is not shown in a player's build; F1 still opens the log there.
+        [TestCase(true, true)]
+        [TestCase(false, false)]
+        public void TheDebugLogHintShowsOnlyInDevelopmentRuns(bool developmentRun, bool expected) =>
+            Assert.AreEqual(expected, DevelopmentTools.ShowsDebugLogHint(developmentRun));
+
         // ---- the game asks the rules
+
+        [Test]
+        public void TheDebugLogAsksBeforeDrawingTheHint() =>
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(DebugOverlay), "OnGUI", typeof(DevelopmentTools).GetMethod(nameof(DevelopmentTools.ShowsDebugLogHint))));
 
         [Test]
         public void TheSpawnerAsksBeforePlacingDummies() =>

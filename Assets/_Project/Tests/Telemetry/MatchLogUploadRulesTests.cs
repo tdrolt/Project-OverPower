@@ -77,6 +77,21 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheReportersNoteAfterCtrlBIsKept()
+        {
+            string log = "{\"e\":\"chat\",\"t\":5,\"a\":1,\"text\":\"gg\"}\n" +
+                         "{\"e\":\"bug\",\"t\":10.5,\"a\":1,\"tm\":0}\n" +
+                         "{\"e\":\"chat\",\"t\":20,\"a\":1,\"text\":\"the wall ate my shot\"}\n" +
+                         "{\"e\":\"chat\",\"t\":70.5,\"a\":1,\"text\":\"still in the window\"}\n" +
+                         "{\"e\":\"chat\",\"t\":71,\"a\":1,\"text\":\"lol\"}\n";
+            string sent = MatchLogUploadRules.SentCopy(log);
+            StringAssert.Contains("the wall ate my shot", sent, "the note the toast asks for");
+            StringAssert.Contains("still in the window", sent, "60 s after the mark, as the report reads it");
+            StringAssert.DoesNotContain("gg", sent, "before the mark");
+            StringAssert.DoesNotContain("lol", sent, "after the window");
+        }
+
+        [Test]
         public void TheSentCopyHasNoWindowsUserName()
         {
             string sent = MatchLogUploadRules.SentCopy("{\"e\":\"console\",\"t\":3,\"msg\":\"saved to C:\\\\Users\\\\tudor.oltean\\\\Documents\\\\OverPower\"}\n");

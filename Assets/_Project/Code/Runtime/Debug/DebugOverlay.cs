@@ -152,8 +152,9 @@ public class DebugOverlay : MonoBehaviour
 
         if (!visible)
         {
-            // Always show the hint, so a tester who has never been told still finds it, in the log's own column.
-            GUI.Label(new Rect(area.x, area.y, area.width, HintHeightPixels), $"{ToggleKey}: debug log");
+            // The hint sits in the log's own column; a player's build leaves it out (F1 still works there).
+            if (Overpower.Data.DevelopmentTools.ShowsDebugLogHint(Debug.isDebugBuild))
+                GUI.Label(new Rect(area.x, area.y, area.width, HintHeightPixels), $"{ToggleKey}: debug log");
             return;
         }
 

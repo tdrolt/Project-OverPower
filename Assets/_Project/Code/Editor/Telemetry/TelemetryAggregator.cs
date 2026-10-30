@@ -446,7 +446,7 @@ namespace Overpower.EditorTools.Telemetry
                 // The reporter's OWN chat, 0-60s after the mark - never another player's.
                 if (chatByActor.TryGetValue(actor, out var chats))
                     foreach (var (t, text) in chats)
-                        if (t >= e.T && t <= e.T + 60.0)
+                        if (t >= e.T && t <= e.T + MatchLogUploadRules.BugNoteSeconds)
                             bug.ChatNotes.Add(text);
 
                 // Every client's console lines, 20s before to 5s after - merged across files, sorted by time below, labelled by
