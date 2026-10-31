@@ -560,6 +560,13 @@ MonoBehaviour:
   leaveMatchPromptText: Leave the match?
   escapeMenuTitleText: Sound
   escapeMenuCloseText: Close
+  escapeMenuMatchTitleText: MENU
+  escapeMenuSoundHeaderText: SOUND
+  escapeMenuLeaveMatchText: LEAVE MATCH
+  escapeMenuLeaveButtonColor: {r: 0.78, g: 0.2, b: 0.2, a: 1}
+  leaveMatchRejoinNoteText: You can rejoin from the list while the match is running.
+  leaveMatchYesText: YES, LEAVE
+  leaveMatchStayText: STAY
   matchDataNoticeText: Match data, including your player name, is collected to help improve the game.
   quitYesText: Yes
   quitNoText: No

@@ -1472,14 +1472,29 @@ namespace Overpower.UI
         [Tooltip("Escape's pop-up question outside a match on a desktop build (the name screen, the lobby list, a lobby before " +
                  "its start). Yes closes the game. The browser build never offers it: a web page cannot close itself.")]
         public string quitPromptText = "Close the game?";
-        [Tooltip("Escape's pop-up question during a match (from the warm-up on). Yes takes this player back to the lobby list; " +
-                 "the match carries on for everyone else and the seat is freed.")]
+        [Tooltip("The question on the second card, after Leave match in the menu during a match (from the warm-up on). Yes, leave " +
+                 "takes this player back to the lobby list; the match carries on for everyone else and the seat is freed.")]
         public string leaveMatchPromptText = "Leave the match?";
         [Tooltip("Escape's pop-up title in the browser outside a match, where there is nothing to quit: the pop-up then only " +
                  "holds the master volume and a close button.")]
         public string escapeMenuTitleText = "Sound";
-        [Tooltip("The close button of that browser pop-up (same effect as pressing Escape again).")]
+        [Tooltip("The close button of that browser pop-up and of the menu in a match (same effect as pressing Escape again).")]
         public string escapeMenuCloseText = "Close";
+        [Tooltip("Title of the menu Escape opens during a match (from the warm-up on): the Sound section, a line, then Leave match and Close.")]
+        public string escapeMenuMatchTitleText = "MENU";
+        [Tooltip("Heading of the Sound section above the master volume in the menu during a match.")]
+        public string escapeMenuSoundHeaderText = "SOUND";
+        [Tooltip("The menu's leave button during a match. It does not leave at once: it opens the second card (Leave Match Prompt Text and " +
+                 "Leave Match Rejoin Note Text) with Yes, leave and Stay.")]
+        public string escapeMenuLeaveMatchText = "LEAVE MATCH";
+        [Tooltip("Fill colour of the menu's Leave match button, so it reads as the one that takes you out.")]
+        public Color escapeMenuLeaveButtonColor = new Color(0.78f, 0.2f, 0.2f, 1f);
+        [Tooltip("The line under \"Leave the match?\" on the second card: what a player who leaves can still do.")]
+        public string leaveMatchRejoinNoteText = "You can rejoin from the list while the match is running.";
+        [Tooltip("The second card's button that really leaves: back to the lobby list, the match carries on for everyone else.")]
+        public string leaveMatchYesText = "YES, LEAVE";
+        [Tooltip("The second card's button that closes both cards and goes back to the match (same effect as pressing Escape).")]
+        public string leaveMatchStayText = "STAY";
         [Tooltip("One muted line under the name screen's buttons, shown only when this build sends match logs " +
                  "(TelemetryConfig > Upload has an address): it tells players that match data, with their player name, is collected.")]
         public string matchDataNoticeText = "Match data, including your player name, is collected to help improve the game.";

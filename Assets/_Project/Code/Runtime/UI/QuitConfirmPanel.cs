@@ -8,8 +8,9 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Escape's pop-up: "Leave the match?" during a match (back to the lobby list), "Close the game?" outside one on a desktop
-    /// build, and only the volume in the browser outside a match (BackToNameScreenRules). A scene-level runtime component (one
+    /// Escape's pop-up: during a match a menu (MENU, the Sound section, a line, Leave match in red and Close) whose Leave match
+    /// opens a second card ("Leave the match?", Yes, leave / Stay); "Close the game?" outside a match on a desktop build, and only
+    /// the volume in the browser outside a match (BackToNameScreenRules). A scene-level runtime component (one
     /// instance, like TestRangePanel and ConnectionLostPanel), a clickable overlay canvas with a GraphicRaycaster built in code.
     /// A raw Keyboard.current poll, not an InputAction (a tool key, like every other Escape consumer here).
     /// OWNERSHIP: LoadoutScreen and the chat panel close THEMSELVES on Escape in the same frame and Update() order
@@ -28,6 +29,10 @@ namespace Overpower.UI
         private LobbyUiKit kit;
         private GameObject uiRoot;
         private TextMeshProUGUI promptLabel;
+        private GameObject menuCard;
+        private GameObject soundHeader;
+        private GameObject divider;
+        private GameObject confirmCard;
         private TextMeshProUGUI volumeLabel;
         private Slider volumeSlider;
         private LobbyButton yesButton;
@@ -71,7 +76,7 @@ namespace Overpower.UI
             }
             else if (escapePressed)
             {
-                Close();
+                Close(); // from the second card too: Escape always goes back to the game
             }
 
             shopOpenLastFrame = shopOpenNow;
@@ -85,8 +90,9 @@ namespace Overpower.UI
             bool matchRunning = BackToNameScreenRules.IsMatchRunning(PhotonNetwork.InRoom, LobbyStageOfRoom());
             string prompt;
             bool showYes = true;
-            if (BackToNameScreenRules.EscapeLeavesTheMatch(matchRunning))
-                prompt = theme.leaveMatchPromptText;
+            bool menu = BackToNameScreenRules.EscapeLeavesTheMatch(matchRunning);
+            if (menu)
+                prompt = theme.escapeMenuMatchTitleText;
             else if (BackToNameScreenRules.OffersQuitGame(matchRunning, Application.platform == RuntimePlatform.WebGLPlayer))
                 prompt = theme.quitPromptText;
             else
@@ -96,9 +102,24 @@ namespace Overpower.UI
             }
             if (promptLabel != null)
                 promptLabel.text = prompt;
+            soundHeader?.SetActive(menu);
+            divider?.SetActive(menu);
             yesButton?.Root.SetActive(showYes);
+            if (yesButton != null)
+            {
+                yesButton.Label.text = menu ? theme.escapeMenuLeaveMatchText : theme.quitYesText;
+                Color fill = menu ? theme.escapeMenuLeaveButtonColor : theme.lobbyPurpleColor;
+                yesButton.Fill.color = yesButton.EnabledFill = fill;
+                if (yesButton.Border != null) yesButton.Border.color = fill;
+                LobbyUiKit.WidenToLabel(yesButton, theme.dominionBreakButtonPadding);
+            }
             if (noButton != null)
-                noButton.Label.text = showYes ? theme.quitNoText : theme.escapeMenuCloseText;
+            {
+                noButton.Label.text = showYes && !menu ? theme.quitNoText : theme.escapeMenuCloseText;
+                LobbyUiKit.WidenToLabel(noButton, theme.dominionBreakButtonPadding);
+            }
+            menuCard.SetActive(true);
+            confirmCard.SetActive(false);
             if (volumeSlider != null)
             {
                 volumeSlider.SetValueWithoutNotify(AudioListener.volume);
@@ -138,13 +159,13 @@ namespace Overpower.UI
 
         // ---- Yes / No ----
 
-        /// <summary>During a match: back to the lobby list. Otherwise GameQuit.Quit, which stops Play Mode in the Editor (or quits the
-        /// built Player): NEVER press Yes outside a match in an automated check.</summary>
+        /// <summary>During a match (Leave match): the second card, which alone leaves. Otherwise GameQuit.Quit, which stops Play Mode in
+        /// the Editor (or quits the built Player): NEVER press Yes outside a match in an automated check.</summary>
         private void OnYesClicked()
         {
             if (BackToNameScreenRules.EscapeLeavesTheMatch(BackToNameScreenRules.IsMatchRunning(PhotonNetwork.InRoom, LobbyStageOfRoom())))
             {
-                LeaveMatch();
+                ShowLeaveConfirm();
                 return;
             }
             GameQuit.Quit();
@@ -165,6 +186,19 @@ namespace Overpower.UI
         }
 
         private void OnNoClicked() => Close();
+
+        private void ShowLeaveConfirm()
+        {
+            menuCard.SetActive(false);
+            confirmCard.SetActive(true);
+        }
+
+        private void OnConfirmLeaveClicked() => LeaveMatch();
+
+        private void OnStayClicked() => Close();
+
+        /// <summary>Whether the second card ("Leave the match?") is the one showing, for checks.</summary>
+        public bool IsAskingToLeave => visible && confirmCard != null && confirmCard.activeSelf;
 
         private static int LobbyStageOfRoom()
         {
@@ -200,7 +234,9 @@ namespace Overpower.UI
 
             RectTransform card = PopupCard.Card(kit, canvas.transform, "Panel", theme.popupCardWidth, theme.spectatorResultCardPadding, theme.spectatorResultCardGap);
             card.anchorMin = card.anchorMax = card.pivot = new Vector2(0.5f, 0.5f);
+            menuCard = card.gameObject;
             promptLabel = PopupCard.Line(kit, card, "Prompt", theme.quitPromptText, kit.Display, theme.popupTitleSize, theme.lobbyOffWhiteColor, false);
+            soundHeader = PopupCard.Line(kit, card, "Sound", theme.escapeMenuSoundHeaderText, kit.Bold, theme.popupBodySize, theme.lobbyMutedColor, false).gameObject;
 
             HorizontalLayoutGroup row = LobbyUiKit.HGroup(card, "Volume", theme.lobbyListColumnGap, TextAnchor.MiddleCenter);
             LobbyUiKit.Size(row.gameObject, -1f, theme.masterVolumeRowHeight);
@@ -218,9 +254,27 @@ namespace Overpower.UI
             volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
             volumeSlider.gameObject.AddComponent<PointerUpRelay>().Released = OnVolumeReleased;
 
+            divider = new GameObject("Line", typeof(RectTransform), typeof(Image));
+            divider.transform.SetParent(card, false);
+            divider.GetComponent<Image>().color = theme.lobbyBorderColor;
+            divider.GetComponent<Image>().raycastTarget = false;
+            LobbyUiKit.Size(divider, -1f, 2f);
+
             Transform buttons = PopupCard.ButtonRow(card, theme.lobbyListColumnGap);
             yesButton = PopupCard.Primary(kit, buttons, theme.quitYesText, OnYesClicked);
             noButton = PopupCard.Secondary(kit, buttons, theme.quitNoText, OnNoClicked);
+
+            RectTransform confirm = PopupCard.Card(kit, canvas.transform, "Leave Confirm", theme.popupCardWidth, theme.spectatorResultCardPadding, theme.spectatorResultCardGap);
+            confirm.anchorMin = confirm.anchorMax = confirm.pivot = new Vector2(0.5f, 0.5f);
+            confirmCard = confirm.gameObject;
+            PopupCard.Line(kit, confirm, "Prompt", theme.leaveMatchPromptText, kit.Display, theme.popupTitleSize, theme.lobbyOffWhiteColor, false);
+            PopupCard.Line(kit, confirm, "Note", theme.leaveMatchRejoinNoteText, kit.Bold, theme.popupBodySize, theme.lobbyMutedColor, true);
+            Transform confirmButtons = PopupCard.ButtonRow(confirm, theme.lobbyListColumnGap);
+            LobbyButton leave = PopupCard.Primary(kit, confirmButtons, theme.leaveMatchYesText, OnConfirmLeaveClicked);
+            leave.Fill.color = leave.EnabledFill = theme.escapeMenuLeaveButtonColor;
+            if (leave.Border != null) leave.Border.color = theme.escapeMenuLeaveButtonColor;
+            PopupCard.Secondary(kit, confirmButtons, theme.leaveMatchStayText, OnStayClicked);
+            confirmCard.SetActive(false);
 
             uiRoot.SetActive(false);
         }
