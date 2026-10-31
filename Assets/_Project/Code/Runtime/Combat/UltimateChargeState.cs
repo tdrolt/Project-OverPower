@@ -51,6 +51,9 @@ namespace Overpower.Combat
         /// fires, so there is nothing to add in that window.</summary>
         public void AddDamageTaken(float amount) => Add(amount * perDamageTaken);
 
+        /// <summary>An ultimate charge pack: this share of the whole meter (0.3 = 30%).</summary>
+        public void AddFraction(float fraction) => Add(maxCharge * fraction);
+
         /// <summary>CombatEvents.LocalTakedown(true).</summary>
         public void AddKill() => Add(perKill);
 

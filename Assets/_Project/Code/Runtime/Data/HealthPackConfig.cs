@@ -3,9 +3,9 @@ using UnityEngine;
 namespace Overpower.Data
 {
     /// <summary>
-    /// The three Tier III health packs: how much they heal, how long they stay gone, how close you have to
-    /// stand (where each pack stands is in ArenaLayout), and what they look like (their green is the UI Theme's healing
-    /// green). One asset, shared by every pack.
+    /// The packs: the three Tier III health packs (where each stands is in ArenaLayout), and the spot packs placed from a list per map
+    /// below - ultimate charge packs on every map and the Dominion 2v2 health packs. How much they give, how long they stay gone, how close
+    /// you have to stand, and what they look like (a health pack's green is the UI Theme's healing green). One asset, shared by every pack.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Health Pack Config", fileName = "HealthPackConfig")]
     public sealed class HealthPackConfig : ScriptableObject
@@ -84,6 +84,52 @@ namespace Overpower.Data
 
         [Tooltip("How fast the cross turns, in degrees per second.")]
         [SerializeField] private float spinDegreesPerSecond = 60f;
+
+        [Header("Ultimate charge packs")]
+        [Tooltip("How much of the ultimate meter a pack gives, as a share of the whole meter: 0.3 = 30%. A pack is never taken with a full meter; it stays for the others.")]
+        [SerializeField, Range(0f, 1f)] private float ultimateChargeFraction = 0.3f;
+
+        [Tooltip("Seconds an ultimate charge pack stays gone after someone takes it, before it comes back for everyone.")]
+        [SerializeField, Min(1f)] private float ultimateRespawnSeconds = 30f;
+
+        [Tooltip("The colour of an ultimate charge pack's floating icosahedron and pad edge: the ultimate meter's yellow by default.")]
+        [SerializeField] private Color ultimatePackColour = new Color(1f, 0.85f, 0.25f, 1f);
+
+        [System.Serializable]
+        public sealed class PackSpotSet
+        {
+            [Tooltip("The map these spots belong to: its scene's name (Game Scene is the triangle map of Conquest and Dominion 3v3v3).")]
+            public string sceneName = "";
+            [Tooltip("Health the health packs of this list give back (the Tier III packs keep Heal Amount above).")]
+            public float healAmount = 50f;
+            [Tooltip("Where each ultimate charge pack stands on this map: world X and Z, in metres.")]
+            public Vector2[] ultimateSpots = new Vector2[0];
+            [Tooltip("Where each extra health pack stands on this map: world X and Z, in metres.")]
+            public Vector2[] healthSpots = new Vector2[0];
+            public string SceneName => sceneName;
+            public float HealAmount => healAmount;
+            public Vector2[] UltimateSpots => ultimateSpots;
+            public Vector2[] HealthSpots => healthSpots;
+        }
+
+        [Header("Spot packs, per map")]
+        [Tooltip("For each map, where its ultimate charge packs and its extra health packs stand. A map not listed has none.")]
+        [SerializeField] private PackSpotSet[] spotSets = new PackSpotSet[0];
+
+        public float UltimateChargeFraction => ultimateChargeFraction;
+        public int UltimateRespawnMs => Mathf.RoundToInt(ultimateRespawnSeconds * 1000f);
+        public Color UltimatePackColour => ultimatePackColour;
+        public string[] SpotSceneNames
+        {
+            get
+            {
+                var names = new string[spotSets != null ? spotSets.Length : 0];
+                for (int i = 0; i < names.Length; i++)
+                    names[i] = spotSets[i] != null ? spotSets[i].sceneName : null;
+                return names;
+            }
+        }
+        public PackSpotSet SpotSet(int index) => spotSets[index];
 
         public float MinimumMissingHealth => minimumMissingHealth;
         public int MaxAttemptsPerVisit => maxAttemptsPerVisit;

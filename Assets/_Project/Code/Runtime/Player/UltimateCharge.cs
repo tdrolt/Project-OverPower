@@ -93,6 +93,9 @@ public class UltimateCharge : MonoBehaviour
     /// <summary>Owner only. Refused unless full; called by an ultimate's own TryBuildCast only.</summary>
     public bool Spend() => state.Spend();
 
+    /// <summary>Owner only. An ultimate charge pack's share of the meter.</summary>
+    public void AddFraction(float fraction) => state.AddFraction(fraction);
+
     /// <summary>Owner only. F1's "Fill Ultimate" (TestRangePanel).</summary>
     public void Fill() => state.Fill();
 

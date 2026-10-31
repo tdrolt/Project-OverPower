@@ -8,9 +8,10 @@ using UnityEngine.Rendering;
 namespace Overpower.Match
 {
     /// <summary>
-    /// What one health pack looks like: a dark hexagon pad on the floor, its corners exactly at the pickup radius so standing anywhere
-    /// on it takes the pack, with a glowing green edge, and a green cross floating above it that turns and bobs. Ready glows; waiting
-    /// to come back is the same green dimmed (HealthPackLook). Nothing here is solid. HealthPackManager decides ready or not.
+    /// What one pack looks like: a dark hexagon pad on the floor, its corners exactly at the pickup radius so standing anywhere
+    /// on it takes the pack, with a glowing edge, and a shape floating above it that turns and bobs - a green cross for a health pack, a
+    /// yellow icosahedron for an ultimate charge pack. Ready glows; waiting to come back is the same colour dimmed (HealthPackLook).
+    /// Nothing here is solid. HealthPackManager decides ready or not.
     /// </summary>
     public sealed class HealthPackView : MonoBehaviour
     {
@@ -29,6 +30,7 @@ namespace Overpower.Match
         private MeshRenderer edgeRenderer;
         private Mesh padMesh;
         private Mesh edgeMesh;
+        private Mesh shapeMesh;
         private MaterialPropertyBlock block;
         private bool painted;
 
@@ -38,8 +40,10 @@ namespace Overpower.Match
         public Transform Cross => cross;
 
         /// <summary>Builds a pack standing at <paramref name="centre"/> (its ground point). <paramref name="solid"/> is the plain unlit
-        /// material the pad and the cross share; the green edge uses the Arena Look's FX Alpha and is left out (with a warning) without it.</summary>
-        public static HealthPackView Create(Transform parent, Vector3 centre, string name, HealthPackConfig config, UiTheme theme, Material solid)
+        /// material the pad and the shape share; the glowing edge uses the Arena Look's FX Alpha and is left out (with a warning) without it.
+        /// <paramref name="ultimate"/>: an ultimate charge pack (yellow icosahedron) instead of a health pack (green cross).</summary>
+        public static HealthPackView Create(Transform parent, Vector3 centre, string name, HealthPackConfig config, UiTheme theme, Material solid,
+                                           bool ultimate = false)
         {
             var root = new GameObject(name);
             root.transform.SetParent(parent, false);
@@ -47,7 +51,7 @@ namespace Overpower.Match
             HealthPackView view = root.AddComponent<HealthPackView>();
             view.config = config;
             // Without a theme the pack is still drawn (white): hiding it would hide a pickup from the players.
-            view.green = theme != null ? LookColours.For(LookFamily.Heal, -1, theme) : Color.white;
+            view.green = ultimate ? config.UltimatePackColour : theme != null ? LookColours.For(LookFamily.Heal, -1, theme) : Color.white;
             view.block = new MaterialPropertyBlock();
 
             float radius = config.PickupRadius, thickness = config.PadThicknessMetres;
@@ -82,11 +86,17 @@ namespace Overpower.Match
             leanObject.transform.SetParent(crossObject.transform, false);
             view.lean = leanObject.transform;
             float length = config.CrossSizeMetres, arm = length / 3f;
-            view.crossRenderers = new Renderer[]
+            if (ultimate)
             {
-                MakeBox(leanObject.transform, "Horizontal bar", new Vector3(length, arm, arm), solid),
-                MakeBox(leanObject.transform, "Vertical bar", new Vector3(arm, length, arm), solid),
-            };
+                view.shapeMesh = IcosahedronMesh.Create(length / 2f); // as tall as the cross
+                view.crossRenderers = new Renderer[] { AddMesh(leanObject.transform, "Icosahedron", view.shapeMesh, solid) };
+            }
+            else
+                view.crossRenderers = new Renderer[]
+                {
+                    MakeBox(leanObject.transform, "Horizontal bar", new Vector3(length, arm, arm), solid),
+                    MakeBox(leanObject.transform, "Vertical bar", new Vector3(arm, length, arm), solid),
+                };
             view.Animate(0f);
             view.Paint(true);
             return view;
@@ -150,6 +160,7 @@ namespace Overpower.Match
         {
             Free(ref padMesh);
             Free(ref edgeMesh);
+            Free(ref shapeMesh);
         }
 
         private static void Free(ref Mesh mesh)
@@ -167,7 +178,7 @@ namespace Overpower.Match
         {
 #if UNITY_EDITOR
             foreach (Mesh leftover in Resources.FindObjectsOfTypeAll<Mesh>())
-                if (leftover != null && (leftover.name == PadMeshName || leftover.name == EdgeMeshName)
+                if (leftover != null && (leftover.name == PadMeshName || leftover.name == EdgeMeshName || leftover.name == IcosahedronMesh.MeshName)
                     && (leftover.hideFlags & HideFlags.DontSave) != 0 && !UnityEditor.EditorUtility.IsPersistent(leftover))
                     DestroyImmediate(leftover);
 #endif

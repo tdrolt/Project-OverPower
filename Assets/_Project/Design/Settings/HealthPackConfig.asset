@@ -33,3 +33,22 @@ MonoBehaviour:
   bobCyclesPerSecond: 0.6
   crossLeanDegrees: 65
   spinDegreesPerSecond: 60
+  ultimateChargeFraction: 0.3
+  ultimateRespawnSeconds: 30
+  ultimatePackColour: {r: 1, g: 0.85, b: 0.25, a: 1}
+  spotSets:
+  - sceneName: Game Scene
+    healAmount: 50
+    ultimateSpots:
+    - {x: 65.05, y: 44.84}
+    - {x: 57.69, y: 57.59}
+    - {x: 72.41, y: 57.59}
+    healthSpots: []
+  - sceneName: Dominion 2v2
+    healAmount: 25
+    ultimateSpots:
+    - {x: 63.55, y: 54.9}
+    - {x: 66.65, y: 51.7}
+    healthSpots:
+    - {x: 73.3, y: 65}
+    - {x: 56.9, y: 41.6}

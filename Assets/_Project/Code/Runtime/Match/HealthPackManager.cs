@@ -10,8 +10,10 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 namespace Overpower.Match
 {
     /// <summary>
-    /// The health packs: a floating cross in each Tier III zone's recess and, while a corner is cut, one in the cut wall's
-    /// recess (indexed after the zones'). Walk over one hurt and alive and it heals you, then it is gone for everyone until it returns.
+    /// The packs: a floating cross in each Tier III zone's recess and, while a corner is cut, one in the cut wall's recess (indexed
+    /// after the zones'); and the spot packs this map lists in HealthPackConfig (ids from HealthPackRules.SpotPackId): ultimate charge
+    /// packs, and on the 2v2 map extra health packs. Walk over one hurt (an ultimate pack: with room in your meter) and alive and it
+    /// gives, then it is gone for everyone until it returns.
     /// State: ONE Room Property per pack, "hp" + index, written ONLY by the master with a check-and-set; a player asks through
     /// its own Player Property "hpReq" and heals when it READS the echo naming it, never on the send. No RPC. Every client
     /// builds and draws the packs itself from the room and the server clock alone, so all agree; a pack whose zone the map
@@ -38,6 +40,9 @@ namespace Overpower.Match
             public int zone;
             public string key;             // "hp" + index, built once
             public bool recess;            // the cut wall's recess pack: "zone" is its index, not a zone
+            public bool spot;              // a pack from this map's spot list: "zone" is its id, not a zone, and it is always in play
+            public bool ultimate;          // gives ultimate charge instead of health
+            public float healAmount;
             public Vector3 centre;         // the pack's ground point
             public GameObject root;
             public HealthPackView view;
@@ -58,10 +63,12 @@ namespace Overpower.Match
         private int nextRequestId;
         private int lastHealedRequestId;
         private PlayerHealth localHealth;
+        private UltimateCharge localUltimate;
         private readonly Dictionary<int, int> lastHandledByActor = new Dictionary<int, int>();
 
         /// <summary>Diagnostics for tests and recordings.</summary>
         public int HealsApplied { get; private set; }
+        public int UltimateGrantsApplied { get; private set; }
         public int RequestsSent { get; private set; }
         public int GrantsWritten { get; private set; }
 
@@ -118,6 +125,7 @@ namespace Overpower.Match
                 return;
 
             EnsurePacks();
+            EnsureSpotPacks();
 
             int now = PhotonNetwork.ServerTimestamp;
             if (now == 0)
@@ -157,7 +165,7 @@ namespace Overpower.Match
             {
                 if (!buildings.TryGetZoneCentre(zone, out Vector3 tower))
                     continue;
-                packs[zone] = Build(zone, SpotFor(tower), recess: false);
+                packs[zone] = Build(zone, SpotFor(tower), recess: false, config.HealAmount);
             }
             packsSettled = settled;
         }
@@ -188,11 +196,35 @@ namespace Overpower.Match
             }
             recessPack = index;
             if (index >= 0)
-                packs[index] = Build(index, new Vector3(spot.x, 0f, spot.y), recess: true);
+                packs[index] = Build(index, new Vector3(spot.x, 0f, spot.y), recess: true, config.HealAmount);
+        }
+
+        private bool spotPacksBuilt;
+
+        /// <summary>This map's spot packs, once per scene: the list in HealthPackConfig whose scene name is this scene's.</summary>
+        private void EnsureSpotPacks()
+        {
+            if (spotPacksBuilt) return;
+            spotPacksBuilt = true;
+            int set = HealthPackRules.SpotSetIndex(config.SpotSceneNames, gameObject.scene.name);
+            if (set < 0) return;
+            HealthPackConfig.PackSpotSet spots = config.SpotSet(set);
+            int index = 0;
+            foreach (Vector2 at in spots.UltimateSpots)
+                AddSpotPack(index++, at, ultimate: true, spots.HealAmount);
+            foreach (Vector2 at in spots.HealthSpots)
+                AddSpotPack(index++, at, ultimate: false, spots.HealAmount);
+        }
+
+        private void AddSpotPack(int index, Vector2 at, bool ultimate, float healAmount)
+        {
+            int id = HealthPackRules.SpotPackId(index);
+            Pack pack = Build(id, new Vector3(at.x, 0f, at.y), recess: false, healAmount, spotPack: true, ultimate: ultimate);
+            packs[id] = pack;
         }
 
         private static bool InPlay(Pack pack, MatchDirector match) =>
-            HealthPackRules.PackInPlay(pack.recess, match != null && match.IsOutOfPlay(pack.zone));
+            HealthPackRules.PackInPlay(pack.recess || pack.spot, !pack.spot && match != null && match.IsOutOfPlay(pack.zone));
 
         /// <summary>The pack's spot for the zone whose tower is at <paramref name="tower"/>: the authored recess point
         /// (turned into that zone's third), or the tower itself when there is no arena or layout to read it from (a
@@ -212,14 +244,16 @@ namespace Overpower.Match
         // A zone's pack stands in its Tier III recess, midway between the arena wall behind it and the low barrier across
         // its mouth. That spot is authored once (ArenaLayout.HealthPackPoint, Source third); the copy nearest this zone's
         // tower is the one in its recess, so the three packs are placed by the same rule.
-        private Pack Build(int zone, Vector3 spot, bool recess)
+        private Pack Build(int zone, Vector3 spot, bool recess, float healAmount, bool spotPack = false, bool ultimate = false)
         {
             float ground = CaptureRingView.GroundHeight(spot, 0.5f);
-            var pack = new Pack { zone = zone, key = PackKey(zone), recess = recess, centre = new Vector3(spot.x, ground, spot.z) };
+            var pack = new Pack { zone = zone, key = PackKey(zone), recess = recess, spot = spotPack, ultimate = ultimate, healAmount = healAmount,
+                                  centre = new Vector3(spot.x, ground, spot.z) };
 
             solidMaterial = solidMaterial != null ? solidMaterial : new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            string packName = recess ? "Health Pack (recess " + zone + ")" : "Health Pack (zone " + zone + ")";
-            pack.view = HealthPackView.Create(transform, pack.centre, packName, config, theme, solidMaterial);
+            string packName = ultimate ? "Ultimate Pack (spot " + zone + ")" : spotPack ? "Health Pack (spot " + zone + ")"
+                            : recess ? "Health Pack (recess " + zone + ")" : "Health Pack (zone " + zone + ")";
+            pack.view = HealthPackView.Create(transform, pack.centre, packName, config, theme, solidMaterial, ultimate);
             pack.root = pack.view.gameObject;
             return pack;
         }
@@ -243,6 +277,7 @@ namespace Overpower.Match
                 foreach (PlayerHealth candidate in FindObjectsByType<PlayerHealth>(FindObjectsSortMode.None))
                     if (candidate.HasLocalAuthority) { localHealth = candidate; break; }
                 if (localHealth == null) return;
+                localUltimate = localHealth.GetComponent<UltimateCharge>();
             }
 
             Vector3 position = BodyPosition(localHealth);
@@ -257,8 +292,10 @@ namespace Overpower.Match
 
                 bool inPlay = InPlay(pack, match);
                 bool available = IsPackAvailable(pack, now, match);
-                if (!HealthPackRules.MayTake(localHealth.IsAlive, localHealth.Health, localHealth.MaxHealth,
-                                             config.MinimumMissingHealth, available, inPlay))
+                bool mayTake = pack.ultimate
+                    ? HealthPackRules.MayTakeUltimate(localHealth.IsAlive, localUltimate == null || localUltimate.IsFull, available, inPlay)
+                    : HealthPackRules.MayTake(localHealth.IsAlive, localHealth.Health, localHealth.MaxHealth, config.MinimumMissingHealth, available, inPlay);
+                if (!mayTake)
                     continue;
                 if (pack.attempts >= config.MaxAttemptsPerVisit)
                     continue;
@@ -325,7 +362,7 @@ namespace Overpower.Match
             int[] roomValue = ReadRoomValue(pack.key);
             int[] basis = pack.pending != null && Time.unscaledTime < pack.pendingUntil ? pack.pending : roomValue;
             HealthPackRules.Decision decision = HealthPackRules.Decide(basis, now, alive, inPlay, inRange,
-                                                                       targetPlayer.ActorNumber, requestId, config.RespawnMs, LiveAtMs(match));
+                                                                       targetPlayer.ActorNumber, requestId, RespawnMsOf(pack), LiveAtMs(match));
             if (!decision.Granted)
                 return;
 
@@ -376,11 +413,19 @@ namespace Overpower.Match
                 if (localHealth == null)
                     continue;
                 if (!HealthPackRules.EchoIsMyFreshTake(value, PhotonNetwork.LocalPlayer.ActorNumber, nextRequestId,
-                                                       lastHealedRequestId, PhotonNetwork.ServerTimestamp, config.RespawnMs))
+                                                       lastHealedRequestId, PhotonNetwork.ServerTimestamp, RespawnMsOf(pack)))
                     continue;
 
                 lastHealedRequestId = nextRequestId;
-                if (localHealth.Heal(config.HealAmount) > 0f)
+                if (pack.ultimate)
+                {
+                    if (localUltimate != null)
+                    {
+                        localUltimate.AddFraction(config.UltimateChargeFraction);
+                        UltimateGrantsApplied++;
+                    }
+                }
+                else if (localHealth.Heal(pack.healAmount) > 0f)
                     HealsApplied++;
             }
         }
@@ -398,7 +443,9 @@ namespace Overpower.Match
         private static int LiveAtMs(MatchDirector match) => match != null && match.IsLive ? match.LiveAtMs : 0;
 
         private bool IsPackAvailable(Pack pack, int now, MatchDirector match) =>
-            HealthPackRules.IsAvailable(ReadRoomValue(pack.key), now, LiveAtMs(match), config.RespawnMs);
+            HealthPackRules.IsAvailable(ReadRoomValue(pack.key), now, LiveAtMs(match), RespawnMsOf(pack));
+
+        private int RespawnMsOf(Pack pack) => pack.ultimate ? config.UltimateRespawnMs : config.RespawnMs;
 
         private static float FlatDistance(Vector3 a, Vector3 b)
         {

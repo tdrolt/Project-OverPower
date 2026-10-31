@@ -63,6 +63,23 @@ namespace Overpower.Match
             public Decision(bool granted, int[] newValue) { Granted = granted; NewValue = newValue; }
         }
 
+        /// <summary>An ultimate charge pack: alive, ready, in play, and a meter with room left (a full one leaves it for the others).</summary>
+        public static bool MayTakeUltimate(bool alive, bool meterFull, bool available, bool inPlay) => alive && !meterFull && available && inPlay;
+
+        /// <summary>Which of the configured spot lists belongs to this map (its scene name), or -1 for none.</summary>
+        public static int SpotSetIndex(System.Collections.Generic.IReadOnlyList<string> sceneNames, string scene)
+        {
+            if (sceneNames == null) return -1;
+            for (int i = 0; i < sceneNames.Count; i++)
+                if (sceneNames[i] == scene) return i;
+            return -1;
+        }
+
+        /// <summary>The pack id (and room value key) of the map's index-th spot pack: well above every zone and the recess pack.</summary>
+        public static int SpotPackId(int index) => SpotPackFirstId + index;
+
+        private const int SpotPackFirstId = 100;
+
         /// <summary>Available when nothing was ever taken here, or the take has run its course.</summary>
         public static bool IsAvailable(int[] value, int nowMs) =>
             value == null || value.Length < ValueLength || unchecked(nowMs - value[TakenUntilIndex]) >= 0;
