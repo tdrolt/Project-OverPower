@@ -5,7 +5,7 @@ namespace Overpower.Combat
 {
     public enum StatusKind { Burn, Slow, Stun, Vulnerability, Invulnerability }
 
-    public enum StackRule { Refresh, StackToCap, LongestWins }
+    public enum StackRule { Refresh, StackToCap, LongestWins, StackToCapRefreshAll }
 
     [System.Serializable]
     public struct StatusEffectSpec
@@ -42,7 +42,8 @@ namespace Overpower.Combat
     ///   Burn            - Refresh: a fresh application replaces the remaining duration outright.
     ///   Slow            - StackToCap: magnitudes add, clamped to slowCap.
     ///   Stun            - LongestWins: only the longest remaining duration survives.
-    ///   Vulnerability   - StackToCap: magnitudes add, clamped to vulnerabilityCap.
+    ///   Vulnerability   - StackToCapRefreshAll: magnitudes add, clamped to vulnerabilityCap; every new stack sets every stack's
+    ///                     time back to the new one's, so they all end together (the Raybeam's stacks, Tudor 31 Oct).
     ///   Invulnerability - LongestWins: only the longest remaining duration survives.
     /// </summary>
     public sealed class StatusEffectState
@@ -85,6 +86,17 @@ namespace Overpower.Combat
                         stacksByKind[spec.kind] = stacks;
                     }
                     stacks.Add(instance);
+                    break;
+
+                case StackRule.StackToCapRefreshAll:
+                    if (!stacksByKind.TryGetValue(spec.kind, out var refreshed))
+                    {
+                        refreshed = new List<Instance>();
+                        stacksByKind[spec.kind] = refreshed;
+                    }
+                    for (int i = 0; i < refreshed.Count; i++)
+                        refreshed[i] = new Instance { magnitude = refreshed[i].magnitude, remaining = spec.duration };
+                    refreshed.Add(instance);
                     break;
 
                 case StackRule.LongestWins:
@@ -183,7 +195,7 @@ namespace Overpower.Combat
                 case StatusKind.Burn: return StackRule.Refresh;
                 case StatusKind.Slow: return StackRule.StackToCap;
                 case StatusKind.Stun: return StackRule.LongestWins;
-                case StatusKind.Vulnerability: return StackRule.StackToCap;
+                case StatusKind.Vulnerability: return StackRule.StackToCapRefreshAll;
                 case StatusKind.Invulnerability: return StackRule.LongestWins;
                 default: return StackRule.Refresh;
             }

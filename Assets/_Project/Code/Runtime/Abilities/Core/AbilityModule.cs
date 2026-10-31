@@ -128,6 +128,9 @@ namespace Overpower.Abilities
         public float RechargeProgress => pool != null ? pool.RechargeProgress : 0f;
         public virtual bool IsActive => false;
 
+        /// <summary>Owner only: true while this ability keeps the caster from shooting and from using another ability (the Raybeam's channel).</summary>
+        public virtual bool LocksCaster => false;
+
         /// <summary>The serialized cooldown this module was authored with: the DESIGN number, not a live remaining
         /// cooldown. The loadout screen's hover text reads a MODULE PREFAB ASSET, where ChargesAvailable and
         /// RechargeProgress are 0 (no pool: Bind never ran); this and ConfiguredCharges exist either way.</summary>

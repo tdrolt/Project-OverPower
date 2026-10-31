@@ -177,7 +177,13 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
             // buffered press.
             module.TickCooldown(deltaTime);
 
-            if (pressBuffers[i].IsPending(now, window) &&
+            if (LockedByAnother(i))
+            {
+                // A press during another ability's channel (the Raybeam's) is dropped, not saved for after.
+                if (pressBuffers[i].IsPending(now, window))
+                    pressBuffers[i].TryConsume(now, window);
+            }
+            else if (pressBuffers[i].IsPending(now, window) &&
                 CastGate.ForAbility(actorBlock, module.HasChargeGate, module.HasCharge, module.IsReady) == CastBlock.None)
             {
                 bool cast = TryCast(module);
@@ -195,6 +201,17 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
             bool held = canAct && IsHeld(SlotFromIndex(i));
             module.OwnerTick(deltaTime, held, actorBlock);
         }
+    }
+
+    /// <summary>Owner only: an ability (the Raybeam's channel) keeps this player from shooting and from using another ability.</summary>
+    public bool CasterLocked => LockedByAnother(-1);
+
+    private bool LockedByAnother(int slotIndex)
+    {
+        for (int i = 0; i < SlotCount; i++)
+            if (i != slotIndex && modules[i] != null && modules[i].LocksCaster)
+                return true;
+        return false;
     }
 
     /// <summary>

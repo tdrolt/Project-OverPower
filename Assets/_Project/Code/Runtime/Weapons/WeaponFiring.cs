@@ -67,6 +67,7 @@ namespace Overpower.Weapons
         private PlayerLifecycle lifecycle;
         private PlayerInputRouter input;
         private PlayerStatusEffects statusEffects;
+        private AbilityRunner abilities;
 
         private WeaponDefinition weapon;
         private float nextFireTime;
@@ -164,6 +165,7 @@ namespace Overpower.Weapons
             lifecycle = GetComponent<PlayerLifecycle>();
             input = GetComponent<PlayerInputRouter>();
             statusEffects = GetComponent<PlayerStatusEffects>();
+            abilities = GetComponent<AbilityRunner>();
             buildingMask = LayerMask.GetMask("Building");
 
             // A silent null here would leave this player unable to fire at all, or - worse - able
@@ -310,7 +312,10 @@ namespace Overpower.Weapons
             // Routing the trigger through CastGate instead of this class's own if-chain is what
             // keeps "can this player act right now" from drifting between the weapon and whatever
             // ability checks it next - a stun that should freeze a dash must freeze the gun too.
-            if (ActorBlock() != CastBlock.None)
+            bool blocked = ActorBlock() != CastBlock.None;
+            if (!blocked && abilities != null)
+                blocked = abilities.CasterLocked; // an ability's channel (the Raybeam) keeps the gun quiet like a stun does
+            if (blocked)
             {
                 // Without this, a blocked player's stale nextFireTime sat wherever it was left when the block started, and the first tick after the block
                 // lifted could misread as "still mid-cadence" and fire a shot only a sliver of an interval later - see FireScheduleRule.

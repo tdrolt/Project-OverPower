@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Overpower.Combat;
@@ -9,114 +10,106 @@ using Overpower.Vision;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Three beams from the gun, the outer two converging at Beam Convergence Range straight down the aim (a ground cursor cannot be clicked
-    /// precisely enough at range to converge on it), each applying Vulnerability once to every enemy it crosses (pierce) up to the first wall or
-    /// IStructure. Zero damage; the third beam is redundancy against a partial miss, and the stacking cap is GameplayConfig's Vulnerability Cap.
-    /// Beam Width is the one home for what hits and what is drawn (one merged beam, RaybeamBeamView). The press only starts the wind-up
-    /// (RaybeamWindup); the caster's machine then fires with the aim of that moment or cancels, and only firing spends the meter, which alone
-    /// gates the press. The fire phase runs on every client from the synced rays; status is victim-side (the receiver's IsMine guard).
+    /// A cast time (RaybeamWindup: a red hexagon shrinking at the gun), then ONE beam channelled from the gun along the caster's aim for Channel
+    /// Seconds (RaybeamChannel): it damages the first enemy it touches and gives that enemy one vulnerability stack per full second spent in it.
+    /// Walls and placed cover stop it, the short barriers never do (HitMasks). The meter is spent as the channel starts; a stun, a knockback or
+    /// death ends it early, an overheat does not. RUNS ON EVERY CLIENT from the channel phase, re-reading the caster's gun and facing each frame
+    /// (PlayerAim turns the body, PlayerNetSync replicates it), as the Flamethrower does; damage and status are victim-side (only the target's
+    /// own client acts on ApplyDamage/ApplyStatus). Only the owner slows the caster and locks the gun and the other abilities (LocksCaster).
     /// </summary>
     public sealed class RaybeamAbility : AbilityModule
     {
-        [Header("Beams")]
-        [SerializeField, Tooltip("Extra damage taken from ONE beam, as a fraction - 0.30 means " +
-                 "+30%. The real cap on stacking several is NOT set here: it lives on GameplayConfig " +
-                 "as Vulnerability Cap (0.60), shared by every debuff in the game that applies this " +
-                 "status, so two or three beams landing together read +60%, never +90%.")]
-        private float vulnerabilityPerBeam = 0.30f;
+        [Header("Beam")]
+        [SerializeField, Tooltip("Damage per second the beam deals to the enemy it touches, before that enemy's vulnerability (which the beam " +
+                 "itself raises), through the normal damage funnel: armour, shields and immunity apply as for any damage.")]
+        private float damagePerSecond = 5f;
 
-        [SerializeField, Tooltip("How many seconds the +damage debuff lasts from ONE beam. A second " +
-                 "raybeam landing before this runs out adds a fresh stack of its own rather than " +
-                 "extending this one, but the reported time-left reads as a refresh either way, " +
-                 "since it always shows whichever stack has the most time remaining.")]
+        [SerializeField, Tooltip("How long the beam lasts once the cast time is over, in seconds. A stun, a knockback or death ends it sooner.")]
+        private float channelSeconds = 3f;
+
+        [SerializeField, Tooltip("Extra damage taken per vulnerability stack, as a fraction: 0.2 means +20%. The total is capped by GameplayConfig's " +
+                 "Vulnerability Cap (0.6 = three stacks).")]
+        private float vulnerabilityPerStack = 0.2f;
+
+        [SerializeField, Tooltip("Seconds an enemy must spend in the beam for each vulnerability stack. The time adds up over one channel, so a " +
+                 "target the beam slips off and finds again keeps what it had.")]
+        private float secondsPerStack = 1f;
+
+        [SerializeField, Tooltip("How long the vulnerability lasts, in seconds. Every new stack sets the time of all of them back to this.")]
         private float vulnerabilitySeconds = 4f;
 
-        [SerializeField, Tooltip("How far apart the two outer beams start either side of the muzzle, in metres. The three lines are " +
-                 "drawn as one beam, so this is not a visible gap: with Beam Width it sets how wide the beam is at the gun, and with " +
-                 "Beam Convergence Range where the lines cross. Narrow enough that all three still converge on one target at the " +
-                 "tuned range below.")]
-        private float beamOriginSpacing = 0.9f;
-
-        [SerializeField, Tooltip("How far each beam TRAVELS AND DEBUFFS from its OWN origin, in metres, pierce included. Two things " +
-                 "at once: the CAMERA sets how far out you can place the cursor on screen (about 38m at the zoom a match " +
-                 "starts at, the farthest; about 19m with the wheel zoomed all the way in) - but when the beams fire, the cursor's point is pulled back to THIS " +
-                 "number whenever the cursor sits further away than it, so the beams meet at this distance instead of " +
-                 "at the cursor. That makes this both how far a beam keeps hitting things past its target AND the " +
-                 "furthest point the three beams can ever converge, whatever the camera would otherwise let you reach.")]
+        [SerializeField, Tooltip("How far the beam reaches from the gun, in metres, when no enemy, wall or cover stops it first.")]
         private float beamRange = 28.8f;
 
-        [SerializeField, Tooltip("Diameter of each of the three hit lines, in metres - BOTH what it hits (the SphereCast radius is half " +
-                 "of it) AND what you see: the drawn beam spans the outer lines' outer edges, each exactly this wide, and its white " +
-                 "core is a share of this width. One number, one home.")]
+        [SerializeField, Tooltip("Width of the beam, in metres - BOTH what it hits (the SphereCast radius is half of it) AND what you see: the " +
+                 "drawn beam is exactly this wide, and its white core is a share of this width. One number, one home.")]
         private float beamWidth = 0.6825f;
 
-        [SerializeField, Tooltip("How far downrange, in metres, the two OUTER beams are aimed to cross the centre beam's line - a " +
-                 "fixed distance along the shooter's own aim direction, not wherever the cursor happens to sit. The " +
-                 "raybeam is a long-range ultimate, so the crossing point is fixed here. Converging on the cursor's " +
-                 "exact depth already works at any range for a pixel-perfect click, but a ground cursor cannot " +
-                 "deliver pixel-perfect depth at range, which is what actually limited the old stacked-vulnerability " +
-                 "bonus to close quarters. Fixing the crossing point here instead means catching two or three beams " +
-                 "is about closing to roughly this distance and firing along the target, not about clicking one exact " +
-                 "metre of ground. Default 15 sits in the middle of the 10-20m band the ultimate is meant to reward; " +
-                 "clamped to Beam Range so it can never ask a beam to converge past where it stops existing.")]
-        private float beamConvergenceRange = 15f;
-
-        [SerializeField, Tooltip("Which layers a beam can hit. Default is where living players and " +
-                 "dummies sit; Building is the walls a beam must stop at. Deployable cover is found " +
-                 "as an IStructure on whatever collider it actually sits on, whichever layer that is.")]
+        [SerializeField, Tooltip("Which layers the beam can hit. Default is where living players and dummies sit; Building is the walls it " +
+                 "stops at. Deployable cover is found as an IStructure on whatever collider it actually sits on, whichever layer that is.")]
         private LayerMask hitMask = ~0;
 
-        [Header("Wind-up")]
-        [SerializeField, Tooltip("Seconds from pressing the Raybeam to the beams firing. Meanwhile a red hexagon shrinks at your gun " +
-                 "for everyone who can see you, and you can still move and aim: the beams fire from wherever your gun is and points " +
-                 "when it ends. Being stunned or dying during it cancels the Raybeam, and your ultimate meter stays full; " +
-                 "overheating does not, the beams still fire. 0 fires at the press.")]
-        private float windupSeconds = 0.2f;
+        [Header("Cast time and channel")]
+        [SerializeField, Tooltip("Seconds from pressing the Raybeam to the beam starting (the cast time). Meanwhile a red hexagon shrinks at " +
+                 "your gun for everyone who can see you, and you can still move and aim. Being stunned or dying during it cancels the Raybeam " +
+                 "and your ultimate meter stays full; overheating does not. 0 starts the beam at the press.")]
+        private float windupSeconds = 0.6f;
+
+        [SerializeField, Tooltip("How fast the caster walks while the beam is on, as a share of their speed: 0.5 = half speed. They cannot " +
+                 "shoot or use another ability meanwhile.")]
+        private float channelMoveMultiplier = 0.5f;
 
         [Header("Visuals")]
-        [SerializeField, Tooltip("The visible beam: the three hit lines drawn as ONE beam spanning the outer lines' outer edges (each " +
-                 "line exactly Beam Width wide): Raybeam Beam (one red sheath, one white-hot core, one team-colour outline). Any other " +
-                 "prefab with a Line Renderer draws the centre line as a plain line. Leave empty for invisible beams (useful while " +
-                 "first wiring the ability up).")]
+        [SerializeField, Tooltip("The visible beam: Raybeam Beam (one red sheath, one white-hot core, one team-colour outline), kept for the " +
+                 "whole channel and laid along the beam every frame. Any other prefab with a Line Renderer draws a plain line. Leave empty for " +
+                 "an invisible beam.")]
         private GameObject beamVfx;
 
-        [SerializeField, Tooltip("Seconds the beam stays on screen. Purely visual - the status " +
-                 "application already happened the instant the beams fired.")]
-        private float beamVisualSeconds = 0.15f;
-
-        [SerializeField, Tooltip("The scorch that flashes where a beam stops on a wall or a placed cover. Shown where your team " +
-                 "can see that spot, like a gun's impact. Leave empty for no scorch.")]
+        [SerializeField, Tooltip("The scorch that flashes where the beam rests on a wall or a placed cover. Shown where your team can see that " +
+                 "spot, like a gun's impact. Leave empty for no scorch.")]
         private GameObject scorchVfx;
 
-        // Not a tuning value, matching Hitscan's MaxContacts: nine players with a couple of colliders each plus the
-        // walls along a beam fit comfortably.
+        [SerializeField, Tooltip("How often the scorch flashes again while the beam rests on a wall, in seconds.")]
+        private float scorchEverySeconds = 0.25f;
+
+        // Not a tuning value, matching Hitscan's MaxContacts: nine players with a couple of colliders each plus the walls along a beam fit.
         private const int MaxContacts = 32;
-        private const byte PhaseWindup = 0, PhaseFire = 1, PhaseCancel = 2; // 0 is always the press (CastEvent.Phase)
+        private const byte PhaseWindup = 0, PhaseChannel = 1, PhaseCancel = 2; // 0 is always the press (CastEvent.Phase)
         private readonly RaycastHit[] hitBuffer = new RaycastHit[MaxContacts];
         private readonly List<BeamContact> contactBuffer = new List<BeamContact>(MaxContacts);
         private readonly List<Vector3> normalBuffer = new List<Vector3>(MaxContacts); // alongside contactBuffer: where a scorch faces
 
-        // Vulnerability's magnitude and duration never change per cast, so the spec is built once
-        // rather than re-boxed every ExecuteCast.
         private StatusEffectSpec vulnerabilitySpec;
 
-        private readonly Vector3[] lineFrom = new Vector3[3], lineTo = new Vector3[3];
+        private readonly Vector3[] lineFrom = new Vector3[1], lineTo = new Vector3[1];
         private bool windingUp; // owner only
         private float windupStartedAt;
+        private bool channelling; // owner only: the lock and the slow
+        private float channelStartedAt;
         private RaybeamChargeView charge;
         private bool chargeBuilt;
+
+        // Every client: the beam being drawn and who is in it.
+        private Coroutine beamRoutine;
+        private GameObject beam;
+        private int beamCasterActor, beamCasterTeam;
+        private float nextScorchAt;
+        private readonly Dictionary<IDamageable, float> secondsInBeam = new Dictionary<IDamageable, float>();
+        private System.Func<Vector3, Vector3, bool> beamSeenAlong;
 
         protected override void OnValidate()
         {
             base.OnValidate();
-            vulnerabilityPerBeam = Mathf.Max(0f, vulnerabilityPerBeam);
+            damagePerSecond = Mathf.Max(0f, damagePerSecond);
+            channelSeconds = Mathf.Max(0f, channelSeconds);
+            vulnerabilityPerStack = Mathf.Max(0f, vulnerabilityPerStack);
+            secondsPerStack = Mathf.Max(0.01f, secondsPerStack);
             vulnerabilitySeconds = Mathf.Max(0f, vulnerabilitySeconds);
-            beamOriginSpacing = Mathf.Max(0f, beamOriginSpacing);
             beamRange = Mathf.Max(0.1f, beamRange);
             beamWidth = Mathf.Max(0.01f, beamWidth);
-            beamConvergenceRange = Mathf.Clamp(beamConvergenceRange, 0.1f, beamRange);
             windupSeconds = Mathf.Max(0f, windupSeconds);
-            beamVisualSeconds = Mathf.Max(0f, beamVisualSeconds);
+            channelMoveMultiplier = Mathf.Clamp01(channelMoveMultiplier);
+            scorchEverySeconds = Mathf.Max(0.02f, scorchEverySeconds);
             RebuildSpec();
         }
 
@@ -129,6 +122,9 @@ namespace Overpower.Abilities
         {
             if (charge != null)
                 Destroy(charge.gameObject);
+            HideBeam();
+            if (channelling && Owner?.Motor != null)
+                Owner.Motor.RemoveSpeedMultiplier(this);
         }
 
         /// <summary>Rebuilt once more here: Awake/OnValidate run before Bind assigns Definition (AbilityModule: "do not
@@ -141,21 +137,22 @@ namespace Overpower.Abilities
             {
                 kind = StatusKind.Vulnerability,
                 duration = vulnerabilitySeconds,
-                magnitude = vulnerabilityPerBeam,
-                // Definition is null here when OnValidate runs on the raw prefab asset (before Bind
-                // ever assigns it) - see AbilityModule's own OnValidate comment.
+                magnitude = vulnerabilityPerStack,
+                // Definition is null here when OnValidate runs on the raw prefab asset (before Bind ever assigns it).
                 abilityId = Definition != null ? Definition.Id : -1
             };
         }
 
         // ---- owner only ---------------------------------------------------------------------------
 
-        /// <summary>Full meter only, like the other ultimates, and not while a wind-up is already charging: the base class's 1 charge and
-        /// 0 s cooldown recover instantly, so without this override that pool would never refuse a cast and Raybeam would be spammable.</summary>
-        public override bool IsReady => RaybeamWindup.IsReady(Owner.UltimateCharge != null && Owner.UltimateCharge.IsFull, windingUp);
+        /// <summary>Full meter only, like the other ultimates, and not while a cast or a beam is under way: the base class's 1 charge and
+        /// 0 s cooldown recover instantly, so without this override that pool would never refuse a cast.</summary>
+        public override bool IsReady => RaybeamWindup.IsReady(Owner.UltimateCharge != null && Owner.UltimateCharge.IsFull, windingUp || channelling);
 
-        /// <summary>The press only starts the wind-up: the payload tells every client where the gun was, for the hexagon. The meter is
-        /// not spent here but when the beams fire (EndWindup), so a cancelled wind-up leaves it full.</summary>
+        public override bool LocksCaster => RaybeamChannel.LocksCaster(channelling);
+
+        /// <summary>The press only starts the cast time: the payload tells every client where the gun was, for the hexagon. The meter is
+        /// spent when the beam starts (EndWindup), so a cancelled cast leaves it full.</summary>
         public override bool TryBuildCast(in CastContext ctx, out CastPayload payload)
         {
             payload = default;
@@ -170,21 +167,38 @@ namespace Overpower.Abilities
 
         public override void OwnerTick(float deltaTime, bool held, CastBlock actorBlock)
         {
-            if (!windingUp)
+            if (windingUp)
+            {
+                RaybeamWindupStep step = RaybeamWindup.Step(Time.time - windupStartedAt, windupSeconds, actorBlock);
+                if (step != RaybeamWindupStep.Waiting)
+                    EndWindup(step);
                 return;
-            RaybeamWindupStep step = RaybeamWindup.Step(Time.time - windupStartedAt, windupSeconds, actorBlock);
-            if (step != RaybeamWindupStep.Waiting)
-                EndWindup(step);
+            }
+            if (channelling)
+                TickChannel(actorBlock);
         }
 
-        /// <summary>A death, a stun or an unequip ends the wind-up; a silence does not (RaybeamWindup.InterruptCancels). Died and Unequipped
-        /// reach every client, Stunned only the owner, whose cancel phase hides the hexagon everywhere else.</summary>
+        private void TickChannel(CastBlock actorBlock)
+        {
+            bool knockedBack = Owner.Displacement is PlayerDisplacement displacement && displacement.IsKnockedBack;
+            RaybeamChannelStep step = RaybeamChannel.Step(Time.time - channelStartedAt, channelSeconds, actorBlock, knockedBack);
+            if (step == RaybeamChannelStep.Broken)
+                EndChannel(sendCancel: true);
+            else if (step == RaybeamChannelStep.Finished)
+                EndChannel(sendCancel: false); // every client ends its own beam after Channel Seconds
+        }
+
+        /// <summary>A death, a stun or an unequip ends the cast time or the beam; a silence does not (RaybeamWindup.InterruptCancels). Died and
+        /// Unequipped reach every client, Stunned only the owner, whose cancel phase ends the beam everywhere else.</summary>
         public override void Interrupt(InterruptReason reason)
         {
             if (!RaybeamWindup.InterruptCancels(reason))
                 return;
             if (windingUp)
                 EndWindup(RaybeamWindupStep.Cancel);
+            if (channelling)
+                EndChannel(sendCancel: true);
+            HideBeam();
             if (charge != null)
                 charge.End();
         }
@@ -193,31 +207,24 @@ namespace Overpower.Abilities
         {
             windingUp = false;
             if (RaybeamWindup.SpendsUltimate(end) && Owner.UltimateCharge != null && Owner.UltimateCharge.Spend())
-                SendPhase(PhaseFire, BeamPayload(CurrentContext()));
+            {
+                // Set before the send: with RpcTarget.All the caster's own ExecuteCast runs inside it.
+                channelling = true;
+                channelStartedAt = Time.time;
+                Owner.Motor?.AddSpeedMultiplier(this, channelMoveMultiplier);
+                CastContext ctx = CurrentContext();
+                SendPhase(PhaseChannel, new CastPayload { Origin = ctx.Muzzle, Direction = ctx.AimDirection, Point = ctx.TargetPoint });
+            }
             else
                 SendPhase(PhaseCancel, default);
         }
 
-        /// <summary>
-        /// Origin is the MUZZLE (ctx.Muzzle, the wall-safe one), not the body: three beams from the gun read better than
-        /// from the chest, and SafeMuzzlePosition keeps it off the inside of a wall the caster is pressed against.
-        /// Point is the cursor's ground point with Y set to muzzle height (a ground point would angle every beam into the
-        /// floor), clamped to Beam Range from the muzzle.
-        /// </summary>
-        private CastPayload BeamPayload(in CastContext ctx)
+        private void EndChannel(bool sendCancel)
         {
-            Vector3 origin = ctx.Muzzle;
-
-            Vector3 rawPoint = ctx.TargetPoint;
-            rawPoint.y = origin.y; // A ground point sends beams into the floor.
-
-            Vector3 toRaw = rawPoint - origin;
-            float rawDistance = toRaw.magnitude;
-            Vector3 point = (rawDistance > beamRange && rawDistance > 0.0001f)
-                ? origin + toRaw / rawDistance * beamRange
-                : rawPoint;
-
-            return new CastPayload { Origin = origin, Direction = ctx.AimDirection, Point = point };
+            channelling = false;
+            Owner.Motor?.RemoveSpeedMultiplier(this);
+            if (sendCancel)
+                SendPhase(PhaseCancel, default);
         }
 
         // ---- every client -------------------------------------------------------------------------
@@ -229,14 +236,15 @@ namespace Overpower.Abilities
                 case PhaseWindup:
                     ShowCharge(cast);
                     return;
-                case PhaseFire:
+                case PhaseChannel:
                     if (charge != null)
                         charge.End();
-                    FireBeams(cast);
+                    StartBeam(cast);
                     return;
                 case PhaseCancel:
                     if (charge != null)
                         charge.End();
+                    HideBeam();
                     return;
             }
         }
@@ -253,42 +261,40 @@ namespace Overpower.Abilities
                 charge.Begin(Time.time - cast.SecondsLate, windupSeconds, cast.CasterTeam);
         }
 
-        private void FireBeams(in CastEvent cast)
+        private void StartBeam(in CastEvent cast)
         {
-            Vector3 origin = cast.Payload.Origin;
-            Vector3 direction = cast.Payload.Direction;
-            int casterActor = cast.CasterActor;
-            int casterTeam = cast.CasterTeam;
-
-            RaybeamGeometry.BeamOrigins(origin, direction, beamOriginSpacing,
-                out Vector3 left, out Vector3 centre, out Vector3 right);
-
-            // The outer beams converge on a FIXED point down the shooter's aim direction (beamConvergenceRange), never
-            // on cast.Payload.Point (still sent, but it does not decide where beams cross). The centre beam's origin sits on
-            // the aim line, so the same point is identical to firing straight down direction and keeps one formula.
-            // The formula lives in RaybeamGeometry so it has its own test.
-            Vector3 convergePoint = RaybeamGeometry.ConvergencePoint(origin, direction, beamConvergenceRange, beamRange);
-
-            lineFrom[0] = left;
-            lineFrom[1] = centre;
-            lineFrom[2] = right;
-            for (int i = 0; i < lineFrom.Length; i++)
-                lineTo[i] = FireOneBeam(lineFrom[i], convergePoint, direction, casterActor, casterTeam);
-            DrawBeam(origin, direction, casterTeam);
+            HideBeam();
+            beamCasterActor = cast.CasterActor;
+            beamCasterTeam = cast.CasterTeam;
+            secondsInBeam.Clear(); // the time in the beam counts per channel
+            nextScorchAt = 0f;
+            beamRoutine = StartCoroutine(BeamRoutine(cast.SecondsLate));
         }
 
-        /// <summary>
-        /// One beam: resolve who it crosses, apply the debuff to each once, scorch where it stops; returns where it ended. No
-        /// ApplyDamage at all (zero damage; SonicPulseAbility likewise carries no dead "damage" field).
-        /// </summary>
-        private Vector3 FireOneBeam(Vector3 beamOrigin, Vector3 point, Vector3 fallbackDirection,
-                                 int casterActor, int casterTeam)
+        private IEnumerator BeamRoutine(float secondsLate)
         {
-            Vector3 aimDirection = RaybeamGeometry.AimFromOriginToPoint(beamOrigin, point, fallbackDirection);
+            float elapsed = Mathf.Max(0f, secondsLate);
+            while (elapsed < channelSeconds)
+            {
+                BeamTick(Time.deltaTime);
+                yield return null;
+                elapsed += Time.deltaTime;
+            }
+            beamRoutine = null;
+            HideBeam();
+        }
 
-            int count = Physics.SphereCastNonAlloc(beamOrigin, beamWidth * 0.5f, aimDirection, hitBuffer,
-                                                   beamRange, BuildMask(), QueryTriggerInteraction.Ignore);
+        /// <summary>One frame of beam, on every client: from the caster's gun along their facing, to the first enemy, wall or cover. Damage and
+        /// stacks are offered to whatever it touches; only that target's own client takes them.</summary>
+        private void BeamTick(float deltaTime)
+        {
+            Transform body = Owner.Root.transform;
+            Vector3 origin = Owner.Weapon != null ? Owner.Weapon.SafeMuzzlePosition : body.position;
+            Vector3 aim = body.forward;
+            aim.y = 0f;
+            aim = aim.sqrMagnitude > 1e-6f ? aim.normalized : Vector3.forward;
 
+            int count = Physics.SphereCastNonAlloc(origin, beamWidth * 0.5f, aim, hitBuffer, beamRange, BuildMask(), QueryTriggerInteraction.Ignore);
             contactBuffer.Clear();
             normalBuffer.Clear();
             for (int i = 0; i < count; i++)
@@ -296,30 +302,37 @@ namespace Overpower.Abilities
                 RaycastHit hit = hitBuffer[i];
                 if (hit.collider == null)
                     continue;
-
                 IDamageable target = hit.collider.GetComponentInParent<IDamageable>();
                 contactBuffer.Add(new BeamContact(hit.distance, target, hit.point, target is IStructure));
                 normalBuffer.Add(hit.normal);
             }
 
-            // Unlimited: this ONE beam applies to every enemy it crosses before the cut (pierce); BeamResolver still
-            // keeps each target to a single hit and stops dead at the first wall or structure.
-            BeamResult beam = BeamResolver.Resolve(contactBuffer, beamRange, BeamResolver.Unlimited,
-                                                    casterActor, casterTeam);
-
-            for (int i = 0; i < beam.Struck.Count; i++)
+            BeamResult result = BeamResolver.Resolve(contactBuffer, beamRange, RaybeamChannel.TargetsHit, beamCasterActor, beamCasterTeam);
+            if (result.Struck.Count > 0)
             {
-                IStatusReceiver receiver = (beam.Struck[i].Target as Component)?.GetComponentInParent<IStatusReceiver>();
-                receiver?.ApplyStatus(vulnerabilitySpec, casterActor);
+                BeamContact struck = result.Struck[0];
+                secondsInBeam.TryGetValue(struck.Target, out float before);
+                float after = before + deltaTime;
+                secondsInBeam[struck.Target] = after;
+                struck.Target.ApplyDamage(new DamageInfo(RaybeamChannel.TickDamage(damagePerSecond, deltaTime), beamCasterActor, beamCasterTeam, -1,
+                                                         DamageSource.Burn, false, struck.Point, vulnerabilitySpec.abilityId));
+                int stacks = RaybeamChannel.StacksEarned(before, after, secondsPerStack);
+                IStatusReceiver receiver = stacks > 0 ? (struck.Target as Component)?.GetComponentInParent<IStatusReceiver>() : null;
+                for (int k = 0; k < stacks && receiver != null; k++)
+                    receiver.ApplyStatus(vulnerabilitySpec, beamCasterActor);
             }
 
-            Vector3 end = beamOrigin + aimDirection * beam.Length;
-
-            RaybeamLook.ScorchSpot(contactBuffer, normalBuffer, beam, end, aimDirection, out Vector3 scorchAt, out Quaternion scorchFacing);
-            if (RaybeamLook.ShowsScorch(RaybeamLook.EndsOnSurface(beam), TeamSight.ShotShownAt(casterTeam, scorchAt)) &&
-                scorchVfx != null && VfxManager.Instance != null)
-                VfxManager.Instance.PlayVFX(scorchVfx, scorchAt, scorchFacing);
-            return end;
+            Vector3 end = origin + aim * result.Length;
+            if (Time.time >= nextScorchAt && RaybeamLook.EndsOnSurface(result))
+            {
+                RaybeamLook.ScorchSpot(contactBuffer, normalBuffer, result, end, aim, out Vector3 scorchAt, out Quaternion scorchFacing);
+                if (RaybeamLook.ShowsScorch(true, TeamSight.ShotShownAt(beamCasterTeam, scorchAt)) && scorchVfx != null && VfxManager.Instance != null)
+                {
+                    VfxManager.Instance.PlayVFX(scorchVfx, scorchAt, scorchFacing);
+                    nextScorchAt = Time.time + scorchEverySeconds;
+                }
+            }
+            DrawBeam(origin, aim, end);
         }
 
         /// <summary>Hitscan.BuildMask's identical reasoning: the designer's layers minus the three
@@ -327,32 +340,52 @@ namespace Overpower.Abilities
         /// shot - Raybeam always passes a jersey barrier (GDD p.29), whatever its own hitMask ticks.</summary>
         private int BuildMask() => HitMasks.StripNonNegotiableLayers(hitMask);
 
-        /// <summary>A local, throwaway effect on each client, matching Hitscan.DrawBeam - never a
-        /// networked object, since every client draws its own copy from the same cast event.</summary>
-        private void DrawBeam(Vector3 origin, Vector3 aim, int casterTeam)
+        /// <summary>A local effect on each client, never a networked object: every client draws its own copy, hidden where its team cannot
+        /// see the beam.</summary>
+        private void DrawBeam(Vector3 origin, Vector3 aim, Vector3 end)
         {
             if (beamVfx == null)
                 return;
-
-            if (!RaybeamLook.BeamShown(lineFrom, lineTo, (a, b) => TeamSight.ShotShownAlong(casterTeam, a, b)))
+            lineFrom[0] = origin;
+            lineTo[0] = end;
+            if (beam == null)
+                beam = Instantiate(beamVfx, origin, Quaternion.identity);
+            if (beamSeenAlong == null)
+                beamSeenAlong = (a, b) => TeamSight.ShotShownAlong(beamCasterTeam, a, b); // made once, not every frame
+            if (!RaybeamLook.BeamShown(lineFrom, lineTo, beamSeenAlong))
+            {
+                if (beam.activeSelf)
+                    beam.SetActive(false);
                 return;
-
-            GameObject beam = Instantiate(beamVfx, origin, Quaternion.identity);
-            ShowBeam(beam, origin, aim, lineFrom, lineTo, casterTeam);
-            Destroy(beam, beamVisualSeconds);
+            }
+            if (!beam.activeSelf)
+                beam.SetActive(true);
+            ShowBeam(beam, origin, aim, lineFrom, lineTo, beamCasterTeam);
         }
 
-        /// <summary>Lays the drawn beam (an instantiated clone, never the prefab asset) over the three lines, each exactly as wide as the
-        /// line that hits (beamWidth is the one home). A beam prefab without the Raybeam's own view gets a plain centre line.</summary>
-        internal void ShowBeam(GameObject beam, Vector3 origin, Vector3 aim, Vector3[] from, Vector3[] to, int casterTeam)
+        private void HideBeam()
         {
-            if (beam.TryGetComponent(out RaybeamBeamView view))
+            if (beamRoutine != null)
+            {
+                StopCoroutine(beamRoutine);
+                beamRoutine = null;
+            }
+            if (beam != null)
+                Destroy(beam);
+            beam = null;
+        }
+
+        /// <summary>Lays the drawn beam (an instantiated clone, never the prefab asset) over the hit lines, each exactly as wide as the
+        /// line that hits (beamWidth is the one home). A beam prefab without the Raybeam's own view gets a plain centre line.</summary>
+        internal void ShowBeam(GameObject beamObject, Vector3 origin, Vector3 aim, Vector3[] from, Vector3[] to, int casterTeam)
+        {
+            if (beamObject.TryGetComponent(out RaybeamBeamView view))
             {
                 view.Draw(origin, aim, from, to, beamWidth, casterTeam);
                 return;
             }
 
-            LineRenderer line = beam.GetComponentInChildren<LineRenderer>();
+            LineRenderer line = beamObject.GetComponentInChildren<LineRenderer>();
             if (line == null)
                 return;
             int middle = from.Length / 2;
@@ -364,7 +397,8 @@ namespace Overpower.Abilities
         }
 
         public override string ShopStatsText() =>
-            ShopNumberFormat.Lines($"+{ShopNumberFormat.Compact(vulnerabilityPerBeam * 100f)}% damage taken per beam, for {ShopNumberFormat.Compact(vulnerabilitySeconds)}s",
+            ShopNumberFormat.Lines($"{ShopNumberFormat.Compact(damagePerSecond)} damage per second for {ShopNumberFormat.Compact(channelSeconds)}s",
+                                   $"+{ShopNumberFormat.Compact(vulnerabilityPerStack * 100f)}% damage taken per second in the beam, for {ShopNumberFormat.Compact(vulnerabilitySeconds)}s",
                                    $"Range {ShopNumberFormat.Compact(beamRange)}m");
     }
 }

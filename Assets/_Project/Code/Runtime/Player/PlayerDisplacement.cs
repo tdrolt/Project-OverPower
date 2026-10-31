@@ -225,6 +225,9 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
     /// Read-only query for a blink to check BEFORE it spends its charge: TeleportTo refuses while a Forced move
     /// is running, and by the time it runs the caster's charge is already spent and cannot be handed back.
     /// </summary>
+    /// <summary>Owner only: a knockback (a forced move) is moving this player right now.</summary>
+    public bool IsKnockedBack => activeKind == DisplaceKind.Forced;
+
     public bool CanTeleport => DisplacementPriority.Accepts(activeKind, DisplaceKind.Teleport);
 
     /// <summary>

@@ -46,16 +46,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cooldownSeconds: 0
   charges: 1
-  vulnerabilityPerBeam: 0.3
+  damagePerSecond: 5
+  channelSeconds: 3
+  vulnerabilityPerStack: 0.2
+  secondsPerStack: 1
   vulnerabilitySeconds: 4
-  beamOriginSpacing: 0.9
   beamRange: 28.8
   beamWidth: 0.6825
-  beamConvergenceRange: 15
   hitMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  windupSeconds: 0.2
+  windupSeconds: 0.6
+  channelMoveMultiplier: 0.5
   beamVfx: {fileID: 857787765400938120, guid: eb1a4ec38fd78114fade88ec925051fd, type: 3}
-  beamVisualSeconds: 0.15
   scorchVfx: {fileID: 982991884354598782, guid: c60bdd267a4aaf943803a5ce0a9bf532, type: 3}
+  scorchEverySeconds: 0.25
