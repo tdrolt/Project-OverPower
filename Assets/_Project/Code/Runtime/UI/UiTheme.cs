@@ -1479,7 +1479,7 @@ namespace Overpower.UI
                  "holds the master volume and a close button.")]
         public string escapeMenuTitleText = "Sound";
         [Tooltip("The close button of that browser pop-up and of the menu in a match (same effect as pressing Escape again).")]
-        public string escapeMenuCloseText = "Close";
+        public string escapeMenuCloseText = "CLOSE";
         [Tooltip("Title of the menu Escape opens during a match (from the warm-up on): the Sound section, a line, then Leave match and Close.")]
         public string escapeMenuMatchTitleText = "MENU";
         [Tooltip("Heading of the Sound section above the master volume in the menu during a match.")]

@@ -559,7 +559,7 @@ MonoBehaviour:
   quitPromptText: Close the game?
   leaveMatchPromptText: Leave the match?
   escapeMenuTitleText: Sound
-  escapeMenuCloseText: Close
+  escapeMenuCloseText: CLOSE
   escapeMenuMatchTitleText: MENU
   escapeMenuSoundHeaderText: SOUND
   escapeMenuLeaveMatchText: LEAVE MATCH
