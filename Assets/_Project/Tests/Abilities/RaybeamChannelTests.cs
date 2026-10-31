@@ -33,12 +33,23 @@ namespace Overpower.Tests
         public void TheBeamDealsItsDamagePerSecondSpreadOverTheFrames() =>
             Assert.AreEqual(0.5f, RaybeamChannel.TickDamage(5f, 0.1f), 1e-5f);
 
-        [TestCase(0f, 0.5f, 0, TestName = "half a second in the beam: no stack yet")]
-        [TestCase(0.9f, 1.1f, 1, TestName = "crossing the first full second: one stack")]
+        // A stack as the beam touches, then one each further second: a whole 3 s channel reaches the third (+60%) instead of ending just short of it.
+        [TestCase(0f, 0.02f, 1, TestName = "the first frame on the target: the first stack")]
+        [TestCase(0.02f, 0.5f, 0, TestName = "within the first second: nothing new")]
+        [TestCase(0.9f, 1.1f, 1, TestName = "a second in the beam: the second stack")]
         [TestCase(1.5f, 1.9f, 0, TestName = "between seconds: nothing new")]
         [TestCase(1.9f, 3.05f, 2, TestName = "a long frame crossing two seconds: two stacks")]
-        public void OneStackPerFullSecondInTheBeam(float before, float after, int expected) =>
+        public void AStackAsTheBeamTouchesThenOneEachSecond(float before, float after, int expected) =>
             Assert.AreEqual(expected, RaybeamChannel.StacksEarned(before, after, 1f));
+
+        [Test]
+        public void AWholeChannelOnOneTargetReachesThreeStacks()
+        {
+            int stacks = 0;
+            float t = 0f;
+            while (t < 2.95f) { stacks += RaybeamChannel.StacksEarned(t, t + 0.05f, 1f); t += 0.05f; }
+            Assert.AreEqual(3, stacks, "2.95 s in the beam (a 3 s channel arriving a little late): +60%");
+        }
 
         [Test]
         public void TheCasterIsLockedOnlyWhileChannelling()

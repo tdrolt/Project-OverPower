@@ -11,7 +11,7 @@ namespace Overpower.Abilities
 {
     /// <summary>
     /// A cast time (RaybeamWindup: a red hexagon shrinking at the gun), then ONE beam channelled from the gun along the caster's aim for Channel
-    /// Seconds (RaybeamChannel): it damages the first enemy it touches and gives that enemy one vulnerability stack per full second spent in it.
+    /// Seconds (RaybeamChannel): it damages the first enemy it touches and gives that enemy a vulnerability stack as it touches, then one per second.
     /// Walls and placed cover stop it, the short barriers never do (HitMasks). The meter is spent as the channel starts; a stun, a knockback or
     /// death ends it early, an overheat does not. RUNS ON EVERY CLIENT from the channel phase, re-reading the caster's gun and facing each frame
     /// (PlayerAim turns the body, PlayerNetSync replicates it), as the Flamethrower does; damage and status are victim-side (only the target's
@@ -31,8 +31,9 @@ namespace Overpower.Abilities
                  "Vulnerability Cap (0.6 = three stacks).")]
         private float vulnerabilityPerStack = 0.2f;
 
-        [SerializeField, Tooltip("Seconds an enemy must spend in the beam for each vulnerability stack. The time adds up over one channel, so a " +
-                 "target the beam slips off and finds again keeps what it had.")]
+        [SerializeField, Tooltip("The first vulnerability stack lands as the beam touches an enemy, then one more each time they have spent " +
+                 "this many more seconds in it (1 = stacks at 0, 1 and 2 s, so a whole 3 s beam reaches +60%). The time adds up over one " +
+                 "channel, so a target the beam slips off and finds again keeps what it had.")]
         private float secondsPerStack = 1f;
 
         [SerializeField, Tooltip("How long the vulnerability lasts, in seconds. Every new stack sets the time of all of them back to this.")]

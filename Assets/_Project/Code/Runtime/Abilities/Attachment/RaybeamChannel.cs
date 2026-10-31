@@ -5,7 +5,7 @@ namespace Overpower.Abilities
     public enum RaybeamChannelStep { Channelling, Finished, Broken }
 
     /// <summary>The Raybeam's channel after its cast time: a beam from the gun along the aim for Channel Seconds, damaging the first enemy it
-    /// touches and adding one vulnerability stack per second that enemy has spent in it. A stun, a knockback or death breaks it early.</summary>
+    /// touches and adding a vulnerability stack as it touches that enemy, then one more each second it stays on them. A stun, a knockback or death breaks it early.</summary>
     public static class RaybeamChannel
     {
         /// <summary>The owner's frame while channelling.</summary>
@@ -24,9 +24,10 @@ namespace Overpower.Abilities
         public static float TickDamage(float damagePerSecond, float deltaSeconds) => damagePerSecond * deltaSeconds;
 
         /// <summary>How many vulnerability stacks a target earns going from <paramref name="secondsBefore"/> to <paramref name="secondsAfter"/>
-        /// of time in this beam: one at each full Seconds Per Stack.</summary>
+        /// of time in this beam: one as the beam first touches it, then one more each further Seconds Per Stack (stacks at 0, 1, 2 s), so a
+        /// whole channel reaches the third stack instead of ending a frame short of it.</summary>
         public static int StacksEarned(float secondsBefore, float secondsAfter, float secondsPerStack) =>
-            secondsPerStack <= 0f ? 0 : (int)System.Math.Floor(secondsAfter / secondsPerStack) - (int)System.Math.Floor(secondsBefore / secondsPerStack);
+            secondsPerStack <= 0f ? 0 : (int)System.Math.Ceiling(secondsAfter / secondsPerStack) - (int)System.Math.Ceiling(secondsBefore / secondsPerStack);
 
         /// <summary>How many enemies the beam damages: it stops at the first (BeamResolver passes allies and the caster).</summary>
         public static int TargetsHit => 1;
