@@ -620,6 +620,7 @@ MonoBehaviour:
   zoomSpeed: 5
   minZoomMultiplier: 0.5
   maxZoomMultiplier: 2
+  turnDegreesPerSecond: 65
   teamYawOffset: 120
 --- !u!1 &8467706376330729575
 GameObject:

@@ -18,7 +18,7 @@ namespace Overpower.UI
     /// OWNER ONLY, built in code like PlayerHud, from state every client has (BuildingManager, ZonePresenceTracker,
     /// replicated positions). Enemies are red dots only for what my team sees now (TeamSight.CanSeePlayer, no last-seen
     /// marks, D10), so an ally's sighting says someone is there, not who. NEVER BLOCKS A SHOT: no GraphicRaycaster and
-    /// no raycast-target Graphic. Turns with CameraTracking's team yaw; labels and markers are turned back upright.
+    /// no raycast-target Graphic. Turns with CameraTracking's team yaw only (MapYaw: Q/E do not turn it); labels and markers are turned back upright.
     /// Each link is two half Images split at the middle of the GAP between the bubbles' edges (the centres' midpoint
     /// starved the capital's half); only Border is two-toned, so ApplyLinkStyle stays one path. Colours change only on
     /// ownership change; markers sit on a nested Canvas so moving them re-batches only that; nothing allocates per frame.
@@ -392,7 +392,7 @@ namespace Overpower.UI
             foreach ((int a, int b) in MinimapLayout.LinkPairs(manager.Map, zoneIds))
                 BuildLink(a, b);
 
-            ownMarker = BuildMarker("You", markersLayer, GeneratedSprites.Triangle, theme.minimapOwnMarkerColor, theme.minimapOwnMarkerSize);
+            ownMarker = BuildMarker("You", markersLayer, GeneratedSprites.Arrowhead, theme.minimapOwnMarkerColor, theme.minimapOwnMarkerSize);
 
             manager.OwnershipChanged += HandleOwnershipChanged;
             // MatchDirector.IsOutOfPlay changes on the live edge with no OwnershipChanged event (a host start's third
@@ -698,7 +698,7 @@ namespace Overpower.UI
 
         private void ApplyYawIfChanged()
         {
-            float yaw = CameraTracking.Instance != null ? CameraTracking.Instance.Yaw : 0f;
+            float yaw = CameraTracking.Instance != null ? CameraTracking.Instance.MapYaw : 0f; // fixed: Q/E turn the view, not the map
             if (Mathf.Approximately(yaw, appliedYaw))
                 return;
             appliedYaw = yaw;

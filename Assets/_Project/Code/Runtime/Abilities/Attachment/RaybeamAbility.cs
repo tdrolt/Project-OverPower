@@ -38,8 +38,8 @@ namespace Overpower.Abilities
         private float beamOriginSpacing = 0.9f;
 
         [SerializeField, Tooltip("How far each beam TRAVELS AND DEBUFFS from its OWN origin, in metres, pierce included. Two things " +
-                 "at once: the CAMERA sets how far out you can place the cursor on screen (roughly 19m out at default " +
-                 "zoom, up to 38m fully zoomed out) - but when the beams fire, the cursor's point is pulled back to THIS " +
+                 "at once: the CAMERA sets how far out you can place the cursor on screen (about 38m at the zoom a match " +
+                 "starts at, the farthest; about 19m with the wheel zoomed all the way in) - but when the beams fire, the cursor's point is pulled back to THIS " +
                  "number whenever the cursor sits further away than it, so the beams meet at this distance instead of " +
                  "at the cursor. That makes this both how far a beam keeps hitting things past its target AND the " +
                  "furthest point the three beams can ever converge, whatever the camera would otherwise let you reach.")]

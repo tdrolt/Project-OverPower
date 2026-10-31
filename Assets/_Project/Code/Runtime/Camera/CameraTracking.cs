@@ -20,9 +20,13 @@ public class CameraTracking : MonoBehaviour
              "0.5 = half the normal distance.")]
     public float minZoomMultiplier = 0.5f;
     [Tooltip("Farthest the camera can zoom out with the scroll wheel, as a multiple of Base Offset. " +
-             "2 = twice the normal distance. Zooming out also lets the cursor reach further from the " +
-             "player, so this limits how far cursor-aimed abilities can be placed.")]
+             "2 = twice the normal distance. Every match starts here; the wheel zooms in from it. Zooming out also lets " +
+             "the cursor reach further from the player, so this limits how far cursor-aimed abilities can be placed.")]
     public float maxZoomMultiplier = 2f;
+    [Tooltip("How fast holding Q or E turns the camera around the player, in degrees per second. 60 = a full circle in " +
+             "six seconds. The height, tilt and distance stay the same; the turn is kept through a respawn and starts " +
+             "again from the team's angle each match.")]
+    public float turnDegreesPerSecond = 65f;
 
     [Header("Per-team orientation")]
     // Every team should see the arena from the same relative angle, so that "toward the centre"
@@ -36,7 +40,9 @@ public class CameraTracking : MonoBehaviour
 
     private Vector3 currentOffset;
     private float currentZoom = 1f; // Default zoom level (1 = baseOffset)
-    private float yaw = 0f;         // degrees rotated around the player
+    private float yaw = 0f;         // the team's starting angle around the player
+    private float turnDegrees = 0f; // the player's own Q/E turn, on top of yaw
+    private PlayerInputRouter turnKeys;
     private bool teamYawResolved = false;
     // Which team teamYawResolved was resolved FOR, so ResolveTeamYaw can tell a body that moved onto another team
     // (a safety net: seats are locked at Start) from "already resolved". PlayerTeam.NoTeam until the first resolve.
@@ -52,9 +58,13 @@ public class CameraTracking : MonoBehaviour
     public static CameraTracking Instance { get; private set; }
 
     /// <summary>Degrees this camera is turned about the vertical axis (Unity yaw: clockwise seen from above; 0 = looking
-    /// toward +Z). 0 until this player's team is known - see ResolveTeamYaw - then fixed for the match. World
-    /// direction (sin Yaw, cos Yaw) is the top of the screen.</summary>
-    public float Yaw => yaw;
+    /// toward +Z): the team's angle (MapYaw) plus the player's Q/E turn. World direction (sin Yaw, cos Yaw) is the top of the
+    /// screen, so whatever is drawn "up on screen" (the capture and charge rings) reads this one.</summary>
+    public float Yaw => CameraViewRules.ScreenYaw(yaw, turnDegrees);
+
+    /// <summary>The team's starting angle without the Q/E turn: the minimap's fixed "up". 0 until this player's team is known - see
+    /// ResolveTeamYaw - then fixed for the match.</summary>
+    public float MapYaw => yaw;
 
     /// <summary>The scroll wheel's own zoom back to the normal distance (1 x Base Offset). A spectator's Space frames the whole map from
     /// a known zoom; extra-zoom multipliers (AddZoomMultiplier) are not touched.</summary>
@@ -117,6 +127,8 @@ public class CameraTracking : MonoBehaviour
 
     void Start()
     {
+        // The scene is loaded fresh for each match, so this is "every match starts far"; a respawn keeps the zoom and the turn.
+        currentZoom = CameraViewRules.StartZoom(1f, maxZoomMultiplier);
         currentOffset = baseOffset;
         if (target != null)
         {
@@ -140,9 +152,17 @@ public class CameraTracking : MonoBehaviour
 
         ResolveTeamYaw();
 
+        // Q/E are read from the local player's own body: the followed one, or yawSource while watching someone else.
+        Transform own = yawSource != null ? yawSource : target;
+        if (turnKeys == null || turnKeys.transform != own)
+            turnKeys = own.GetComponent<PlayerInputRouter>();
+        bool keysBlocked = turnKeys == null || turnKeys.CameraKeysBlocked;
+        if (CameraViewRules.TurnsWithKeys(fixedYaw.HasValue, keysBlocked))
+            turnDegrees = CameraViewRules.Turned(turnDegrees, turnKeys.CameraTurnAxis, turnDegreesPerSecond, Time.unscaledDeltaTime);
+
         // Scroll clamp, then every active extra-zoom multiplier (CameraZoomStack), then rotation.
         Vector3 zoomedOffset = CameraZoomStack.ApplyZoom(baseOffset, currentZoom, CameraZoomStack.Product(zoomMultipliers.Values));
-        currentOffset = Quaternion.AngleAxis(yaw, Vector3.up) * zoomedOffset;
+        currentOffset = Quaternion.AngleAxis(Yaw, Vector3.up) * zoomedOffset;
 
         transform.position = target.position + currentOffset;
         transform.LookAt(target);

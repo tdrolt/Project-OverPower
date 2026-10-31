@@ -24,6 +24,35 @@ namespace Overpower.UI
         public static Sprite Disc => disc != null ? disc : (disc = Build("Generated Disc", Size, (x, y) => DiscAlpha(x, y, Size)));
         public static Sprite Triangle => triangle != null ? triangle : (triangle = Build("Generated Triangle", Size, (x, y) => TriangleAlpha(x, y, Size)));
 
+        private static Sprite arrowhead;
+
+        /// <summary>The player's own minimap marker: an arrowhead pointing up, two back corners with a notch between them.</summary>
+        public static Sprite Arrowhead => arrowhead != null ? arrowhead : (arrowhead = Build("Generated Arrowhead", Size, (x, y) => ArrowheadAlpha(x, y, Size)));
+
+        private const float ArrowheadNotchHeight = 0.32f; // how far up the middle of the back the notch reaches, as a share of the sprite
+
+        /// <summary>Alpha of the Arrowhead sprite at pixel centre (x, y): 1 inside, 0 outside, anti-aliased by half a pixel.</summary>
+        public static float ArrowheadAlpha(float x, float y, int size)
+        {
+            var p = new Vector2(x, y);
+            var tip = new Vector2(size / 2f, size - TriangleCornerInset);
+            var right = new Vector2(size - TriangleCornerInset, TriangleCornerInset);
+            var notch = new Vector2(size / 2f, size * ArrowheadNotchHeight);
+            var left = new Vector2(TriangleCornerInset, TriangleCornerInset);
+            // The shape is not convex (the notch), so: inside by crossing count, softened by the distance to the nearest edge.
+            Vector2[] corners = { tip, right, notch, left };
+            bool inside = false;
+            float nearest = float.MaxValue;
+            for (int i = 0, j = corners.Length - 1; i < corners.Length; j = i++)
+            {
+                Vector2 a = corners[i], b = corners[j];
+                if ((a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x)
+                    inside = !inside;
+                nearest = Mathf.Min(nearest, SegmentDistance(p, a, b));
+            }
+            return Mathf.Clamp01(inside ? nearest + 0.5f : 0.5f - nearest);
+        }
+
         private static Sprite vignette;
 
         /// <summary>Clear in the middle, opaque in the corners (the death card's dark edge): stretched over the screen it follows its shape.</summary>

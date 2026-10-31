@@ -26,6 +26,7 @@ public class PlayerInputRouter : MonoBehaviour
     private InputActionMap gameplayMap;
     private InputAction moveAction, primaryAction, attachmentAction, ultimateAction;
     private InputAction mobilityAction, mapAction, shopAction, scoreboardAction, ventAction;
+    private InputAction turnCameraLeftAction, turnCameraRightAction;
 
     // Mirrors PlayerLifecycle.IsAlive, updated once per AliveChanged instead of polled per read.
     private bool isAlive = true;
@@ -55,6 +56,13 @@ public class PlayerInputRouter : MonoBehaviour
     public bool AttachmentHeld => gameplayMap != null && !PointerFireBlocked && attachmentAction.IsPressed();
     public bool UltimateHeld => gameplayMap != null && !InputSuppressed && ultimateAction.IsPressed();
     public bool MobilityHeld => gameplayMap != null && !InputSuppressed && mobilityAction.IsPressed();
+
+    /// <summary>Q/E held: -1 turns the camera left, +1 right (CameraTracking asks CameraKeysBlocked first).</summary>
+    public float CameraTurnAxis => gameplayMap != null ? CameraViewRules.TurnAxis(turnCameraLeftAction.IsPressed(), turnCameraRightAction.IsPressed()) : 0f;
+
+    /// <summary>Typing in chat or a panel holding input stops Q/E turning the camera; being knocked out does not (you may look
+    /// around while you wait).</summary>
+    public bool CameraKeysBlocked => gameplayMap == null || IsTypingInChat() || toolFocusOwners.Count > 0;
 
     public event System.Action PrimaryPressed;
     public event System.Action PrimaryReleased;
@@ -142,13 +150,14 @@ public class PlayerInputRouter : MonoBehaviour
         mobilityAction = gameplayMap.FindAction("Mobility"); mapAction = gameplayMap.FindAction("ExpandMap");
         shopAction = gameplayMap.FindAction("Shop"); scoreboardAction = gameplayMap.FindAction("Scoreboard");
         ventAction = gameplayMap.FindAction("Vent");
+        turnCameraLeftAction = gameplayMap.FindAction("TurnCameraLeft"); turnCameraRightAction = gameplayMap.FindAction("TurnCameraRight");
 
         if (moveAction == null || primaryAction == null || attachmentAction == null || ultimateAction == null ||
             mobilityAction == null || mapAction == null || shopAction == null || scoreboardAction == null ||
-            ventAction == null)
+            ventAction == null || turnCameraLeftAction == null || turnCameraRightAction == null)
         {
             Debug.LogError($"[PlayerInputRouter] {name}: Gameplay map is missing one or more of the " +
-                            "nine expected actions - check OverpowerControls.inputactions.");
+                            "eleven expected actions - check OverpowerControls.inputactions.");
             gameplayMap = null; // marks setup as failed; every property above checks it
             return;
         }
