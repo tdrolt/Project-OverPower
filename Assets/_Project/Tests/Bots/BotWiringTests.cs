@@ -42,6 +42,15 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheNewMasterClaimsABotBodyBeforeRemovingIt()
+        {
+            MethodInfo claim = typeof(Photon.Pun.PhotonView).GetProperty(nameof(Photon.Pun.PhotonView.ControllerActorNr)).GetSetMethod();
+            MethodInfo destroy = typeof(Photon.Pun.PhotonNetwork).GetMethod(nameof(Photon.Pun.PhotonNetwork.Destroy), new[] { typeof(Photon.Pun.PhotonView) });
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(BotRoster), "TakeAllBotsOut", claim), "a dropped host still controls the bodies here");
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(BotRoster), "TakeAllBotsOut", destroy));
+        }
+
+        [Test]
         public void ABodyIsHandedToItsBotOnlyWhenItsDataNamesOne() =>
             Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(BotSeat), "Awake", M(typeof(BotSeat), nameof(BotSeat.TryReadActor))));
 

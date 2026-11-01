@@ -134,7 +134,13 @@ namespace Overpower.Net
                 if (body != null) bodies.Add(body);
             }
             foreach (PhotonView body in bodies)
+            {
+                // A dropped host is still these views' controller until PUN rebuilds its caches after this callback, and PUN removes only a
+                // body this client controls: the new master claims each one first.
+                foreach (PhotonView part in body.GetComponentsInChildren<PhotonView>(true))
+                    if (!part.IsMine) part.ControllerActorNr = PhotonNetwork.LocalPlayer.ActorNumber;
                 PhotonNetwork.Destroy(body);
+            }
             if (BotRosterRules.Roster(room.CustomProperties).Length == 0 && bodies.Count == 0) return;
             Debug.Log($"[BOTS] the host left: taking {BotRosterRules.Roster(room.CustomProperties).Length} bot(s) out");
             room.SetCustomProperties(BotRosterRules.ClearAllWrite(room.CustomProperties));
