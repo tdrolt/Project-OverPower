@@ -104,16 +104,22 @@ namespace Overpower.Tests
             Assert.AreEqual(0f, HealthPackLook.PickupRingAlpha(1f), 1e-5f);
         }
 
+        // A pack's room value starts with when it comes BACK (the take's time plus the pack's respawn), as HealthPackRules.Decide writes it.
         [TestCase(true, 1000, 1400, true, TestName = "an ultimate pack taken just now")]
         [TestCase(false, 1000, 1400, false, TestName = "a health pack has its own sparks")]
         [TestCase(true, 1000, 3000, false, TestName = "an old take (a late join reading the room) shows nothing")]
         [TestCase(true, 1000, 900, false, TestName = "a take stamped ahead of this clock shows nothing")]
         public void RingsOnlyForAFreshUltimateTake(bool ultimate, int takenAt, int now, bool expected) =>
-            Assert.AreEqual(expected, HealthPackRules.ShowsPickupRings(ultimate, new[] { takenAt, 2, 1 }, now));
+            Assert.AreEqual(expected, HealthPackRules.ShowsPickupRings(ultimate, new[] { takenAt + 30000, 2, 1 }, now, 30000));
+
+        [Test]
+        public void RingsAcrossTheServerClocksWrap() =>
+            Assert.IsTrue(HealthPackRules.ShowsPickupRings(true, new[] { unchecked(int.MaxValue - 100 + 30000), 2, 1 }, unchecked(int.MaxValue + 200), 30000),
+                "the server clock is an int that wraps round");
 
         [Test]
         public void NoRingsWithoutATake() =>
-            Assert.IsFalse(HealthPackRules.ShowsPickupRings(true, null, 1000));
+            Assert.IsFalse(HealthPackRules.ShowsPickupRings(true, null, 1000, 30000));
 
         // ---- the asset and the wiring
 

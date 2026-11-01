@@ -410,7 +410,7 @@ namespace Overpower.Match
                 pack.hasOutstanding = false;
                 pack.pending = null;
 
-                if (HealthPackRules.ShowsPickupRings(pack.ultimate, value, PhotonNetwork.ServerTimestamp))
+                if (HealthPackRules.ShowsPickupRings(pack.ultimate, value, PhotonNetwork.ServerTimestamp, RespawnMsOf(pack)))
                     PickupRingsView.Play(PlayerLookup.GetPhotonViewFor(value[1]), config, config.UltimatePackColour,
                                          theme != null && theme.arenaLook != null ? theme.arenaLook.fxAlpha : null);
 
