@@ -1,5 +1,6 @@
 using System.Reflection;
 using NUnit.Framework;
+using Overpower.Arena;
 using Overpower.Data;
 using Overpower.Match;
 using UnityEditor;
@@ -8,20 +9,56 @@ using UnityEngine;
 namespace Overpower.Tests
 {
     /// <summary>
-    /// Tudor, 1 Nov: the health pack's cross and the ultimate pack's icosahedron get a black edge so their shapes read on any floor; taking an
-    /// ultimate pack shows rings rising round the player who took it (a health pack has its own sparks). Literal numbers are test values.
+    /// Tudor, 1 Nov: the health pack's cross and the ultimate pack's icosahedron get black lines along their edges so their shapes read (unlit,
+    /// their faces are one flat colour); taking an ultimate pack shows rings rising round the player who took it (a health pack has its own
+    /// sparks). Literal numbers are test values.
     /// </summary>
     public class PackLookTests
     {
         private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public;
 
         [Test]
-        public void TheEdgeIsTheShapeGrownByItsThicknessOnEverySide()
+        public void ThePlusIsTracedRoundItsOutlineNotThroughItsMiddle()
         {
-            Vector3 edge = HealthPackLook.OutlineSize(new Vector3(1.2f, 0.4f, 0.4f), 0.06f);
-            Assert.AreEqual(1.32f, edge.x, 1e-5f);
-            Assert.AreEqual(0.52f, edge.y, 1e-5f);
-            Assert.AreEqual(0.52f, edge.z, 1e-5f);
+            var edges = ShapeEdges.Plus(1.2f, 0.4f);
+            Assert.AreEqual(36, edges.Count, "twelve round the front, twelve round the back, twelve between them");
+            foreach ((Vector3 a, Vector3 b) in edges)
+            {
+                Vector3 mid = (a + b) * 0.5f;
+                bool insideBothBars = Mathf.Abs(mid.x) < 0.2f - 1e-4f && Mathf.Abs(mid.y) < 0.2f - 1e-4f;
+                Assert.IsFalse(insideBothBars && Mathf.Abs(mid.z) < 0.2f - 1e-4f, "no line runs inside the plus");
+                Assert.IsFalse(Mathf.Abs(mid.x) < 0.2f - 1e-4f && Mathf.Abs(mid.y) < 0.2f - 1e-4f, "none crosses the middle square where the bars overlap");
+            }
+        }
+
+        [Test]
+        public void TheIcosahedronHasThirtyEqualEdgesOnItsSphere()
+        {
+            var edges = ShapeEdges.Icosahedron(0.6f);
+            Assert.AreEqual(30, edges.Count);
+            float length = Vector3.Distance(edges[0].Item1, edges[0].Item2);
+            foreach ((Vector3 a, Vector3 b) in edges)
+            {
+                Assert.AreEqual(length, Vector3.Distance(a, b), 1e-4f, "all the same length");
+                Assert.AreEqual(0.6f, a.magnitude, 1e-4f);
+            }
+        }
+
+        [Test]
+        public void EachEdgeIsDrawnAsAThinBarAsWideAsTheLine()
+        {
+            Mesh mesh = ShapeEdges.LinesMesh(new System.Collections.Generic.List<(Vector3, Vector3)> { (new Vector3(-0.5f, 0f, 0f), new Vector3(0.5f, 0f, 0f)) }, 0.05f);
+            try
+            {
+                Assert.AreEqual(8, mesh.vertexCount, "a square bar of eight corners per edge");
+                Assert.AreEqual(36, mesh.triangles.Length);
+                Assert.AreEqual(1.05f, mesh.bounds.size.x, 1e-4f, "it runs half a line's width past both ends, so corners close");
+                Assert.AreEqual(0.05f, mesh.bounds.size.y, 1e-4f, "and straddles the edge: half outside, half in");
+            }
+            finally
+            {
+                Object.DestroyImmediate(mesh);
+            }
         }
 
         // ---- the view
@@ -36,7 +73,7 @@ namespace Overpower.Tests
             config = ScriptableObject.CreateInstance<HealthPackConfig>();
             var so = new SerializedObject(config);
             so.FindProperty("crossSizeMetres").floatValue = 1.2f;
-            so.FindProperty("shapeOutlineMetres").floatValue = 0.05f;
+            so.FindProperty("shapeEdgeMetres").floatValue = 0.05f;
             so.ApplyModifiedPropertiesWithoutUndo();
             solid = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { hideFlags = HideFlags.HideAndDontSave };
             parent = new GameObject("PackLookTests") { hideFlags = HideFlags.HideAndDontSave };
@@ -54,33 +91,34 @@ namespace Overpower.Tests
 
         [TestCase(false, TestName = "the health pack's cross")]
         [TestCase(true, TestName = "the ultimate pack's icosahedron")]
-        public void EveryPartOfTheShapeHasABlackEdgeDrawnFromTheInside(bool ultimate)
+        public void EveryPartOfTheShapeHasBlackLinesOnItsEdges(bool ultimate)
         {
             HealthPackView view = HealthPackView.Create(parent.transform, Vector3.zero, "Pack", config, null, solid, ultimate);
-            Assert.AreEqual(view.CrossRenderers.Length, view.OutlineRenderers.Length, "one edge per part");
+            Assert.AreEqual(1, view.EdgeRenderers.Length, "one set of lines for the whole shape");
             var block = new MaterialPropertyBlock();
-            foreach (Renderer edge in view.OutlineRenderers)
-            {
-                edge.GetPropertyBlock(block);
-                Assert.AreEqual(Color.black, block.GetColor("_BaseColor"), edge.name);
-                Assert.AreEqual(1f, edge.sharedMaterial.GetFloat("_Cull"), "front faces culled: only the rim behind the shape shows");
-            }
+            Renderer edge = view.EdgeRenderers[0];
+            edge.GetPropertyBlock(block);
+            Assert.AreEqual(Color.black, block.GetColor("_BaseColor"), edge.name);
+            Assert.AreEqual((ultimate ? 30 : 36) * 8, edge.GetComponent<MeshFilter>().sharedMesh.vertexCount, edge.name);
         }
 
         [Test]
-        public void TheCrossBarsEdgesAreTheBarsGrownByTheThickness()
+        public void TheLinesFollowTheCross()
         {
             HealthPackView view = HealthPackView.Create(parent.transform, Vector3.zero, "Pack", config, null, solid);
-            Vector3 scale = view.OutlineRenderers[0].transform.localScale;
-            Assert.AreEqual(1.3f, scale.x, 1e-5f, "around the 1.2 x 0.4 x 0.4 bar");
-            Assert.AreEqual(0.5f, scale.y, 1e-5f);
+            Bounds lines = view.EdgeRenderers[0].GetComponent<MeshFilter>().sharedMesh.bounds;
+            Assert.AreEqual(1.25f, lines.size.x, 1e-4f, "the 1.2 m cross, plus the line's width");
+            Assert.AreEqual(1.25f, lines.size.y, 1e-4f);
+            Assert.AreEqual(0.45f, lines.size.z, 1e-4f, "its 0.4 m depth");
         }
 
         [Test]
-        public void TheIcosahedronsEdgeIsItGrownByTheThickness()
+        public void DestroyFreesTheLineMeshes()
         {
             HealthPackView view = HealthPackView.Create(parent.transform, Vector3.zero, "Pack", config, null, solid, ultimate: true);
-            Assert.AreEqual((0.6f + 0.05f) / 0.6f, view.OutlineRenderers[0].transform.localScale.x, 1e-4f);
+            Mesh lines = view.EdgeRenderers[0].GetComponent<MeshFilter>().sharedMesh;
+            typeof(HealthPackView).GetMethod("OnDestroy", Any).Invoke(view, null);
+            Assert.IsTrue(lines == null, "the lines' mesh is freed with the pack");
         }
 
         // ---- the rings on an ultimate pack's take
@@ -127,7 +165,7 @@ namespace Overpower.Tests
         public void TheNewLookFieldsAreInTheYamlWithATooltip()
         {
             string yaml = System.IO.File.ReadAllText("Assets/_Project/Design/Settings/HealthPackConfig.asset").Replace("\r\n", "\n");
-            foreach (string name in new[] { "shapeOutlineMetres", "shapeOutlineColour", "pickupRingCount", "pickupRingSeconds", "pickupRingDelaySeconds",
+            foreach (string name in new[] { "shapeEdgeMetres", "shapeEdgeColour", "pickupRingCount", "pickupRingSeconds", "pickupRingDelaySeconds",
                                             "pickupRingStartRadius", "pickupRingEndRadius", "pickupRingRiseMetres", "pickupRingWidthMetres" })
             {
                 FieldInfo field = typeof(HealthPackConfig).GetField(name, Any);
@@ -148,7 +186,9 @@ namespace Overpower.Tests
                 typeof(Overpower.Vision.VisibleWhenSeen).GetMethod(nameof(Overpower.Vision.VisibleWhenSeen.AttachToCaster))),
                 "hidden with a player the fog hides");
             Assert.IsTrue(IlWiring.Uses(typeof(PickupRingsView), "LateUpdate", typeof(HealthPackLook).GetMethod(nameof(HealthPackLook.PickupRingHeight))), "height");
-            Assert.IsTrue(IlWiring.Uses(typeof(HealthPackView), nameof(HealthPackView.Create), typeof(HealthPackLook).GetMethod(nameof(HealthPackLook.OutlineSize))), "edge");
+            Assert.IsTrue(IlWiring.Uses(typeof(HealthPackView), nameof(HealthPackView.Create), typeof(ShapeEdges).GetMethod(nameof(ShapeEdges.Plus))), "the cross's outline");
+            Assert.IsTrue(IlWiring.Uses(typeof(HealthPackView), nameof(HealthPackView.Create), typeof(ShapeEdges).GetMethod(nameof(ShapeEdges.Icosahedron))), "the icosahedron's");
+            Assert.IsTrue(IlWiring.Uses(typeof(HealthPackView), nameof(HealthPackView.Create), typeof(ShapeEdges).GetMethod(nameof(ShapeEdges.LinesMesh))), "drawn as lines");
         }
     }
 }

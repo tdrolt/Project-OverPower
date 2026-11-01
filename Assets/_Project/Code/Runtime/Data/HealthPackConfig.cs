@@ -85,11 +85,12 @@ namespace Overpower.Data
         [Tooltip("How fast the cross turns, in degrees per second.")]
         [SerializeField] private float spinDegreesPerSecond = 60f;
 
-        [Tooltip("How thick the edge round the floating cross and icosahedron is, in metres: it makes their shape read on any floor. 0 = no edge.")]
-        [SerializeField, Min(0f)] private float shapeOutlineMetres = 0.05f;
+        [Tooltip("How wide the lines along the edges of the floating cross and icosahedron are, in metres. Their faces are one flat colour, " +
+                 "so the lines are what shows their shape.")]
+        [SerializeField, Min(0.001f)] private float shapeEdgeMetres = 0.05f;
 
-        [Tooltip("The colour of that edge.")]
-        [SerializeField] private Color shapeOutlineColour = Color.black;
+        [Tooltip("The colour of those lines.")]
+        [SerializeField] private Color shapeEdgeColour = Color.black;
 
         [Header("Ultimate pack pickup rings")]
         [Tooltip("How many rings rise round a player who takes an ultimate charge pack. Everyone who can see that player sees them.")]
@@ -113,8 +114,8 @@ namespace Overpower.Data
         [Tooltip("How thick each ring's line is, in metres.")]
         [SerializeField, Min(0.01f)] private float pickupRingWidthMetres = 0.08f;
 
-        public float ShapeOutlineMetres => shapeOutlineMetres;
-        public Color ShapeOutlineColour => shapeOutlineColour;
+        public float ShapeEdgeMetres => shapeEdgeMetres;
+        public Color ShapeEdgeColour => shapeEdgeColour;
         public int PickupRingCount => pickupRingCount;
         public float PickupRingSeconds => pickupRingSeconds;
         public float PickupRingDelaySeconds => pickupRingDelaySeconds;

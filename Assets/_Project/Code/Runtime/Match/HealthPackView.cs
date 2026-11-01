@@ -10,7 +10,7 @@ namespace Overpower.Match
     /// <summary>
     /// What one pack looks like: a dark hexagon pad on the floor, its corners exactly at the pickup radius so standing anywhere
     /// on it takes the pack, with a glowing edge, and a shape floating above it that turns and bobs - a green cross for a health pack, a
-    /// yellow icosahedron for an ultimate charge pack. Ready glows; waiting to come back is the same colour dimmed (HealthPackLook).
+    /// yellow icosahedron for an ultimate charge pack, each with black lines along its edges. Ready glows; waiting to come back is the same colour dimmed (HealthPackLook).
     /// Nothing here is solid. HealthPackManager decides ready or not.
     /// </summary>
     public sealed class HealthPackView : MonoBehaviour
@@ -27,8 +27,8 @@ namespace Overpower.Match
         private Transform cross;
         private Transform lean;
         private Renderer[] crossRenderers;
-        private Renderer[] outlineRenderers;
-        private Material outlineMaterial;
+        private Renderer[] edgeRenderers;
+        private Mesh[] edgeMeshes;
         private MeshRenderer edgeRenderer;
         private Mesh padMesh;
         private Mesh edgeMesh;
@@ -38,7 +38,7 @@ namespace Overpower.Match
 
         public bool ShownReady { get; private set; }
         public Renderer[] CrossRenderers => crossRenderers;
-        public Renderer[] OutlineRenderers => outlineRenderers;
+        public Renderer[] EdgeRenderers => edgeRenderers;
         public Renderer EdgeRenderer => edgeRenderer;
         public Transform Cross => cross;
 
@@ -88,19 +88,13 @@ namespace Overpower.Match
             var leanObject = new GameObject("Lean");
             leanObject.transform.SetParent(crossObject.transform, false);
             view.lean = leanObject.transform;
-            float length = config.CrossSizeMetres, arm = length / 3f, edge = config.ShapeOutlineMetres;
-            // The black edge: each part again, grown by the edge's thickness and drawn from the inside only (front faces culled), so
-            // it shows as a rim round the part and never over it.
-            view.outlineMaterial = new Material(solid.shader) { name = "Pack Shape Edge", hideFlags = HideFlags.HideAndDontSave };
-            view.outlineMaterial.SetFloat("_Cull", 1f);
+            float length = config.CrossSizeMetres, arm = length / 3f, line = config.ShapeEdgeMetres;
+            // Unlit, every face of the shape is one flat colour: black lines along its edges show its form.
             if (ultimate)
             {
                 view.shapeMesh = IcosahedronMesh.Create(length / 2f); // as tall as the cross
-                MeshRenderer body = AddMesh(leanObject.transform, "Icosahedron", view.shapeMesh, solid);
-                MeshRenderer rim = AddMesh(body.transform, "Icosahedron edge", view.shapeMesh, view.outlineMaterial);
-                rim.transform.localScale = Vector3.one * (HealthPackLook.OutlineSize(Vector3.one * length, edge).x / length);
-                view.crossRenderers = new Renderer[] { body };
-                view.outlineRenderers = new Renderer[] { rim };
+                view.crossRenderers = new Renderer[] { AddMesh(leanObject.transform, "Icosahedron", view.shapeMesh, solid) };
+                view.edgeMeshes = new[] { ShapeEdges.LinesMesh(ShapeEdges.Icosahedron(length / 2f), line) };
             }
             else
             {
@@ -111,14 +105,14 @@ namespace Overpower.Match
                     MakeBox(leanObject.transform, "Horizontal bar", horizontal, solid),
                     MakeBox(leanObject.transform, "Vertical bar", vertical, solid),
                 };
-                view.outlineRenderers = new Renderer[]
-                {
-                    MakeBox(leanObject.transform, "Horizontal bar edge", HealthPackLook.OutlineSize(horizontal, edge), view.outlineMaterial),
-                    MakeBox(leanObject.transform, "Vertical bar edge", HealthPackLook.OutlineSize(vertical, edge), view.outlineMaterial),
-                };
+                view.edgeMeshes = new[] { ShapeEdges.LinesMesh(ShapeEdges.Plus(length, arm), line) };
             }
-            foreach (Renderer rim in view.outlineRenderers)
-                VisualTint.SetMeshColor(rim, view.block, config.ShapeOutlineColour);
+            view.edgeRenderers = new Renderer[view.edgeMeshes.Length];
+            for (int i = 0; i < view.edgeMeshes.Length; i++)
+            {
+                view.edgeRenderers[i] = AddMesh(leanObject.transform, "Edge lines " + i, view.edgeMeshes[i], solid);
+                VisualTint.SetMeshColor(view.edgeRenderers[i], view.block, config.ShapeEdgeColour);
+            }
             view.Animate(0f);
             view.Paint(true);
             return view;
@@ -183,12 +177,9 @@ namespace Overpower.Match
             Free(ref padMesh);
             Free(ref edgeMesh);
             Free(ref shapeMesh);
-            if (outlineMaterial != null)
-            {
-                if (Application.isPlaying) Destroy(outlineMaterial);
-                else DestroyImmediate(outlineMaterial);
-                outlineMaterial = null;
-            }
+            if (edgeMeshes != null)
+                for (int i = 0; i < edgeMeshes.Length; i++)
+                    Free(ref edgeMeshes[i]);
         }
 
         private static void Free(ref Mesh mesh)
@@ -206,7 +197,7 @@ namespace Overpower.Match
         {
 #if UNITY_EDITOR
             foreach (Mesh leftover in Resources.FindObjectsOfTypeAll<Mesh>())
-                if (leftover != null && (leftover.name == PadMeshName || leftover.name == EdgeMeshName || leftover.name == IcosahedronMesh.MeshName)
+                if (leftover != null && (leftover.name == PadMeshName || leftover.name == EdgeMeshName || leftover.name == IcosahedronMesh.MeshName || leftover.name == ShapeEdges.MeshName)
                     && (leftover.hideFlags & HideFlags.DontSave) != 0 && !UnityEditor.EditorUtility.IsPersistent(leftover))
                     DestroyImmediate(leftover);
 #endif

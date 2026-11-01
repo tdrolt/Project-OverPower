@@ -33,8 +33,8 @@ MonoBehaviour:
   bobCyclesPerSecond: 0.6
   crossLeanDegrees: 65
   spinDegreesPerSecond: 60
-  shapeOutlineMetres: 0.05
-  shapeOutlineColour: {r: 0, g: 0, b: 0, a: 1}
+  shapeEdgeMetres: 0.05
+  shapeEdgeColour: {r: 0, g: 0, b: 0, a: 1}
   pickupRingCount: 3
   pickupRingSeconds: 0.8
   pickupRingDelaySeconds: 0.15
