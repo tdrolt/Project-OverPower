@@ -181,7 +181,7 @@ namespace Overpower.UI
         private void Awake()
         {
             // Every remote copy stays dormant, like PlayerHud: nobody needs another player's minimap.
-            if (!photonView.IsMine)
+            if (!BodyRole.IsLocalHuman(photonView))
             {
                 enabled = false;
                 return;
@@ -994,7 +994,7 @@ namespace Overpower.UI
                     bool friendly = team == friendlyTeam;
                     // A player whose connection dropped is not on the map (PresenceRules), whatever "alive" they last wrote.
                     bool? aliveFlag = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool isAlive ? isAlive : (bool?)null;
-                    bool playerAlive = PresenceRules.CountsAsAlive(player.IsInactive, aliveFlag);
+                    bool playerAlive = PresenceRules.CountsAsAlive(Presence.IsDropped(player), aliveFlag);
                     if (!playerAlive || (!friendly && !fogOn))
                         continue;
                     PhotonView view = PlayerLookup.GetPhotonViewFor(player.ActorNumber);

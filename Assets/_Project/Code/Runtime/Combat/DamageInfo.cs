@@ -19,9 +19,9 @@ namespace Overpower.Combat
         public readonly float Amount;
 
         /// <summary>
-        /// ActorNumber of whoever fired. Inside a Photon RPC this MUST come from
-        /// PhotonMessageInfo.Sender, never PhotonNetwork.LocalPlayer, which resolves to the
-        /// receiver. Getting this wrong gives kill credit to the victim.
+        /// ActorNumber of whoever fired. Inside a Photon RPC this MUST come from the shooting
+        /// body's photonView.Owner: PhotonNetwork.LocalPlayer resolves to the receiver (kill credit
+        /// to the victim), and PhotonMessageInfo.Sender is the host for every bot's shot.
         /// </summary>
         public readonly int SourceActorNumber;
 
@@ -122,8 +122,8 @@ namespace Overpower.Combat
         int ActorNumber { get; }
 
         /// <summary>
-        /// True only on the machine that owns this target, the same machine ApplyDamage requires IsMine
-        /// on for a real player. A mine reads it so only the victim's own client decides to trigger, the
+        /// True only on the machine that controls this target (the host for a bot), the same machine ApplyDamage
+        /// requires IsMine on for a real player. A mine reads it so only the victim's own client decides to trigger, the
         /// same "only the owner acts, every client calls" rule as the rest of this interface; a test
         /// dummy has no owner to defer to, so it is always locally authoritative over itself.
         /// </summary>

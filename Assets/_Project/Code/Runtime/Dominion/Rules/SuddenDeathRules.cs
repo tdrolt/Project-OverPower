@@ -22,6 +22,31 @@ namespace Overpower.Dominion
     }
 
     /// <summary>
+    /// What the circle owes one body. The cost is added up every frame and handed over once per tick, so the rate is exact at any frame rate.
+    /// One meter per body a client simulates (its human's and, on the host, each bot's): they never share an account.
+    /// </summary>
+    public sealed class OutsideDamageMeter
+    {
+        private float owed;
+        private float sinceTick;
+
+        /// <summary>Forgets what is owed and the time since the last tick.</summary>
+        public void Reset() => owed = sinceTick = 0f;
+
+        /// <summary>Adds this frame's cost. Returns what is due now: everything owed once a whole tick has passed since the last tick, else 0.</summary>
+        public float Add(float damage, float seconds, float tickSeconds)
+        {
+            owed += damage;
+            sinceTick += seconds;
+            if (sinceTick < tickSeconds) return 0f;
+            sinceTick = 0f;
+            float due = owed;
+            owed = 0f;
+            return due > 0f ? due : 0f;
+        }
+    }
+
+    /// <summary>
     /// Sudden death: a circle that shrinks over time, and the last team with anyone
     /// alive wins. Times are the room's server clock (int ms that wraps; compared as unchecked(a - b)).
     /// </summary>

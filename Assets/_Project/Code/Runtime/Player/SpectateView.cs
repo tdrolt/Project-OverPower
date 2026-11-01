@@ -215,7 +215,7 @@ public sealed class SpectateView : MonoBehaviour
 
             bool waiting = p.CustomProperties.TryGetValue(PlayerLifecycle.LastStandKey, out object lastStand) && lastStand is bool w && w;
             bool? alive = p.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool a ? a : (bool?)null;
-            if (waiting || !PresenceRules.CountsAsAlive(p.IsInactive, alive))
+            if (waiting || !PresenceRules.CountsAsAlive(Presence.IsDropped(p), alive))
                 continue;
 
             PhotonView view = PlayerLookup.GetPhotonViewFor(p.ActorNumber);

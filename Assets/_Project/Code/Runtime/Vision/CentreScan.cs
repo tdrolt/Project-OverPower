@@ -179,7 +179,7 @@ namespace Overpower.Vision
                 if (player.IsLocal || !Teams.TryGetPlayingTeam(player, out int team) || team < 0 || team == friendlyTeam)
                     continue;
                 bool? flag = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool isAlive ? isAlive : (bool?)null;
-                if (!PresenceRules.CountsAsAlive(player.IsInactive, flag))
+                if (!PresenceRules.CountsAsAlive(Presence.IsDropped(player), flag))
                     continue;
                 PhotonView view = PlayerLookup.GetPhotonViewFor(player.ActorNumber);
                 if (view == null)

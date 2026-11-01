@@ -271,7 +271,7 @@ namespace Overpower.Match
 
         public override void OnPlayerLeftRoom(Player otherPlayer)
         {
-            if (otherPlayer != null && !PresenceRules.IsPresent(otherPlayer.IsInactive))
+            if (otherPlayer != null && !PresenceRules.IsPresent(Presence.IsDropped(otherPlayer)))
                 inactiveSince[otherPlayer.ActorNumber] = Time.unscaledTime;
             else if (otherPlayer != null)
                 ForgetDropped(otherPlayer.ActorNumber);
@@ -327,7 +327,7 @@ namespace Overpower.Match
             foreach (KeyValuePair<int, float> entry in inactiveSince)
             {
                 Player p = PhotonNetwork.CurrentRoom.GetPlayer(entry.Key);
-                if (p == null || !p.IsInactive || graceEndedHandled.Contains(entry.Key))
+                if (p == null || !Presence.IsDropped(p) || graceEndedHandled.Contains(entry.Key))
                     continue;
                 if (Time.unscaledTime - entry.Value >= grace)
                 {
@@ -703,7 +703,9 @@ namespace Overpower.Match
                     bool? aliveFlag = p.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object aliveRaw) && aliveRaw is bool a ? a : (bool?)null;
                     // A member whose connection dropped (inactive, kept for the rejoin window) is dead here whatever
                     // "alive" they last wrote - PresenceRules.CountsAsDead. With no base the team is out once all its members are.
-                    if (!PresenceRules.CountsAsDead(p.IsInactive, waiting, aliveFlag, p.IsInactive ? SecondsInactive(p) : 0f, DroppedGraceSeconds))
+                    // A bot is never dropped: only its alive flag counts.
+                    bool dropped = Presence.IsDropped(p);
+                    if (!PresenceRules.CountsAsDead(dropped, waiting, aliveFlag, dropped ? SecondsInactive(p) : 0f, DroppedGraceSeconds))
                         continue;
                     dead++;
                     if (waiting)
@@ -810,10 +812,9 @@ namespace Overpower.Match
 
             PhotonView localView = PhotonNetwork.LocalPlayer != null
                 ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
-            PlayerLifecycle lifecycle = localView != null ? localView.GetComponent<PlayerLifecycle>() : null;
 
             bool myTeamKnown = Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam);
-            bool myTeamJustEliminated = myTeamKnown && !prevEliminated.Contains(myTeam) && eliminated.Contains(myTeam);
+            bool myTeamJustEliminated = MatchPhaseRules.TeamJustEliminated(myTeamKnown, prevEliminated.Contains(myTeam), eliminated.Contains(myTeam));
 
             if (!firstRead)
             {
@@ -830,23 +831,46 @@ namespace Overpower.Match
                 if (live && !prevLive)
                     Overpower.Vision.ZoneKnowledge.ResetKnowledge();
 
-                if (live && !prevLive && lifecycle != null)
+                // Every body this client controls takes the edge: the human's, and on the host each bot's.
+                if (live && !prevLive)
                 {
-                    int team = FindFirstObjectByType<RoomManager>()?.EnsureLocalTeamInMatch() ?? myTeam;
-                    lifecycle.ResetForMatchStart(team);
-                    // The live toast, right after the fresh start - two-team text for a host start,
-                    // the ordinary text for the automatic three-team start.
-                    localView?.GetComponent<PlayerHud>()?.ShowMatchLiveToast(phase == MatchPhase.TwoTeams);
+                    var bodies = new List<PhotonView>();
+                    BodyRole.ControlledBodies(bodies);
+                    foreach (PhotonView body in bodies)
+                    {
+                        PlayerLifecycle bodyLifecycle = body.GetComponent<PlayerLifecycle>();
+                        if (bodyLifecycle == null)
+                            continue;
+                        bool human = BodyRole.IsLocalHuman(body);
+                        int team = human
+                            ? (FindFirstObjectByType<RoomManager>()?.EnsureLocalTeamInMatch() ?? myTeam)
+                            : (Teams.TryGetTeam(body.Owner, out int botTeam) ? botTeam : -1);
+                        bodyLifecycle.ResetForMatchStart(team);
+                        // The live toast, right after the fresh start - two-team text for a host start,
+                        // the ordinary text for the automatic three-team start.
+                        if (human)
+                            body.GetComponent<PlayerHud>()?.ShowMatchLiveToast(phase == MatchPhase.TwoTeams);
+                    }
                 }
 
                 if (myTeamJustEliminated)
                     localView?.GetComponent<MatchUi>()?.ShowYouLost();
 
-                if (prevPhase == MatchPhase.ThreeTeams && phase == MatchPhase.TwoTeams && !myTeamJustEliminated)
+                if (prevPhase == MatchPhase.ThreeTeams && phase == MatchPhase.TwoTeams)
                 {
-                    if (lifecycle != null && lifecycle.IsAlive)
-                        lifecycle.ReturnToSpawnForPhaseChange();
-                    localView?.GetComponent<PlayerHud>()?.ShowTwoTeamsLeftBanner();
+                    var bodies = new List<PhotonView>();
+                    BodyRole.ControlledBodies(bodies);
+                    foreach (PhotonView body in bodies)
+                    {
+                        PlayerLifecycle bodyLifecycle = body.GetComponent<PlayerLifecycle>();
+                        bool justEliminated = BodyRole.IsLocalHuman(body)
+                            ? myTeamJustEliminated
+                            : TeamJustEliminated(body.Owner, prevEliminated, eliminated);
+                        if (MatchPhaseRules.SendsHomeOnPhaseChange(prevPhase, phase, justEliminated, bodyLifecycle != null && bodyLifecycle.IsAlive))
+                            bodyLifecycle.ReturnToSpawnForPhaseChange();
+                    }
+                    if (MatchPhaseRules.TwoTeamsLeftReaches(prevPhase, phase, myTeamJustEliminated))
+                        localView?.GetComponent<PlayerHud>()?.ShowTwoTeamsLeftBanner();
                 }
             }
 
@@ -857,6 +881,9 @@ namespace Overpower.Match
                 || cutTeam != prevCutTeam || modeChanged)
                 LiveStateChanged?.Invoke();
         }
+
+        private static bool TeamJustEliminated(Player player, List<int> before, List<int> now) =>
+            MatchPhaseRules.TeamJustEliminated(Teams.TryGetTeam(player, out int team), before.Contains(team), now.Contains(team));
 
         private static MatchPhase ReadPhase(Hashtable props) =>
             props.TryGetValue(PhaseKey, out object raw) && raw is int p ? (MatchPhase)p : MatchPhase.Warmup;

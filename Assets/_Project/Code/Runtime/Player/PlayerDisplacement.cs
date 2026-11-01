@@ -184,16 +184,15 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
     /// <summary>
     /// A knockback somebody else caused (the sonic pulse): Forced like Displace, but it knows who pushed. A shielded
     /// player (Dominion respawn bubble) is not pushed by an enemy: nothing moves, BLOCKED is stamped, and onEnd never
-    /// fires (nothing started, the contract a refused DisplaceVoluntary has). On a copy nothing moves either, but when
-    /// the push is this client's own player's on a living enemy, its respawn shield hears of it (A25).
+    /// fires (nothing started, the contract a refused DisplaceVoluntary has). On a copy nothing moves either. When the
+    /// push is from a body this client plays and lands on a living enemy, that body's respawn shield hears of it (A25).
     /// </summary>
     public void Displace(Vector3 direction, float distance, float speed, Action<DisplaceEnd> onEnd, int sourceActor)
     {
+        // Asked on every client, as PlayerStatusEffects.Apply does: on the host the pushed body may be a bot it simulates itself.
+        Overpower.Dominion.RespawnShield.NoteMyEffectOnCopy(photonView, sourceActor);
         if (!photonView.IsMine)
-        {
-            Overpower.Dominion.RespawnShield.NoteMyEffectOnCopy(photonView, sourceActor);
             return;
-        }
 
         if (effectShield != null && effectShield.StopsEnemyEffectFrom(sourceActor))
             return;

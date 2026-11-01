@@ -1,6 +1,7 @@
 using Photon.Pun;
 using UnityEngine;
 using Overpower.Combat;
+using Overpower.Net;
 
 /// <summary>
 /// Faces the player at the mouse cursor and owns the active weapon's aim cone (bloom on fire,
@@ -44,7 +45,7 @@ public class PlayerAim : MonoBehaviour
     private Vector3 aimDirection = Vector3.forward;
     private Vector3 groundPointUnderCursor;
 
-    // Test/harness hook, not gameplay - see SetAimOverride.
+    // Aim given by code (a bot's driver, a test script) - see SetAimOverride.
     private Vector3? aimOverride;
 
     /// <summary>Flat, normalised, toward the cursor.</summary>
@@ -86,7 +87,7 @@ public class PlayerAim : MonoBehaviour
 
     private void Update()
     {
-        // Only the local player controls their own rotation; the rest learn it from PlayerNetSync.
+        // Only the client controlling this body turns it (for a bot, the host); the rest learn it from PlayerNetSync.
         if (!photonView.IsMine)
             return;
 
@@ -94,10 +95,11 @@ public class PlayerAim : MonoBehaviour
         {
             AimAt(aimOverride.Value);
         }
-        else if (Application.isFocused)
+        else if (BodyRole.IsLocalHuman(photonView) && Application.isFocused)
         {
             UpdateRotationFromMouse();
         }
+        // The mouse is the local human's only: a bot with no override keeps its last aim rather than turn to the host's cursor.
         // Input.mousePosition keeps reading the real OS cursor while this window is UNFOCUSED
         // (alt-tabbed, or a background Editor a script is driving), so an idle player would keep
         // turning toward wherever the mouse is on the desktop. Hence the isFocused gate: unfocused
@@ -133,8 +135,8 @@ public class PlayerAim : MonoBehaviour
     }
 
     /// <summary>
-    /// TEST/HARNESS HOOK, not a gameplay feature. While set, this player aims at worldPoint every
-    /// frame regardless of Application.isFocused or the OS cursor. Null releases it. Prefer this over
+    /// Aim by code: a bot's only aim, and the test harness's hook. While set, this player aims at worldPoint every
+    /// frame regardless of Application.isFocused or the OS cursor. Null releases it (a bot then keeps its last aim). Prefer this over
     /// reflecting into aimDirection/groundPointUnderCursor (two-client-harness.md §11): it also turns
     /// the body, which those fields alone do not.
     /// </summary>

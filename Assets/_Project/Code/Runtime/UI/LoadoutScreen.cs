@@ -270,8 +270,8 @@ namespace Overpower.UI
 
         private void Awake()
         {
-            // Every remote copy stays permanently dormant.
-            if (!photonView.IsMine)
+            // Every remote copy, and every bot body the host controls, stays permanently dormant.
+            if (!BodyRole.IsLocalHuman(photonView))
             {
                 enabled = false;
                 return;
@@ -322,7 +322,7 @@ namespace Overpower.UI
         {
             // Owner only (Awake switched every other copy off). A fresh joiner mid-round finds the shop open by itself, with the round's
             // limits, so they pick a build before spawning; a rejoiner keeps what they had.
-            if (!photonView.IsMine || photonView.Owner == null || photonView.Owner.HasRejoined || !ShopPricing.DominionLive())
+            if (!BodyRole.IsLocalHuman(photonView) || photonView.Owner == null || photonView.Owner.HasRejoined || !ShopPricing.DominionLive())
                 return;
             DominionDirector director = DominionDirector.Instance;
             if (director == null)
@@ -349,11 +349,11 @@ namespace Overpower.UI
             if (abilityRunner != null)
                 abilityRunner.SlotChanged -= HandleAbilitySlotChanged;
 
-            // MINE ONLY: every remote copy also runs OnDestroy (whenever any OTHER player leaves) though it bailed out of
-            // Awake; without this guard its teardown would clear the STATIC IsOpen, and release a focus claim it never
-            // made, under the local player's open screen. Also the guarantee for the owner's copy, since OnDisable does
+            // LOCAL HUMAN ONLY: every remote copy and bot body also runs OnDestroy (whenever any OTHER player leaves) though it
+            // bailed out of Awake; without this guard its teardown would clear the STATIC IsOpen, and release a focus claim it
+            // never made, under the local player's open screen. Also the guarantee for the owner's copy, since OnDisable does
             // not run for every teardown path.
-            if (photonView != null && photonView.IsMine)
+            if (BodyRole.IsLocalHuman(photonView))
             {
                 inputRouter?.SetToolFocus(this, false);
                 IsOpen = false;

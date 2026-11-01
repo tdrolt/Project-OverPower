@@ -74,7 +74,7 @@ namespace Overpower.Dominion
         {
             zone = -1;
             BuildingManager buildings = BuildingManager.Instance;
-            if (buildings == null || DominionMode.TeamsOfCurrentRoom().Length != 3) return false;
+            if (buildings == null || DominionMode.TeamCountOfCurrentRoom() != 3) return false; // the cached count: a bot asks this every tick
             if (centreZone >= 0 && buildings.BaseTierOf(centreZone) == DominionRules.CentreTier) { zone = centreZone; return true; }
             for (int z = 0; z < buildings.ZoneCount; z++)
                 if (buildings.BaseTierOf(z) == DominionRules.CentreTier) { centreZone = z; zone = z; return true; }

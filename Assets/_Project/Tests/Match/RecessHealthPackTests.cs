@@ -269,7 +269,7 @@ namespace Overpower.Tests
             Check(IlWiring.Uses(manager, "EnsureRecessPack", manager.GetMethod(nameof(HealthPackManager.SetRecessPack), Any)), "and is handed to the builder");
             Check(inPlay != null && IlWiring.Uses(manager, "Update", inPlay), "drawing asks whether the pack is in play");
             Check(inPlay != null && IlWiring.Uses(manager, "TryRequestLocal", inPlay), "so does asking for it");
-            Check(inPlay != null && IlWiring.Uses(manager, "OnPlayerPropertiesUpdate", inPlay), "and the master's decision");
+            Check(inPlay != null && IlWiring.Uses(manager, "Grant", inPlay), "and the master's decision, for a player's request and a bot's alike");
             System.Type pack = manager.GetNestedType("Pack", Any);
             FieldInfo recess = pack != null ? pack.GetField("recess", Any) : null;
             Check(recess != null && IlWiring.Uses(manager, "InPlay", recess), "a recess pack is in play while its cut stands, whatever its index says as a zone");

@@ -4,33 +4,21 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// Pure static events (no Photon, no MonoBehaviour) that fire ONLY on the machine of the player who
-    /// earned the damage or the takedown, never on a victim's or a bystander's client. That is what
-    /// makes static safe: unlike PlayerHealth.Damaged (fires on the victim, once per victim per
-    /// client), exactly one machine per hit raises these, so there is no cross-player ambiguity.
-    /// UnityEngine is used only for Transform/Vector3.
+    /// Pure static events (no Photon, no MonoBehaviour) for the screen of the human at this keyboard only: damage numbers, the mark
+    /// diamond, blocked pops. Raise an attacker's event only when the attacker is that human (actor == PhotonNetwork.LocalPlayer's):
+    /// on the host every bot is controlled here too, and a bot's hit must not pop on the human's screen. What a body EARNED (damage
+    /// dealt, takedowns, scoreboard credit, an enemy affected) is not here: it goes through CombatFeed.For(actor), so the host's
+    /// human and each bot hear only their own. UnityEngine is used only for Transform/Vector3.
     ///
-    /// Two paths raise these:
+    /// Two paths raise the hit/mark events:
     ///  - PlayerCombatCredit.RPC_DamageCredit, on the attacker's own machine, once the victim's client
     ///    has told it how much it actually dealt (the attacker cannot know this any other way:
     ///    PlayerHealth.ApplyDamage is victim-side).
     ///  - DummyTarget, single-client only: the local player's hits on a test-range dummy need no
     ///    network round trip, so it raises these directly.
-    ///
-    /// Intended subscribers: the zip gun cooldown reset (takedown) and the ultimate charge. Armor
-    /// recharge is wired through NoteDealtDamage, not these events.
     /// </summary>
     public static class CombatEvents
     {
-        /// <summary>Raised with the amount of damage this client's own player just dealt (armor +
-        /// health actually removed from the victim), never with zero or negative amounts.</summary>
-        public static event Action<float> LocalDamageDealt;
-
-        /// <summary>Raised when this client's own player earned credit for ending a fight - true
-        /// for the kill itself, false for an assist (damage within the assist window, but someone
-        /// else landed the killing blow).</summary>
-        public static event Action<bool> LocalTakedown;
-
         /// <summary>Raised on the attacker's machine with the damage that actually LANDED on victim (the
         /// victim's own truth). cashedMark is true exactly when this hit used up the attacker's own mark
         /// (MarkOutcome.Cashed). Two raisers: PlayerCombatCredit.RPC_DamageCredit (a networked victim;
@@ -64,17 +52,6 @@ namespace Overpower.Combat
         /// PlayerHealth.ApplyDamage's guard.</summary>
         public static event Action<Transform> LocalBlockedSeen;
 
-        /// <summary>Raised ONLY by PlayerCombatCredit.RPC_DamageCredit - credit for hitting a real player, never a
-        /// test-range dummy (DummyTarget raises the two events above directly). The scoreboard listens to this one.
-        /// takedown: 0 = damage only, 1 = kill, 2 = assist.</summary>
-        public static event Action<float, int> LocalPlayerCredit;
-
-        public static void RaisePlayerCredit(float amount, int takedown) => LocalPlayerCredit?.Invoke(amount, takedown);
-
-        public static void RaiseDamageDealt(float amount) => LocalDamageDealt?.Invoke(amount);
-
-        public static void RaiseTakedown(bool isKill) => LocalTakedown?.Invoke(isKill);
-
         public static void RaiseHitReported(Transform victim, float amount, bool cashedMark) =>
             LocalHitReported?.Invoke(victim, amount, cashedMark);
 
@@ -98,14 +75,5 @@ namespace Overpower.Combat
         public static event Action<Transform, float> LocalShieldBlockedSeen;
 
         public static void RaiseShieldBlockedSeen(Transform victim, float popupSeconds) => LocalShieldBlockedSeen?.Invoke(victim, popupSeconds);
-
-        /// <summary>Something THIS client's own player did reached an enemy (A25) - damage (read from the victim's credit
-        /// message), a stun, slow, burn or vulnerability (this client's own simulation of the effect, on its copy of the victim) or a push (the
-        /// same, from the pulse). Raised only on the machine of the player who did it, so no RPC carries it. victimShielded = the enemy's own
-        /// respawn shield was up (the effect was stopped, so nothing was hit); fromBeforeRespawn = the effect was set up before the attacker's
-        /// respawn (a mine, a fire field, a burn: A26). The attacker's RespawnShield is the one subscriber.</summary>
-        public static event Action<bool, bool> LocalEnemyAffected;
-
-        public static void RaiseEnemyAffected(bool victimShielded, bool fromBeforeRespawn) => LocalEnemyAffected?.Invoke(victimShielded, fromBeforeRespawn);
     }
 }

@@ -7,8 +7,9 @@ public static class StunShakeRule
 {
     private const float GoldenAngle = 137.5f; // each step turns this far from the last, so no two neighbours point alike; not a look number
 
-    public static bool ShakesOnApply(StatusKind kind, bool victimIsMine, bool shakeOn, float strength) =>
-        kind == StatusKind.Stun && victimIsMine && shakeOn && strength > 0f;
+    /// <summary>Pass whether the stunned body is the one at this keyboard, not merely one this client controls: a stunned bot on the host must not shake the host's camera.</summary>
+    public static bool ShakesOnApply(StatusKind kind, bool victimIsLocalHuman, bool shakeOn, float strength) =>
+        kind == StatusKind.Stun && victimIsLocalHuman && shakeOn && strength > 0f;
 
     /// <summary>How far the camera is off <paramref name="ageSeconds"/> into a shake: <paramref name="strength"/> at once, easing to 0 at
     /// <paramref name="seconds"/>.</summary>

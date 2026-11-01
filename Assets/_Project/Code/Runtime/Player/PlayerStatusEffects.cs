@@ -197,7 +197,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         publishedLabel = label;
         publishedEndMs = endMs;
         publishedTotalMs = totalMs;
-        photonView.Owner.SetCustomProperties(new Hashtable
+        PlayerProps.Set(photonView.Owner, new Hashtable
         {
             { StatusLabelProperty.Key, label == StatusLabel.None ? StatusLabelProperty.None() : StatusLabelProperty.Encode((int)label, endMs, totalMs) },
         });
@@ -240,16 +240,19 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
     /// </summary>
     public void Apply(in StatusEffectSpec spec, int sourceActorNumber = -1)
     {
-        if (!photonView.IsMine)
+        // The attacker's side (A25): if the effect is from a body this client plays and hits a living enemy, that body's respawn
+        // shield hears of it. Asked on every client, not only on a copy: on the host the victim may be a bot it simulates itself,
+        // hit by its own human or another bot. RespawnShield decides whether to report; nothing is applied by it.
+        Overpower.Dominion.RespawnShieldRules.EffectReportDecision mine =
+            Overpower.Dominion.RespawnShield.NoteMyEffectOnCopy(photonView, sourceActorNumber, spec.effectPlacedMs);
+        if (RaybeamMarkRule.ShowsOnEnemy(spec.kind, mine.Report, mine.VictimShielded))
         {
-            // This client simulates its own effect on its copy of someone else; if it hits a living enemy,
-            // our respawn shield hears of it (A25). Nothing is applied here, only the victim's client does.
-            Overpower.Dominion.RespawnShieldRules.EffectReportDecision mine =
-                Overpower.Dominion.RespawnShield.NoteMyEffectOnCopy(photonView, sourceActorNumber, spec.effectPlacedMs);
-            if (RaybeamMarkRule.ShowsOnEnemy(spec.kind, mine.Report, mine.VictimShielded))
+            if (IsLocalHumanActor(sourceActorNumber))
                 CombatEvents.RaiseVulnerabilitySeen(transform, spec.duration);
-            return;
         }
+
+        if (!photonView.IsMine)
+            return; // only the victim's own client applies it
 
         // A respawned player is untouchable: no enemy stun, slow, burn or vulnerability while the bubble
         // is up (A24). Own and teammate statuses land as always.
@@ -267,13 +270,17 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         ApplyStunToMotor(); // freeze at once so the stun and the movement it blocks read as the same frame
 
         Overpower.Arena.ArenaLook look = playerHealth != null && playerHealth.Theme != null ? playerHealth.Theme.arenaLook : null;
-        if (look != null && StunShakeRule.ShakesOnApply(spec.kind, photonView.IsMine, look.stunShakeOn, look.stunShakeStrength)
+        if (look != null && StunShakeRule.ShakesOnApply(spec.kind, BodyRole.IsLocalHuman(photonView), look.stunShakeOn, look.stunShakeStrength)
             && CameraTracking.Instance != null)
             CameraTracking.Instance.Shake(look.stunShakeSeconds, look.stunShakeStrength, look.stunShakeFrequency);
 
         // Both raw numbers for every kind, not one picked per kind.
         StatusApplied?.Invoke(spec.kind, sourceActorNumber, spec.abilityId, spec.duration, spec.magnitude);
     }
+
+    /// <summary>The human at this keyboard did it: the screen-only events are theirs, never a bot's the host plays.</summary>
+    private static bool IsLocalHumanActor(int actorNumber) =>
+        PhotonNetwork.LocalPlayer != null && actorNumber == PhotonNetwork.LocalPlayer.ActorNumber;
 
     /// <summary>IStatusReceiver's generic entry point, for callers that found this through
     /// GetComponentInParent&lt;IStatusReceiver&gt;. Forwards to Apply.</summary>
@@ -366,7 +373,8 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
     /// Sonic pulse's player-into-player collision stun is the first user: only the pulse owner's
     /// physics sees that collision.
     ///
-    /// Applies locally when this IS the local player; otherwise RPCs the one owner who may apply it.
+    /// Applies locally when this client simulates the victim; otherwise RPCs the one client that does (its
+    /// controller: the owner, or the host for a bot, which cannot receive an RPC itself).
     /// Never RpcTarget.All: every other client would also try to apply a status meant for one victim.
     /// </summary>
     public void RequestOnOwner(in StatusEffectSpec spec, int sourceActor)
@@ -380,7 +388,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         // abilityId is appended LAST: appending an RPC parameter does not touch the RpcList (it indexes
         // method NAMES, see WeaponFiring.RPC_FireWeapon), but every client must run the same build for
         // the extra parameter to line up.
-        photonView.RPC(nameof(RPC_ApplyStatusFromPeer), photonView.Owner,
+        photonView.RPC(nameof(RPC_ApplyStatusFromPeer), photonView.Controller,
                        (byte)spec.kind, spec.duration, spec.magnitude, sourceActor, spec.abilityId);
     }
 

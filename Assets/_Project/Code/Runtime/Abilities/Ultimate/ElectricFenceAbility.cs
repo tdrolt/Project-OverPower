@@ -47,7 +47,7 @@ namespace Overpower.Abilities
                 return; // Only the caster's own machine ever places the real networked object.
 
             // This ability's id, so ElectricFence can attribute its damage passes (DamageInfo.AbilityId) for telemetry.
-            NetworkedDeployable.Spawn(fencePrefab.name, cast.Payload.Point, new object[] { Definition.Id });
+            NetworkedDeployable.Spawn(fencePrefab.name, cast.Payload.Point, new object[] { Definition.Id }, Owner.ActorNumber, Owner.TeamId);
         }
 
         public override string ShopStatsText()

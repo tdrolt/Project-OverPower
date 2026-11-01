@@ -19,6 +19,8 @@ namespace Overpower.Telemetry
     /// REMOTE COPIES DO NOTHING: Awake disables the component when photonView.IsMine is false, before any GetComponent call or
     /// subscription runs. Deleting Assets/_Project/Code/Runtime/Telemetry leaves the game running (design doc, Principle 1).
     ///
+    /// A BOT'S BODY (IsMine on the host) is recorded too, into the bot's own file (MatchTelemetry.LogBot), never into the host's.
+    ///
     /// ALLOCATION: one TelemetryLine is reused for every event; the shots/dots accumulators are reset in place on every flush; event-name
     /// strings come from static arrays instead of Enum.ToString(). The only per-frame work is two cheap bool reads in Update's polling
     /// (IsSilenced, IsFull).
@@ -55,6 +57,9 @@ namespace Overpower.Telemetry
         private Vector3 MyPosition => body != null ? body.position : transform.position;
 
         private readonly TelemetryLine line = new TelemetryLine();
+
+        // The bot actor when this body is a bot's (its lines go to the bot's own file), else 0 (this client's own file).
+        private int botActor;
 
         private float sampleTimer;
 
@@ -150,6 +155,8 @@ namespace Overpower.Telemetry
                 return;
             }
 
+            botActor = BodyRole.IsBot(photonView) ? photonView.OwnerActorNr : 0;
+
             if (config == null)
                 Debug.LogError($"[PlayerTelemetry] {name}: TelemetryConfig is not assigned - the sample interval and Record Positions fall back to hardcoded defaults.");
             if (territoryConfig == null)
@@ -210,8 +217,8 @@ namespace Overpower.Telemetry
             if (MatchTelemetry.Instance != null)
                 MatchTelemetry.Instance.BeforeClose += HandleBeforeClose;
 
-            // Static event: a dummy is not networked and lives in exactly one client's scene, so the only right listener is that client's
-            // own local player (see DummyTarget.AnyDamaged).
+            // Static event: a dummy is not networked and lives in exactly one client's scene, so the only right listener is the body whose
+            // player fired the shot (see DummyTarget.AnyDamaged and HandleDummyDamaged).
             DummyTarget.AnyDamaged += HandleDummyDamaged;
         }
 
@@ -270,6 +277,18 @@ namespace Overpower.Telemetry
             FlushHeal();
         }
 
+        /// <summary>Hands the finished line to the file it belongs in: this client's own, or the bot's when this is a bot's body.</summary>
+        private void Emit()
+        {
+            MatchTelemetry telemetry = MatchTelemetry.Instance;
+            if (telemetry == null)
+                return;
+            if (botActor != 0)
+                telemetry.LogBot(botActor, line);
+            else
+                telemetry.Log(line);
+        }
+
         private void Update()
         {
             if (MatchTelemetry.Instance == null)
@@ -310,7 +329,7 @@ namespace Overpower.Telemetry
             line.Begin(TelemetryKeys.Overheat, MatchTelemetry.Instance.Now);
             line.String(TelemetryKeys.State, silenced ? "silenced" : "recovered");
             line.Int(TelemetryKeys.Weapon, weaponFiring != null && weaponFiring.Weapon != null ? weaponFiring.Weapon.Id : -1);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
         private void PollUltimateCharge()
@@ -330,7 +349,7 @@ namespace Overpower.Telemetry
 
             line.Begin(TelemetryKeys.UltimateReady, MatchTelemetry.Instance.Now);
             line.Int(TelemetryKeys.AbilityId, abilityRunner != null ? abilityRunner.EquippedId(AbilitySlot.Ultimate) : -1);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
         // ---------------------------------------------------------------- economy
@@ -347,7 +366,8 @@ namespace Overpower.Telemetry
             }
         }
 
-        private void HandlePurchased(PurchaseCategory category, int itemId, int price, int balanceAfter, bool free)
+        /// <summary>LoadoutScreen.Purchased, and a bot's shop (a bot body has no shop screen to raise it) calls it too.</summary>
+        public void HandlePurchased(PurchaseCategory category, int itemId, int price, int balanceAfter, bool free)
         {
             if (MatchTelemetry.Instance == null)
                 return;
@@ -359,10 +379,11 @@ namespace Overpower.Telemetry
             line.Int(TelemetryKeys.BalanceAfter, balanceAfter);
             line.Int(TelemetryKeys.Zone, CurrentZone());
             line.Bool(TelemetryKeys.Free, free);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
-        private void HandleRefunded(PurchaseCategory category, int amount, int balanceAfter)
+        /// <summary>LoadoutScreen.Refunded, and a bot's shop calls it too.</summary>
+        public void HandleRefunded(PurchaseCategory category, int amount, int balanceAfter)
         {
             if (MatchTelemetry.Instance == null)
                 return;
@@ -372,10 +393,11 @@ namespace Overpower.Telemetry
             line.Int(TelemetryKeys.Amount, amount);
             line.Int(TelemetryKeys.BalanceAfter, balanceAfter);
             line.Int(TelemetryKeys.Zone, CurrentZone());
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
-        private void HandlePurchaseRefused(int itemId, int price, PurchaseBlock reason, int shortfall)
+        /// <summary>LoadoutScreen.PurchaseRefused, and a bot's shop calls it too.</summary>
+        public void HandlePurchaseRefused(int itemId, int price, PurchaseBlock reason, int shortfall)
         {
             if (MatchTelemetry.Instance == null)
                 return;
@@ -386,7 +408,7 @@ namespace Overpower.Telemetry
             line.String(TelemetryKeys.Reason, ReasonName(reason));
             line.Int(TelemetryKeys.Shortfall, shortfall);
             line.Int(TelemetryKeys.Zone, CurrentZone());
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
         private static string CategoryName(PurchaseCategory category)
@@ -498,7 +520,7 @@ namespace Overpower.Telemetry
             line.Int(TelemetryKeys.Refund, refundCreditedThisInterval);
             line.Int(TelemetryKeys.Debug, debugCreditedThisInterval);
             line.Int(TelemetryKeys.Other, otherCreditedThisInterval);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
 
             territoryCreditedThisInterval = 0;
             bountyCreditedThisInterval = 0;
@@ -625,7 +647,7 @@ namespace Overpower.Telemetry
 
             line.Begin(TelemetryKeys.Heal, MatchTelemetry.Instance.Now);
             line.Ints(TelemetryKeys.HealTiers, healByTierWholeScratch);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
         // ---------------------------------------------------------------- shots
@@ -660,7 +682,7 @@ namespace Overpower.Telemetry
                 line.Int(TelemetryKeys.Weapon, pair.Key);
                 line.Int(TelemetryKeys.Pulls, pair.Value.Pulls);
                 line.Int(TelemetryKeys.Projectiles, pair.Value.Projectiles);
-                MatchTelemetry.Instance.Log(line);
+                Emit();
                 pair.Value.Reset();
             }
         }
@@ -680,7 +702,7 @@ namespace Overpower.Telemetry
             line.Float(TelemetryKeys.X, MyPosition.x);
             line.Float(TelemetryKeys.Z, MyPosition.z);
             line.Int(TelemetryKeys.FollowUp, 1);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
         private void HandleCast(AbilitySlot slot, int abilityId)
@@ -693,7 +715,7 @@ namespace Overpower.Telemetry
             line.Int(TelemetryKeys.AbilityId, abilityId);
             line.Float(TelemetryKeys.X, MyPosition.x);
             line.Float(TelemetryKeys.Z, MyPosition.z);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
 
             if (slot != AbilitySlot.Ultimate)
                 return;
@@ -714,7 +736,7 @@ namespace Overpower.Telemetry
             line.Begin(TelemetryKeys.UltimateUsed, MatchTelemetry.Instance.Now);
             line.Int(TelemetryKeys.AbilityId, abilityId);
             line.Float(TelemetryKeys.SecondsSinceReady, sinceReady);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
         // ---------------------------------------------------------------- status
@@ -730,7 +752,7 @@ namespace Overpower.Telemetry
             line.Int(TelemetryKeys.AbilityId, abilityId);
             line.Float(TelemetryKeys.Duration, duration);
             line.Float(TelemetryKeys.DurationOrMagnitude, magnitude);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
         // ---------------------------------------------------------------- overpower
@@ -744,7 +766,7 @@ namespace Overpower.Telemetry
             line.String(TelemetryKeys.State, "triggered");
             line.Float(TelemetryKeys.ZoneDistance, ZoneDistance());
             line.Float(TelemetryKeys.HealthAtTrigger, playerHealth != null ? playerHealth.Health : 0f);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
         private void HandleOverpowerEnded(string reason)
@@ -757,7 +779,7 @@ namespace Overpower.Telemetry
             line.String(TelemetryKeys.Reason, reason);
             line.Float(TelemetryKeys.ZoneDistance, ZoneDistance());
             line.Float(TelemetryKeys.HealthAtTrigger, playerHealth != null ? playerHealth.Health : 0f);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
         private float ZoneDistance()
@@ -789,12 +811,9 @@ namespace Overpower.Telemetry
         /// actor/team are -1: a dummy has no Photon identity (DummyTarget.ActorNumber is -1 by the same convention).</summary>
         private void HandleDummyDamaged(DummyTarget dummy, DamageResult result, DamageInfo info)
         {
-            if (PhotonNetwork.LocalPlayer == null)
-                return;
-
-            // Only this player's own shots landing on a dummy are this client's to log; a dummy is plain scenery with no owner guard,
-            // so this is the one place that check happens.
-            if (info.SourceActorNumber != PhotonNetwork.LocalPlayer.ActorNumber)
+            // Only this player's own shots landing on a dummy are this body's to log (a bot's go to the bot's file); a dummy is plain
+            // scenery with no owner guard, so this is the one place that check happens.
+            if (info.SourceActorNumber != photonView.OwnerActorNr)
                 return;
 
             float distance = Vector3.Distance(MyPosition, dummy.transform.position);
@@ -857,7 +876,7 @@ namespace Overpower.Telemetry
             // Appended LAST, and only when this hit touched a mark, so hit lines from non-marking weapons stay byte-identical.
             if (result.Mark != MarkOutcome.None)
                 line.Int(TelemetryKeys.Mark, (int)result.Mark);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
         private void WriteDotLine((int Victim, int AttackerActor, int AttackerTeam, int WeaponId, int AbilityId, int Source) key,
@@ -883,7 +902,7 @@ namespace Overpower.Telemetry
             line.Float(TelemetryKeys.HealthLost, dot.HealthSum);
             line.Float(TelemetryKeys.FirstT, (float)dot.FirstT);
             line.Float(TelemetryKeys.LastT, (float)dot.LastT);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
         private void FlushDots()
@@ -946,7 +965,7 @@ namespace Overpower.Telemetry
             line.Float(TelemetryKeys.TimeAlive, Time.time - aliveSinceTime);
             line.Int(TelemetryKeys.UnspentGold, goldWallet != null ? goldWallet.Balance : 0);
             WriteLoadout(useDeathKeys: true);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
 
             // Shots flush on death (and on leave, in OnDestroy).
             FlushShots();
@@ -994,7 +1013,7 @@ namespace Overpower.Telemetry
             line.Bool(TelemetryKeys.UnderAttackSpawn, !freshStart && lifecycle != null && lifecycle.LastRespawnWasUnderAttackSpawn);
             if (freshStart)
                 line.Bool(TelemetryKeys.Fresh, true);
-            MatchTelemetry.Instance.Log(line);
+            Emit();
         }
 
         // ---------------------------------------------------------------- sample
@@ -1023,8 +1042,8 @@ namespace Overpower.Telemetry
             line.Float(TelemetryKeys.Armor, playerHealth != null ? playerHealth.Armor : 0f);
             line.Float(TelemetryKeys.UltimateCharge, ultimateCharge != null ? ultimateCharge.Normalised : 0f);
             line.Float(TelemetryKeys.OverheatLevel, overheat != null ? overheat.Normalised : 0f);
-            line.Int(TelemetryKeys.Ping, PhotonNetwork.GetPing());
-            MatchTelemetry.Instance.Log(line);
+            line.Int(TelemetryKeys.Ping, botActor != 0 ? 0 : PhotonNetwork.GetPing()); // a bot has no connection of its own
+            Emit();
         }
 
         /// <summary>This player's own loadout ids and both armor levels, written into whichever event is being built (callers Begin

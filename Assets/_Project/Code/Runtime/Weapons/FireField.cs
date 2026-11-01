@@ -112,7 +112,9 @@ namespace Overpower.Weapons
         /// instantiationData, so every client, remote copies included (they only ever read the packed value), burns for the same already-scaled
         /// number. Clamped to >= 0 like WeaponFiring.SetStatMultipliers.
         /// </param>
-        public static void Spawn(GameObject prefab, Vector3 position, int weaponId, float damageMultiplier = 1f)
+        /// <param name="placerActor">Who fired the rocket (ProjectileContext.ShooterActorNumber). Sent because the client spawning a bot's
+        /// field is the host, so the object's sender would be the host.</param>
+        public static void Spawn(GameObject prefab, Vector3 position, int weaponId, int placerActor, float damageMultiplier = 1f)
         {
             if (prefab == null)
                 return;
@@ -140,6 +142,7 @@ namespace Overpower.Weapons
                 template.damagePerSecond * Mathf.Max(0f, damageMultiplier),
                 template.duration,
                 weaponId,
+                placerActor,
             };
 
             PhotonNetwork.Instantiate(prefab.name, position, Quaternion.identity, 0, data);
@@ -168,10 +171,9 @@ namespace Overpower.Weapons
                                 "other clients.");
             }
 
-            // The owner of the object is whoever fired the shot that left it, so kill credit, the no-friendly-fire rule and the TEAM COLOUR below all come
-            // from there with no new RPC or instantiationData slot (MineView/PortalView/FenceCageView read an owner's team the same way).
-            sourceActorNumber = info.Sender != null ? info.Sender.ActorNumber : -1;
-            Teams.TryGetTeam(info.Sender, out sourceTeamId);
+            // Kill credit, the no-friendly-fire rule and the TEAM COLOUR below all come from whoever fired the rocket.
+            sourceActorNumber = PlacerActor(data, info.Sender != null ? info.Sender.ActorNumber : -1);
+            Teams.TryGetTeam(sourceActorNumber, out sourceTeamId);
             // When this field was set up, so its burn can say whether it predates its owner's respawn. A late joiner's replay of an old field reads a later
             // time here; fields are short-lived and the worst case is one tick counted as new. (A26)
             placedServerTimestampMs = info.SentServerTimestamp;
@@ -184,12 +186,17 @@ namespace Overpower.Weapons
             VisibleWhenSeen gate = GetComponent<VisibleWhenSeen>();
             if (gate != null)
                 gate.SetSeenRadius(radius, true);
+                gate.SetPlacerTeam(sourceTeamId);
 
             Debug.Log($"[FireField] lit at {transform.position} - {radius:0.##}m, " +
                        $"{damagePerSecond:0.#} dmg/s for {duration:0.##}s");
 
             StartCoroutine(Burn());
         }
+
+        /// <summary>Who fired the rocket: Spawn's placer slot (a bot's actor, though the host spawned it), else the sender.</summary>
+        public static int PlacerActor(object[] data, int senderActor) =>
+            data != null && data.Length >= 5 && data[4] is int placer ? placer : senderActor;
 
         /// <summary>The floor flames over exactly the radius this field was sent, burning in the shooter's team hue, and the rim at its edge:
         /// the shooter's team accent.</summary>

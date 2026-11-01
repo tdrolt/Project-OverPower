@@ -5,6 +5,7 @@ using Overpower.Arena;
 using Overpower.Combat;
 using Overpower.Vision;
 using Overpower.Match;
+using Overpower.Net;
 using Overpower.UI;
 
 namespace Overpower.Abilities
@@ -252,7 +253,7 @@ namespace Overpower.Abilities
             if (!PhotonNetwork.InRoom || !Owner.IsMine)
                 return;
 
-            PhotonNetwork.LocalPlayer.SetCustomProperties(new ExitGames.Client.Photon.Hashtable { { AllyPortalTraveller.ReadyKey, ready } });
+            PlayerProps.Set(Owner.PhotonView.Owner, new ExitGames.Client.Photon.Hashtable { { AllyPortalTraveller.ReadyKey, ready } });
             lastPublishedReady = ready;
         }
 
@@ -422,7 +423,7 @@ namespace Overpower.Abilities
         private void PlacePortal(CastPayload payload)
         {
             object[] data = { portalTemplate.PortalDiameter, payload.IntArg, channelSeconds };
-            GameObject spawned = NetworkedDeployable.Spawn(portalPrefab.name, payload.Point, data);
+            GameObject spawned = NetworkedDeployable.Spawn(portalPrefab.name, payload.Point, data, Owner.ActorNumber, Owner.TeamId);
             if (spawned == null)
                 return; // Spawn already logged why.
 

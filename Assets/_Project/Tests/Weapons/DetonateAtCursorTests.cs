@@ -59,5 +59,30 @@ namespace Overpower.Tests
 
             Assert.AreEqual(0f, distance, 1e-4f);
         }
+
+        // ---- which client lights the fire ----
+
+        [Test]
+        public void AHumansRocketLightsItsFireOnTheirOwnClientOnly()
+        {
+            Assert.IsTrue(DetonateAtCursor.LightsFireHere(shooterIsLocalPlayer: true, shooterIsBot: false, shooterBodyIsMine: true));
+            Assert.IsTrue(DetonateAtCursor.LightsFireHere(true, false, false), "a body missing from the lookup still lights on its owner's client");
+            Assert.IsFalse(DetonateAtCursor.LightsFireHere(false, false, false));
+            Assert.IsFalse(DetonateAtCursor.LightsFireHere(false, false, true), "the host controlling a dropped human's body does not light it");
+        }
+
+        [Test]
+        public void ABotsRocketLightsItsFireOnTheHostThatPlaysTheBot()
+        {
+            Assert.IsTrue(DetonateAtCursor.LightsFireHere(shooterIsLocalPlayer: false, shooterIsBot: true, shooterBodyIsMine: true));
+            Assert.IsFalse(DetonateAtCursor.LightsFireHere(false, true, false), "every other client only watches the bot's rocket");
+        }
+
+        [Test]
+        public void TheRocketAsksTheRuleBeforeLightingItsFire()
+        {
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(DetonateAtCursor), nameof(DetonateAtCursor.OnExpired),
+                typeof(DetonateAtCursor).GetMethod(nameof(DetonateAtCursor.LightsFireHere))));
+        }
     }
 }

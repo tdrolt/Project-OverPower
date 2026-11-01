@@ -26,6 +26,9 @@ namespace Overpower.Match
     /// The flow mirrors PlayerLoadout: the OWNER applies every change locally first (so spending
     /// feels instant), then publishes it; every OTHER client only ever reads the published
     /// property; a LATE JOINER reads whatever value is already there.
+    ///
+    /// A bot's wallet is the host's to run, like any body it controls, so every read and write here goes through
+    /// photonView.Owner, never LocalPlayer: on the host those are two different players.
     /// </summary>
     public class GoldWallet : MonoBehaviourPun, IInRoomCallbacks
     {
@@ -116,9 +119,9 @@ namespace Overpower.Match
             // remembers this actor's real "gold" Player Property from before. Always starting from
             // StartingGold and republishing would silently wipe that balance back to 0 the moment
             // the new component's Start ran - read it back first if the room already has it.
-            bool hasExistingBalance = PhotonNetwork.LocalPlayer.CustomProperties.ContainsKey(GoldKey);
+            bool hasExistingBalance = photonView.Owner.CustomProperties.ContainsKey(GoldKey);
             int startingBalance = hasExistingBalance
-                ? LoadoutProperties.ReadInt(PhotonNetwork.LocalPlayer.CustomProperties, GoldKey, 0)
+                ? LoadoutProperties.ReadInt(photonView.Owner.CustomProperties, GoldKey, 0)
                 : (territoryConfig != null ? territoryConfig.StartingGold : 0);
 
             accrual = new GoldAccrual(startingBalance);
@@ -167,7 +170,7 @@ namespace Overpower.Match
         {
             if (!photonView.IsMine || accrual == null)
                 return;
-            if (!Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam) || newOwner != myTeam)
+            if (!Teams.TryGetTeam(photonView.Owner, out int myTeam) || newOwner != myTeam)
                 return;
 
             // Dominion has no gold: the capture still scores its bounty points (paid on the master), only the gold is silenced.
@@ -186,7 +189,7 @@ namespace Overpower.Match
                 return;
 
             if (PhotonNetwork.InRoom && territoryConfig != null && BuildingManager.Instance != null &&
-                BuildingManager.Instance.Current != null && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int team))
+                BuildingManager.Instance.Current != null && Teams.TryGetTeam(photonView.Owner, out int team))
             {
                 TerritorySnapshot current = BuildingManager.Instance.Current;
                 if (ownersScratch == null || ownersScratch.Length != current.ZoneCount)
@@ -303,7 +306,7 @@ namespace Overpower.Match
                 return;
 
             int balance = accrual != null ? accrual.Balance : 0;
-            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { GoldKey, balance } });
+            PlayerProps.Set(photonView.Owner, new Hashtable { { GoldKey, balance } });
             lastPublishedBalance = balance;
             lastPublishTime = Time.unscaledTime;
             BalanceChanged?.Invoke(balance);

@@ -2,6 +2,7 @@ using Photon.Pun;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Overpower.Data;
+using Overpower.Net;
 using Overpower.UI;
 using Overpower.Weapons;
 
@@ -9,7 +10,7 @@ using Overpower.Weapons;
 /// Draws where this player's shots can actually go: two edge lines from the muzzle out to the
 /// weapon's range, plus an arc joining them at that range. A designer switch (UiTheme.showAimCone), off by default.
 ///
-/// OWNER ONLY (as PlayerHud). Built as plain child GameObjects in Awake, not prefab children, so
+/// LOCAL HUMAN ONLY (as PlayerHud; never a bot's body on the host). Built as plain child GameObjects in Awake, not prefab children, so
 /// nothing on the prefab has to be kept in sync by hand.
 ///
 /// Reads PlayerAim.EffectiveConeAngle, the SAME value WeaponFiring hands the shot sampler this frame
@@ -56,8 +57,8 @@ public class AimConeView : MonoBehaviourPun
         lifecycle = GetComponent<PlayerLifecycle>();
         input = GetComponent<PlayerInputRouter>();
 
-        // Owner only: every read here is meaningless for a remote copy.
-        if (!photonView.IsMine)
+        // The local human's only: every read here is meaningless for a remote copy, and a bot's cone is nobody's to see.
+        if (!BodyRole.IsLocalHuman(photonView))
         {
             enabled = false;
             return;

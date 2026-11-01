@@ -24,6 +24,10 @@ namespace Overpower.Match
 
         public static int TeamBit(int team) => team >= 0 && team < MaxTeams ? 1 << team : 0;
 
+        /// <summary>A player just back from the dead is skipped for a moment on the master, because their alive flag and their new position arrive on
+        /// two channels. Not the master's own player, nor a bot it plays: those change together on the measuring machine.</summary>
+        public static bool WaitsForRespawnSettle(bool isLocalPlayer, bool isBot) => !isLocalPlayer && !isBot;
+
         /// <param name="owner">The zone's owner, or -1 for neutral.</param>
         /// <param name="presentMask">Bit t set = a living player of team t is inside the zone now.</param>
         /// <param name="lastSeenMs">Server ms each team last left a zone; this zone's three entries start at

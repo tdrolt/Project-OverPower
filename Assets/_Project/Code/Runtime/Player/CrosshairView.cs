@@ -1,4 +1,5 @@
 using Overpower.Data;
+using Overpower.Net;
 using Overpower.UI;
 using Overpower.Weapons;
 using Photon.Pun;
@@ -11,7 +12,7 @@ using UnityEngine.UI;
 /// charging gun charges. Wherever a click would not fire (the shop, a menu, the chat, dead) it hides and the arrow comes back, by
 /// the router's own gate (PlayerInputRouter.PointerFireBlocked).
 ///
-/// OWNER ONLY, no networking. Its canvas has no GraphicRaycaster and nothing on it is a raycast target: pointerOverUi would
+/// LOCAL HUMAN ONLY, no networking. Its canvas has no GraphicRaycaster and nothing on it is a raycast target: pointerOverUi would
 /// otherwise always be true under the crosshair and block every shot. Every size and colour is on UiTheme, Crosshair.
 /// </summary>
 public class CrosshairView : MonoBehaviourPun
@@ -49,7 +50,7 @@ public class CrosshairView : MonoBehaviourPun
         input = GetComponent<PlayerInputRouter>();
         overheat = GetComponent<PlayerOverheat>();
 
-        if (!photonView.IsMine)
+        if (!BodyRole.IsLocalHuman(photonView))
         {
             enabled = false;
             return;

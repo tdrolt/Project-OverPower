@@ -83,6 +83,28 @@ namespace Overpower.Telemetry
             return result;
         }
 
+        /// <summary>The bots' session files ("{botActor}_{nick}.jsonl", bot actors are above Overpower.Net.BotRosterRules.ActorBase): the host
+        /// writes them, so MatchLogZip adds them to a zip only when this client wrote some, never to another local client's zip.</summary>
+        public static List<string> SelectBotFiles(IEnumerable<string> fileNames)
+        {
+            var result = new List<string>();
+            if (fileNames == null)
+                return result;
+
+            foreach (string name in fileNames)
+            {
+                if (string.IsNullOrEmpty(name) || !name.EndsWith(".jsonl", StringComparison.Ordinal))
+                    continue;
+
+                int underscore = name.IndexOf('_');
+                if (underscore > 0 && int.TryParse(name.Substring(0, underscore), System.Globalization.NumberStyles.None,
+                        System.Globalization.CultureInfo.InvariantCulture, out int actor) && Overpower.Net.BotRosterRules.IsBotActor(actor))
+                    result.Add(name);
+            }
+
+            return result;
+        }
+
         /// <summary>OverPower-log_&lt;matchFolderName&gt;_&lt;actor&gt;_&lt;sanitizedNick&gt;.zip. matchFolderName is a plain parameter
         /// (MatchLogZip passes the match folder's own name, Path.GetFileName of MatchTelemetry.CurrentFolder), never a wall-clock
         /// read: a clock-minute name minted a second file when a quit landed in a different minute than the result panel's zip. The

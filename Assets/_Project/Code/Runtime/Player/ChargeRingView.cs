@@ -1,5 +1,6 @@
 using Overpower.Abilities;
 using Overpower.Match;
+using Overpower.Net;
 using Overpower.UI;
 using Overpower.Weapons;
 using Photon.Pun;
@@ -9,7 +10,7 @@ using UnityEngine.Rendering;
 /// <summary>
 /// The ring at your own feet that fills while you hold a charging weapon's trigger.
 ///
-/// OWNER ONLY, like AimConeView: every read here is meaningless on a remote copy. Its lines are built
+/// LOCAL HUMAN ONLY, like AimConeView: every read here is meaningless on a remote copy or a bot's body. Its lines are built
 /// as plain child GameObjects in Awake, so the prefab only carries this component and one Theme reference.
 ///
 /// Flat lines, the shape CaptureRingView draws on the ground: a dark full-loop TRACK (so a part-filled
@@ -49,7 +50,7 @@ public class ChargeRingView : MonoBehaviourPun
         lifecycle = GetComponent<PlayerLifecycle>();
         input = GetComponent<PlayerInputRouter>();
 
-        if (!photonView.IsMine)
+        if (!BodyRole.IsLocalHuman(photonView))
         {
             enabled = false;
             return;

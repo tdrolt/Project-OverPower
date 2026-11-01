@@ -10,13 +10,14 @@ namespace Overpower.Abilities
     /// The shared base for every ability that leaves a real networked object behind (portal, mine, cover wall, fence,
     /// zone) instead of a local RPC-rebuilt one: a player who joins while it still stands must see it, which only
     /// PhotonNetwork.Instantiate gives (see FireField's class comment, Assets/_Project/Code/Runtime/Weapons).
-    /// OnPhotonInstantiate resolves OwnerActor/OwnerTeam from info.Sender, never PhotonNetwork.LocalPlayer, which in
-    /// that callback is the RECEIVER. OnPlaced (every client, a late joiner's cache replay included) is the subclass hook.
+    /// OnPhotonInstantiate resolves OwnerActor/OwnerTeam from the placer Spawn appends (DeployablePlacement), never
+    /// PhotonNetwork.LocalPlayer, which in that callback is the RECEIVER, nor info.Sender, which is the host for a bot's
+    /// deployable. OnPlaced (every client, a late joiner's cache replay included) is the subclass hook.
     ///
     /// AGE COMES FROM instantiationData, NOT info.SentServerTime (FAIL #15): a late joiner's cached replay reads
     /// SentServerTime as "just placed", so a live 45 s mine looked freshly armed. Spawn appends the placer's
-    /// PhotonNetwork.ServerTimestamp as the LAST element; OnPhotonInstantiate strips it (subclass indices unchanged)
-    /// and DeployableAge.SecondsSince does the unchecked 32-bit subtraction that survives the ~49.7-day wrap.
+    /// PhotonNetwork.ServerTimestamp (then the placer) after the subclass's data; OnPhotonInstantiate strips both (subclass
+    /// indices unchanged) and DeployableAge.SecondsSince does the unchecked 32-bit subtraction that survives the ~49.7-day wrap.
     /// ServerTimestamp is itself 0 until the post-connect fetch lands, which a fresh join's first replay can beat:
     /// InitializeAfterServerTimeIsReady waits (bounded) for a non-zero reading.
     /// Lifetime Seconds: the OWNER alone schedules PhotonNetwork.Destroy at lifetime - Age (the single-destroyer rule,
@@ -37,8 +38,8 @@ namespace Overpower.Abilities
         /// <summary>Lifetime Seconds (0 = never expires), read-only - the shop's pop-up shows it.</summary>
         public float LifetimeSeconds => lifetimeSeconds;
 
-        /// <summary>The actor number of whoever placed this - from the instantiate's own sender, set
-        /// once in OnPhotonInstantiate and never changed after.</summary>
+        /// <summary>The actor number of whoever placed this (a bot's own, though the host instantiated it) - from the placer in
+        /// instantiationData, else the instantiate's sender; set once in OnPhotonInstantiate and never changed after.</summary>
         public int OwnerActor { get; private set; } = -1;
 
         /// <summary>The owner's team at the moment this was placed, or -1 if it was not yet known.
@@ -92,11 +93,28 @@ namespace Overpower.Abilities
 
         public void OnPhotonInstantiate(PhotonMessageInfo info)
         {
-            OwnerActor = info.Sender != null ? info.Sender.ActorNumber : -1;
-            Teams.TryGetTeam(info.Sender, out int team);
-            OwnerTeam = team;
+            if (!DeployablePlacement.TrySplit(info.photonView.InstantiationData, out object[] subclassData, out int placedServerTimestampMs,
+                                              out bool hasPlacer, out int placerActor, out int placerTeam))
+            {
+                Debug.LogError("[NetworkedDeployable] instantiationData is missing its placement " +
+                                "timestamp - falling back to Age 0 (this object was spawned by a " +
+                                "caller that bypassed NetworkedDeployable.Spawn).");
+                placedServerTimestampMs = PhotonNetwork.ServerTimestamp;
+            }
 
-            object[] subclassData = StripPlacedTimestamp(info.photonView.InstantiationData, out int placedServerTimestampMs);
+            if (hasPlacer)
+            {
+                OwnerActor = placerActor;
+                // Read here and now, as the sender's team always was; the team it was placed with only if the placer is unknown here.
+                OwnerTeam = Teams.TryGetTeam(placerActor, out int liveTeam) ? liveTeam : placerTeam;
+            }
+            else
+            {
+                OwnerActor = info.Sender != null ? info.Sender.ActorNumber : -1;
+                Teams.TryGetTeam(info.Sender, out int senderTeam);
+                OwnerTeam = senderTeam;
+            }
+
             StartCoroutine(InitializeAfterServerTimeIsReady(placedServerTimestampMs, subclassData, info));
         }
 
@@ -156,29 +174,6 @@ namespace Overpower.Abilities
             }
         }
 
-        /// <summary>
-        /// Splits the placer's ServerTimestamp (appended by Spawn) off the end of instantiationData and returns the rest
-        /// at the indices a subclass's OnPlaced reads. Missing or malformed data (a caller that bypassed Spawn, a stale
-        /// build) logs an error and falls back to "placed right now" rather than throwing.
-        /// </summary>
-        private static object[] StripPlacedTimestamp(object[] rawData, out int placedServerTimestampMs)
-        {
-            if (rawData == null || rawData.Length == 0 || !(rawData[rawData.Length - 1] is int placedMs))
-            {
-                Debug.LogError("[NetworkedDeployable] instantiationData is missing its placement " +
-                                "timestamp - falling back to Age 0 (this object was spawned by a " +
-                                "caller that bypassed NetworkedDeployable.Spawn).");
-                placedServerTimestampMs = PhotonNetwork.ServerTimestamp;
-                return rawData;
-            }
-
-            placedServerTimestampMs = placedMs;
-
-            var subclassData = new object[rawData.Length - 1];
-            System.Array.Copy(rawData, subclassData, subclassData.Length);
-            return subclassData;
-        }
-
         /// <summary>Hands the placed object to every visual-only IDeployableView on it. A broken visual must never stop
         /// what follows here (the IsExpired hide, the owner's lifetime destroy), so each view's exception is logged and swallowed.</summary>
         private void NotifyViews()
@@ -212,18 +207,20 @@ namespace Overpower.Abilities
         /// <summary>
         /// Networked spawn for a deployable with no particular facing (a portal, a mine); see the rotated overload.
         /// </summary>
-        public static GameObject Spawn(string prefabName, Vector3 position, object[] instantiationData)
-            => Spawn(prefabName, position, Quaternion.identity, instantiationData);
+        public static GameObject Spawn(string prefabName, Vector3 position, object[] instantiationData, int placerActor, int placerTeam)
+            => Spawn(prefabName, position, Quaternion.identity, instantiationData, placerActor, placerTeam);
 
         /// <summary>
         /// Networked spawn for a deployable that needs a facing at placement (Cover Wall faces the caster's aim).
         /// prefabName resolves through PUN's default pool (Resources.Load), so the prefab lives under a Resources folder
         /// (see FireField.Spawn). Returns null and logs rather than throwing, like FireField.Spawn: a missing room or a
         /// bad name refuses the cast quietly. The rotation travels in PUN's own instantiate call, a late joiner's replay included.
-        /// APPENDS PhotonNetwork.ServerTimestamp AS THE LAST ELEMENT of instantiationData, after whatever a subclass put
-        /// there; OnPhotonInstantiate strips it before OnPlaced, so subclass indices never move.
+        /// placerActor/placerTeam are the casting body's owner (AbilityOwner), a bot's own on the host.
+        /// APPENDS PhotonNetwork.ServerTimestamp AND THE PLACER after whatever a subclass put in instantiationData
+        /// (DeployablePlacement); OnPhotonInstantiate strips them before OnPlaced, so subclass indices never move.
         /// </summary>
-        public static GameObject Spawn(string prefabName, Vector3 position, Quaternion rotation, object[] instantiationData)
+        public static GameObject Spawn(string prefabName, Vector3 position, Quaternion rotation, object[] instantiationData,
+                                       int placerActor, int placerTeam)
         {
             if (string.IsNullOrEmpty(prefabName))
             {
@@ -237,23 +234,21 @@ namespace Overpower.Abilities
                 return null;
             }
 
-            int existingCount = instantiationData != null ? instantiationData.Length : 0;
-            var dataWithPlacedMs = new object[existingCount + 1];
-            if (existingCount > 0)
-                System.Array.Copy(instantiationData, dataWithPlacedMs, existingCount);
-            dataWithPlacedMs[existingCount] = PhotonNetwork.ServerTimestamp;
-
-            return PhotonNetwork.Instantiate(prefabName, position, rotation, 0, dataWithPlacedMs);
+            object[] data = DeployablePlacement.Append(instantiationData, PhotonNetwork.ServerTimestamp, placerActor, placerTeam);
+            return PhotonNetwork.Instantiate(prefabName, position, rotation, 0, data);
         }
 
-        /// <summary>The fresh start at match-live destroys every deployable THIS client placed (a mine, cover wall,
-        /// portal, fence, AoE zone) through RequestDestroy, the single-destroyer path. Fire fields are left alone: Decision 6
-        /// gives already-in-flight fire the same few seconds' grace as any other projectile.</summary>
-        public static void DestroyAllPlacedByLocalPlayer()
+        /// <summary>A body's fresh start (match-live, a round start, sudden death) destroys every deployable THIS client placed for
+        /// actorNumber (a mine, cover wall, portal, fence, AoE zone) through RequestDestroy, the single-destroyer path: on the host
+        /// a bot's reset takes only that bot's. Fire fields are left alone: Decision 6 gives already-in-flight fire the same few
+        /// seconds' grace as any other projectile.</summary>
+        public static void DestroyAllPlacedBy(int actorNumber)
         {
+            bool sweptIsLocalPlayer = PhotonNetwork.LocalPlayer != null && PhotonNetwork.LocalPlayer.ActorNumber == actorNumber;
             foreach (NetworkedDeployable deployable in FindObjectsByType<NetworkedDeployable>(FindObjectsSortMode.None))
             {
-                if (deployable.IsOwnerClient)
+                if (DeployablePlacement.IsSweptFor(deployable.IsOwnerClient, deployable.photonView.AmOwner, deployable.OwnerActor,
+                                                   actorNumber, sweptIsLocalPlayer))
                     deployable.RequestDestroy();
             }
         }

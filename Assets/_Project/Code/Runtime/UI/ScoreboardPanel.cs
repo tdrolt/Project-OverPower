@@ -15,7 +15,8 @@ namespace Overpower.UI
     /// (ScoreboardPublisher writes it; ScoreboardRules documents the layout), plus the team and nickname on the room's
     /// players. Nothing is read while closed; while open it re-reads UiTheme.scoreboardRefreshesPerSecond times a second
     /// and rewrites only a text whose number changed. Overlay canvas with no GraphicRaycaster, so it never swallows
-    /// a click meant for the game. Owner only: PlayerHud builds it for the local player.
+    /// a click meant for the game. Owner only: PlayerHud builds it for the local player. A bot is a row like any player, untagged: in a
+    /// match nobody can tell a bot from a player (the BOT badge is the lobby's only).
     /// </summary>
     public sealed class ScoreboardPanel : MonoBehaviour
     {

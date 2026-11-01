@@ -12,7 +12,8 @@ using Overpower.Net;
 namespace Overpower.Vision
 {
     /// <summary>
-    /// What my team sees, for the owner's own copy of the player only (like AimConeView and PlayerHud). Once per frame it
+    /// What my team sees, for the local human's own body only (like AimConeView and PlayerHud; never a bot's, which the host
+    /// controls too - a bot's team is asked through TeamSightQuery). Once per frame it
     /// lists the eyes (my own and my living teammates'; when I am dead only the teammates'; when I am spectating the
     /// watched team's) and answers CanSee / CanSeePlayer. The rules are VisionRules and SightEyes; this only gathers the
     /// facts from Photon and the scene and does the wall test (a Linecast on the Building layer at eye height).
@@ -124,7 +125,7 @@ namespace Overpower.Vision
             abilities = GetComponent<AbilityRunner>();
             clearLine = ClearLine;
             minimap = SceneMinimapConfig.Resolve(minimap); // a map with its own picture (the Dominion lane) replaces the prefab's
-            if (!photonView.IsMine)
+            if (!BodyRole.IsLocalHuman(photonView))
                 enabled = false;
             else if (config == null)
                 Debug.LogError($"[TeamSight] {name}: Vision Config is not assigned - nothing will be hidden.");
@@ -138,7 +139,7 @@ namespace Overpower.Vision
 
         private void OnDestroy()
         {
-            if (photonView != null && photonView.IsMine)
+            if (BodyRole.IsLocalHuman(photonView))
                 Shader.SetGlobalFloat(FogEnabledId, 0f); // a remote copy leaving must not drop the owner's fog
             if (sightTexture != null)
             {
@@ -256,7 +257,7 @@ namespace Overpower.Vision
 
         private void OnEnable()
         {
-            if (photonView != null && photonView.IsMine)
+            if (BodyRole.IsLocalHuman(photonView))
                 Local = this;
         }
 
@@ -264,7 +265,7 @@ namespace Overpower.Vision
         {
             if (Local == this)
                 Local = null;
-            if (photonView != null && photonView.IsMine)
+            if (BodyRole.IsLocalHuman(photonView))
                 Shader.SetGlobalFloat(FogEnabledId, 0f);
         }
 
@@ -294,10 +295,10 @@ namespace Overpower.Vision
         }
 
         /// <summary>My own body and my team (the watched team while spectating) are always shown; anyone else only while
-        /// their position is seen.</summary>
+        /// their position is seen. A bot body on the host is IsMine too, so "my own body" is this component's body, by reference.</summary>
         public bool CanSeePlayer(PhotonView view)
         {
-            if (view == null || view.IsMine || !FogOn)
+            if (view == null || view == photonView || !FogOn)
                 return true;
             Refresh();
             int friendly = SightEyes.FriendlyTeam(mode, localTeam, watchedTeam);
@@ -486,14 +487,15 @@ namespace Overpower.Vision
                         team = -1; // a seat spectator (no body) or a player with no team yet: no team's eye
                     // Same reading as MinimapView: a missing flag means alive, a dropped player is not.
                     bool? flag = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool b ? b : (bool?)null;
-                    bool alive = view.IsMine ? localAlive : PresenceRules.CountsAsAlive(player.IsInactive, flag); // my own state from the same source as the mode
+                    bool own = view == photonView; // not IsMine: on the host a bot body is IsMine too
+                    bool alive = own ? localAlive : PresenceRules.CountsAsAlive(Presence.IsDropped(player), flag); // my own state from the same source as the mode
                     Vector3 position = view.transform.position;
                     Vector3 forward = view.transform.forward;
                     // Each eye stands at its own player's feet (this prefab's capsule bottom), not at the local player's height.
                     float eyeY = position.y + FeetOffset() + eyeHeight;
                     // Local = my own live Scope state (no round trip); everyone else = their published vScp property.
-                    bool scoped = view.IsMine ? LocalHoldingScope() : player.CustomProperties.TryGetValue(ScopeSightProperty.Key, out object scp) && ScopeSightProperty.Read(scp);
-                    candidates.Add(new SightCandidate(team, alive, view.IsMine,
+                    bool scoped = own ? LocalHoldingScope() : player.CustomProperties.TryGetValue(ScopeSightProperty.Key, out object scp) && ScopeSightProperty.Read(scp);
+                    candidates.Add(new SightCandidate(team, alive, own,
                         new Vector2(position.x, position.z), new Vector2(forward.x, forward.z), eyeY, scoped));
                 }
             }

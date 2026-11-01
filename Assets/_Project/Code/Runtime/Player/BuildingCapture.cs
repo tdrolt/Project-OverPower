@@ -8,6 +8,7 @@ using Overpower.Arena;
 using Overpower.Data;
 using Overpower.Dominion;
 using Overpower.Match;
+using Overpower.Net;
 using Overpower.UI;
 
 // Lets BuildingCaptureRadiusTests call CaptureRadiusFor directly (internal, not public: it is the pure rule
@@ -1016,7 +1017,9 @@ public class BuildingCapture : MonoBehaviourPun
         if (player.photonView.IsMine)
         {
             Debug.Log($"[BuildingCapture] Team {player.teamID} entered tower {buildingID}.");
-            localPlayerViewIdInZone = player.photonView.ViewID;
+            // Only the human is remembered for a new master: the host's bots leave with the host, and one slot cannot hold them all.
+            if (BodyRole.IsLocalHuman(player.photonView))
+                localPlayerViewIdInZone = player.photonView.ViewID;
             photonView.RPC("RPC_AddToZone", RpcTarget.MasterClient, player.photonView.ViewID);
         }
     }

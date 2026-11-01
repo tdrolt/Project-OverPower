@@ -16,6 +16,16 @@ namespace Overpower.Lobby
             return text;
         }
 
+        /// <summary>A seat's text with the lobby-only badge after a bot's name (in a match a bot's name stands alone, like a player's).</summary>
+        public static string SeatText(string playerName, bool mine, bool host, string mineSuffix, string hostSuffix, bool bot, string botSuffix)
+        {
+            string text = SeatText(playerName, mine, host, mineSuffix, hostSuffix);
+            return bot ? text + botSuffix : text;
+        }
+
+        /// <summary>The host's click on a bot's seat takes the bot out; anyone else's click (or the host's on a human's seat) asks for the seat.</summary>
+        public static bool ClickRemovesBot(bool iAmHost, int holderActor) => iAmHost && Overpower.Net.BotRosterRules.IsBotActor(holderActor);
+
         /// <summary>The name of a team from a list of team names (index = team number); a team with no name reads "Team 3" (number + 1).</summary>
         public static string TeamName(string[] names, int team)
         {

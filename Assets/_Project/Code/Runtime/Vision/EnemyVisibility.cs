@@ -1,11 +1,12 @@
 using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
+using Overpower.Net;
 
 namespace Overpower.Vision
 {
     /// <summary>
-    /// On every player's prefab, remote copies only: while my team does not see this player, their body (every Renderer
+    /// On every player's prefab, except the local human's own body: while my team does not see this player, their body (every Renderer
     /// under the character model) and the overhead canvas (the plate with name and bar, STUNNED/SLOWED label, immune
     /// frame) are switched off. Teammates are always shown. Only Renderer.enabled and Canvas.enabled are touched - never
     /// active state, colliders or networking - so PlayerLifecycle's hide-on-death (SetActive) stays independent and a
@@ -25,7 +26,7 @@ namespace Overpower.Vision
 
         private void Awake()
         {
-            if (photonView.IsMine)
+            if (BodyRole.IsLocalHuman(photonView)) // a bot body is IsMine on the host and is hidden there like any enemy
             {
                 enabled = false;
                 return;

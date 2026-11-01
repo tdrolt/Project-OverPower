@@ -5,6 +5,7 @@ using Overpower.Arena;
 using Overpower.Combat;
 using Overpower.Vision;
 using Overpower.Match;
+using Overpower.Net;
 using Overpower.UI;
 
 namespace Overpower.Abilities
@@ -264,12 +265,12 @@ namespace Overpower.Abilities
             }
 
             // Re-read on every spray, so an Inspector change to Cone Angle/Range shows on the next cast.
-            // Owner.IsMine: the aiming outline is the caster's own aid, at its stronger opacity only on their screen.
+            // The aiming outline is the caster's own aid, at its stronger opacity only on their screen (never a bot's on the host).
             // The outline wears the caster's team colour and the flames burn in its hue; the fan under them stays the fire's orange-red.
             UiTheme theme = Owner.Health != null ? Owner.Health.Theme : null;
             Color fire = theme != null ? FlameLook.Edge(theme, Definition.Id) : vfxColor;
             Color outline = theme != null ? LookColours.Accent(casterTeam, theme, fire) : fire;
-            vfx.Configure(coneRange, coneAngle, fire, outline, Owner.IsMine);
+            vfx.Configure(coneRange, coneAngle, fire, outline, BodyRole.IsLocalHuman(Owner.PhotonView));
             vfx.ConfigureFire(coneRange, coneAngle, theme, Definition.Id, casterTeam);
             vfx.gameObject.SetActive(true);
             // Vision: the cone is hidden with the enemy who sprays it, checked every frame (friendly: always).

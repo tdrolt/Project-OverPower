@@ -213,7 +213,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
         int actor = player.ActorNumber;
         bool? aliveFlag = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool alive ? alive : (bool?)null;
         // A dropped (inactive) actor's body stands where it was; it is neither present nor alive (PresenceRules).
-        if (!PresenceRules.CountsAsAlive(player.IsInactive, aliveFlag))
+        if (!PresenceRules.CountsAsAlive(Presence.IsDropped(player), aliveFlag))
         {
             // A dead player isn't attacking or defending anything.
             measuredDead.Add(actor);
@@ -221,8 +221,9 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
             return false;
         }
 
-        // The local player's flag and position change together on this machine, so only remote players need the wait.
-        if (measuredDead.Remove(actor) && !player.IsLocal)
+        // The local player's flag and position change together on this machine, and so do a bot's (the master plays it), so only
+        // remote players need the wait.
+        if (measuredDead.Remove(actor) && ZoneThreat.WaitsForRespawnSettle(player.IsLocal, player is BotPlayer))
             countAgainFrom[actor] = Time.unscaledTime + RespawnSettleSeconds;
 
         if (countAgainFrom.TryGetValue(actor, out float from))

@@ -2,6 +2,7 @@ using Photon.Pun;
 using UnityEngine;
 using Overpower.Abilities;
 using Overpower.Combat;
+using Overpower.Net;
 
 namespace Overpower.Weapons
 {
@@ -98,7 +99,7 @@ namespace Overpower.Weapons
         /// <summary>
         /// The rocket is gone, however it went, so light the fire where it ended up.
         ///
-        /// ONLY THE SHOOTER'S CLIENT SPAWNS IT. Every client simulates every projectile, so this
+        /// ONLY THE SHOOTER'S CLIENT SPAWNS IT (the host for a bot). Every client simulates every projectile, so this
         /// runs on all nine machines for the same rocket - and unlike damage, which is filtered
         /// harmlessly by the victim's own ownership check, PhotonNetwork.Instantiate would
         /// genuinely create nine fire fields. One client decides; Photon tells the rest.
@@ -108,8 +109,9 @@ namespace Overpower.Weapons
             if (fireFieldPrefab == null || context == null)
                 return;
 
-            if (PhotonNetwork.LocalPlayer == null ||
-                PhotonNetwork.LocalPlayer.ActorNumber != context.ShooterActorNumber)
+            PhotonView shooterBody = PlayerLookup.GetPhotonViewFor(context.ShooterActorNumber);
+            bool shooterIsLocalPlayer = PhotonNetwork.LocalPlayer != null && PhotonNetwork.LocalPlayer.ActorNumber == context.ShooterActorNumber;
+            if (!LightsFireHere(shooterIsLocalPlayer, BodyRole.IsBot(shooterBody), shooterBody != null && shooterBody.IsMine))
                 return;
 
             // The field goes on the FLOOR below the burst, not at the rocket's own muzzle-height position - found here, on the shooter's own client, with
@@ -122,8 +124,13 @@ namespace Overpower.Weapons
 
             // The combined multiplier (behaviour-scaling * OverPower's fire-time bonus), the same product Damage and SplashDamageAt apply, so the burning
             // ground this rocket leaves scales with the shot exactly like its direct hit and its splash do.
-            FireField.Spawn(fireFieldPrefab, spawnPosition, context.Weapon.Id,
+            FireField.Spawn(fireFieldPrefab, spawnPosition, context.Weapon.Id, context.ShooterActorNumber,
                              context.DamageMultiplier * context.FireTimeDamageMultiplier);
         }
+
+        /// <summary>The one client that lights a rocket's fire. A bot's is the host, where its body IsMine; a human's is their own client, asked
+        /// by actor rather than IsMine because the host also controls a dropped human's body.</summary>
+        public static bool LightsFireHere(bool shooterIsLocalPlayer, bool shooterIsBot, bool shooterBodyIsMine) =>
+            shooterIsBot ? shooterBodyIsMine : shooterIsLocalPlayer;
     }
 }

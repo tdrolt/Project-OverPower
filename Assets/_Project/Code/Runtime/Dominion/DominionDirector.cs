@@ -53,6 +53,10 @@ namespace Overpower.Dominion
         private bool healAreaWarned;
         private bool gameplayMissingLogged;
 
+        private readonly List<PhotonView> controlled = new List<PhotonView>(); // the bodies this client simulates, refilled for each edge reset
+        private DominionRoomState cachedRoom;
+        private int cachedRoomFrame = -1;
+
         /// <summary>The round now in play (or the round a break leads to), 0 before round 1. Reads the room.</summary>
         public int Round => PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(DominionKeys.Round, out object r) && r is int round ? round : 0;
 
@@ -62,6 +66,38 @@ namespace Overpower.Dominion
 
         /// <summary>dSd: the server ms the sudden-death circle starts to shrink (a replay writes a new one), 0 when none is written. Reads the room.</summary>
         public int SuddenDeathStartMs => PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(DominionKeys.SuddenDeathStart, out object s) && s is int ms ? ms : 0;
+
+        /// <summary>All the Dominion values in the room, read once per frame (Read builds arrays, and a bot brain asks several times a tick). Read
+        /// only: never change its arrays.</summary>
+        public DominionRoomState RoomState
+        {
+            get
+            {
+                if (!PhotonNetwork.InRoom) return DominionRoomState.Read(null);
+                if (cachedRoomFrame != Time.frameCount)
+                {
+                    cachedRoom = DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties);
+                    cachedRoomFrame = Time.frameCount;
+                }
+                return cachedRoom;
+            }
+        }
+
+        /// <summary>Seconds until the stage in play ends (the round, the break, the overtime). 0 when it has no end (sudden death, before round 1),
+        /// when the server clock has not synced, or when the end has passed.</summary>
+        public float SecondsLeftInStage => DominionRules.SecondsUntil(RoomState.EndMs, PhotonNetwork.ServerTimestamp);
+
+        /// <summary>dCtr: the server ms of the centre's next payout, 0 when none is written (no centre in this match, or no round running).</summary>
+        public int CentrePayoutMs => RoomState.CentreMs;
+
+        /// <summary>Seconds until the centre's next payout; 0 when none is written or it is due.</summary>
+        public float SecondsToCentrePayout => DominionRules.SecondsUntil(RoomState.CentreMs, PhotonNetwork.ServerTimestamp);
+
+        /// <summary>The zone that pays the centre's lump (a three-team match on a map with a Tier 4 zone), or -1 when this match has none.</summary>
+        public int CentreZone => CentreInPlay(out int zone) ? zone : -1;
+
+        /// <summary>CentreZone as a try: false when this match has no paying centre.</summary>
+        public bool TryGetCentreZone(out int zone) => CentreInPlay(out zone);
 
         private int[] suddenDeathTeams = System.Array.Empty<int>();
         private int[] suddenDeathTeamsForWins;
@@ -223,7 +259,7 @@ namespace Overpower.Dominion
         {
             foreach (KeyValuePair<int, Player> pair in PhotonNetwork.CurrentRoom.Players)
             {
-                if (pair.Value.IsInactive)
+                if (Presence.IsDropped(pair.Value))
                 {
                     if (!inactiveSince.ContainsKey(pair.Key)) inactiveSince[pair.Key] = Time.unscaledTime;
                 }
@@ -261,7 +297,7 @@ namespace Overpower.Dominion
         private bool StillCounts(int actor, Player p, float graceSeconds)
         {
             bool timed = inactiveSince.TryGetValue(actor, out float since);
-            return DominionRules.CountsAsPresent(p.IsInactive, timed, since, Time.unscaledTime, graceSeconds);
+            return DominionRules.CountsAsPresent(Presence.IsDropped(p), timed, since, Time.unscaledTime, graceSeconds);
         }
 
         /// <summary>Fills the sudden-death tally from the room's players: each player's replicated alive flag (PlayerLifecycle.AliveKey; a player who
@@ -297,6 +333,7 @@ namespace Overpower.Dominion
             lastAppliedStage = DominionStage.None;
             lastAppliedSuddenDeath = 0;
             lastAppliedWins = null;
+            cachedRoomFrame = -1;
             waitForEchoUntil = -1f;
             announceAgainAt = -1f;
             zonesResetSentFor = 0;
@@ -342,14 +379,14 @@ namespace Overpower.Dominion
             if (prevStage == DominionStage.None && room.Stage == DominionStage.Break) WarnAboutMissingHealAreas();
             if (suddenDeathStart)
             {
-                ResetLocalPlayerForSuddenDeath();
+                ResetControlledBodiesForSuddenDeath();
                 return;
             }
             if (edge == DominionEdge.None) return;
 
             // The zones go back to neutral at the start of the break and again at the start of the round: the master does it from the room's
             // dRz (RunZoneReset), not from seeing this edge, so a master that takes over mid-way finishes it.
-            ResetLocalPlayer(edge);
+            ResetControlledBodies(edge);
         }
 
         /// <summary>The match log's story of the match: round start and end, break, sudden death, match over. Written by the master only, from the
@@ -393,22 +430,26 @@ namespace Overpower.Dominion
             return true;
         }
 
-        private void ResetLocalPlayer(DominionEdge edge)
+        /// <summary>Every body this client simulates takes the edge: its human's and, on the host, each bot's.</summary>
+        private void ResetControlledBodies(DominionEdge edge)
         {
-            if (!Teams.TryGetPlayingTeam(PhotonNetwork.LocalPlayer, out int team)) return; // a spectator has no body to reset
-            PhotonView localView = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
-            PlayerLifecycle lifecycle = localView != null ? localView.GetComponent<PlayerLifecycle>() : null;
-            if (lifecycle == null) return;
+            BodyRole.ControlledBodies(controlled);
+            foreach (PhotonView view in controlled)
+            {
+                if (!Teams.TryGetPlayingTeam(view.Owner, out int team)) continue; // a spectator has no body to reset
+                PlayerLifecycle lifecycle = view.GetComponent<PlayerLifecycle>();
+                if (lifecycle == null) continue;
 
-            if (edge == DominionEdge.BreakStarted)
-            {
-                Overpower.Vision.ZoneKnowledge.ResetKnowledge(); // the zones are neutral again: what the team knew starts over, as at go-live
-                lifecycle.ResetForMatchStart(team, DominionRoomWrites.KeepsScoreboard(edge));
-            }
-            else if (edge == DominionEdge.RoundStarted)
-            {
-                Overpower.Vision.ZoneKnowledge.ResetKnowledge(); // the zones were reset again at the round's start: what the team learnt in the break goes too
-                lifecycle.ResetForRoundStart(team);
+                if (edge == DominionEdge.BreakStarted)
+                {
+                    if (BodyRole.IsLocalHuman(view)) Overpower.Vision.ZoneKnowledge.ResetKnowledge(); // the zones are neutral again: what the team knew starts over, as at go-live
+                    lifecycle.ResetForMatchStart(team, DominionRoomWrites.KeepsScoreboard(edge));
+                }
+                else if (edge == DominionEdge.RoundStarted)
+                {
+                    if (BodyRole.IsLocalHuman(view)) Overpower.Vision.ZoneKnowledge.ResetKnowledge(); // the zones were reset again at the round's start: what the team learnt in the break goes too
+                    lifecycle.ResetForRoundStart(team);
+                }
             }
         }
 
@@ -424,16 +465,19 @@ namespace Overpower.Dominion
 
         /// <summary>Sudden death starts, or starts over after everyone fell at once (every client, on the new dSd): a player of a tied team is alive at
         /// their spawn with full health, no shield and refreshed abilities, keeping the build; a player of any other team is dead and waits, still
-        /// able to watch. The zones are left alone: points have stopped.</summary>
-        private void ResetLocalPlayerForSuddenDeath()
+        /// able to watch. The zones are left alone: points have stopped. Every body this client simulates takes it.</summary>
+        private void ResetControlledBodiesForSuddenDeath()
         {
-            if (!Teams.TryGetPlayingTeam(PhotonNetwork.LocalPlayer, out int team)) return; // a spectator has no body to reset
-            PhotonView localView = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
-            PlayerLifecycle lifecycle = localView != null ? localView.GetComponent<PlayerLifecycle>() : null;
-            if (lifecycle == null) return;
-            bool plays = SuddenDeathRules.TeamPlays(team, SuddenDeathTeams);
-            Debug.Log($"[DOMINION] sudden death starts: team {team} {(plays ? "plays - alive at its spawn" : "is not tied - dead and waiting")} (tied teams [{string.Join(",", SuddenDeathTeams)}])");
-            lifecycle.ResetForSuddenDeath(team, plays);
+            BodyRole.ControlledBodies(controlled);
+            foreach (PhotonView view in controlled)
+            {
+                if (!Teams.TryGetPlayingTeam(view.Owner, out int team)) continue; // a spectator has no body to reset
+                PlayerLifecycle lifecycle = view.GetComponent<PlayerLifecycle>();
+                if (lifecycle == null) continue;
+                bool plays = SuddenDeathRules.TeamPlays(team, SuddenDeathTeams);
+                Debug.Log($"[DOMINION] sudden death starts: {view.Owner.NickName} of team {team} {(plays ? "plays - alive at its spawn" : "is not tied - dead and waiting")} (tied teams [{string.Join(",", SuddenDeathTeams)}])");
+                lifecycle.ResetForSuddenDeath(team, plays);
+            }
         }
 
         public override void OnMasterClientSwitched(Player newMasterClient)

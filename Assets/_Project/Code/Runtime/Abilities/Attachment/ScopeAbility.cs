@@ -1,6 +1,8 @@
 using Photon.Pun;
+using Photon.Realtime;
 using UnityEngine;
 using Overpower.Match;
+using Overpower.Net;
 using Overpower.Vision;
 
 namespace Overpower.Abilities
@@ -114,19 +116,20 @@ namespace Overpower.Abilities
         private void SetHoldingSight(bool value)
         {
             holdingSight = value;
-            if (!seededFromRoom && Owner != null && Owner.PhotonView != null && Owner.IsMine && PhotonNetwork.InRoom)
+            Player sightOwner = Owner != null && Owner.PhotonView != null && Owner.IsMine && PhotonNetwork.InRoom ? Owner.PhotonView.Owner : null;
+            if (!seededFromRoom && sightOwner != null)
             {
                 // First tick in a room: a stale vScp=true left by a drop while scoped counts as published, so it is overwritten.
                 seededFromRoom = true;
-                PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(ScopeSightProperty.Key, out object roomValue);
+                sightOwner.CustomProperties.TryGetValue(ScopeSightProperty.Key, out object roomValue);
                 publishedScoped = ScopeSightProperty.SeedPublished(roomValue);
             }
             if (!ScopeSightProperty.ShouldPublish(publishedScoped, value))
                 return;
-            if (Owner == null || Owner.PhotonView == null || !Owner.IsMine || !PhotonNetwork.InRoom)
+            if (sightOwner == null)
                 return;
             publishedScoped = value;
-            PhotonNetwork.LocalPlayer.SetCustomProperties(new ExitGames.Client.Photon.Hashtable { { ScopeSightProperty.Key, value } });
+            PlayerProps.Set(sightOwner, new ExitGames.Client.Photon.Hashtable { { ScopeSightProperty.Key, value } });
         }
 
         /// <summary>Written every frame appliedFactor sits above 1 (still easing in, or fully scoped); removed
@@ -137,6 +140,10 @@ namespace Overpower.Abilities
         {
             CameraTracking camera = CameraTracking.Instance;
             if (camera == null)
+                return;
+            // The camera is the human's at this keyboard: a bot's Scope on the host publishes its sight but never zooms it.
+            // No Owner is the edit-mode rig.
+            if (Owner != null && !BodyRole.IsLocalHuman(Owner.PhotonView))
                 return;
 
             if (appliedFactor > 1f)

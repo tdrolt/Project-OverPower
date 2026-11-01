@@ -65,8 +65,9 @@ namespace Overpower.Abilities
 
     /// <summary>
     /// What ExecuteCast receives on every client, the caster included. Everything a module needs to
-    /// know about WHO cast is resolved here from the RPC's own sender, never from
-    /// PhotonNetwork.LocalPlayer, which inside an RPC body is the receiver.
+    /// know about WHO cast is resolved here from the casting body's view, never from
+    /// PhotonNetwork.LocalPlayer, which inside an RPC body is the receiver, nor from the RPC's sender,
+    /// which is the host for every bot's cast.
     /// </summary>
     public readonly struct CastEvent
     {
@@ -76,14 +77,14 @@ namespace Overpower.Abilities
         /// the same cast: a channel completing, a channel cancelled, a sprint stopping.</summary>
         public readonly byte Phase;
 
-        /// <summary>The caster's actor number, from PhotonMessageInfo.Sender.</summary>
+        /// <summary>The caster's actor number: the casting body's owner (a bot's own actor).</summary>
         public readonly int CasterActor;
 
         /// <summary>The caster's team, or -1 if their team property has not arrived yet.</summary>
         public readonly int CasterTeam;
 
-        /// <summary>True only on the caster's own machine. Anything that must happen exactly once
-        /// for the whole room - spawning a networked mine, say - checks this first.</summary>
+        /// <summary>True only on the machine that runs the caster's body (the host for a bot). Anything that must
+        /// happen exactly once for the whole room - spawning a networked mine, say - checks this first.</summary>
         public readonly bool IsCasterClient;
 
         /// <summary>How long ago the caster sent this, in seconds, never negative. Lets a projectile-

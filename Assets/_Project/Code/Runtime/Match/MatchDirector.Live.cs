@@ -363,8 +363,8 @@ namespace Overpower.Match
                 return countMembersScratch;
             foreach (System.Collections.Generic.KeyValuePair<int, Player> pair in room.Players)
                 // A spectator plays for no team, and a player whose connection dropped is not "here" for the lobby
-                // (MatchStartRules.CountsAsTeamPlayer, PresenceRules.CountsInTheLobby).
-                if (MatchStartRules.CountsAsTeamPlayer(pair.Value.IsInactive, Teams.IsSpectator(pair.Value)) && Teams.TryGetTeam(pair.Value, out int t) && t >= 0 && t < countMembersScratch.Length)
+                // (MatchStartRules.CountsAsTeamPlayer, PresenceRules.CountsInTheLobby). A bot seat is always here.
+                if (MatchStartRules.CountsAsTeamPlayer(Presence.IsDropped(pair.Value), Teams.IsSpectator(pair.Value)) && Teams.TryGetTeam(pair.Value, out int t) && t >= 0 && t < countMembersScratch.Length)
                     countMembersScratch[t]++;
             return countMembersScratch;
         }

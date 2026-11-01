@@ -5,12 +5,16 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using Overpower.Match;
+using Overpower.Net;
 using TMPro;
 
 /// <summary>
 /// The one place gameplay input enters the game. Reads the OverpowerControls actions asset and
 /// exposes each of the nine design-doc bindings as a property/event pair; nothing else should call
 /// Input or an InputAction directly.
+///
+/// A bot's body is driven through the same properties and events (BeginBotDrive, SetBotInput, PressBotVent), so
+/// nothing that reads the router needs to know who is playing.
 ///
 /// Deliberately NOT IPunObservable: see PlayerNetSync's class comment.
 /// </summary>
@@ -44,18 +48,33 @@ public class PlayerInputRouter : MonoBehaviour
     // panel (F1, the loadout screen) does.
     private bool pointerOverUi;
 
-    /// <summary>Raw WASD, not camera-relative: PlayerMotor converts, since that depends on the camera rig.</summary>
-    public Vector2 MoveAxis => gameplayMap != null && !InputSuppressed ? moveAction.ReadValue<Vector2>() : Vector2.zero;
+    // Set for good by BeginBotDrive; from then on the bot fields below are this body's only input.
+    private bool botDriven;
+    private Vector3 botMove;
+    private bool botPrimary, botAttachment, botUltimate, botMobility;
+
+    /// <summary>Raw WASD, not camera-relative: PlayerMotor converts, since that depends on the camera rig. A bot's is its world
+    /// move as (x, z), for readers that only ask whether the body walks (MechAnimator).</summary>
+    public Vector2 MoveAxis => botDriven
+        ? (InputSuppressed ? Vector2.zero : new Vector2(botMove.x, botMove.z))
+        : gameplayMap != null && !InputSuppressed ? moveAction.ReadValue<Vector2>() : Vector2.zero;
+
+    /// <summary>True once BeginBotDrive has handed this body to the host's bot.</summary>
+    public bool BotDriven => botDriven;
+
+    /// <summary>The bot's move in world space, length at most 1; zero while suppressed, like MoveAxis. PlayerMotor takes it as it
+    /// is: the host's camera turns with its human, not with the bot.</summary>
+    public Vector3 BotWorldMove => botDriven && !InputSuppressed ? botMove : Vector3.zero;
 
     // Each of the four ability slots has both a polled Held property and an edge event on purpose: a
     // charge weapon reads Held every frame, a dash only cares about the instant of press.
     //
     // Primary and Attachment gate on PointerFireBlocked (the pointer over UI as well): both are mouse buttons, so they can land on
     // a UI click; the other two Held properties are keys and cannot.
-    public bool PrimaryHeld => gameplayMap != null && !PointerFireBlocked && primaryAction.IsPressed();
-    public bool AttachmentHeld => gameplayMap != null && !PointerFireBlocked && attachmentAction.IsPressed();
-    public bool UltimateHeld => gameplayMap != null && !InputSuppressed && ultimateAction.IsPressed();
-    public bool MobilityHeld => gameplayMap != null && !InputSuppressed && mobilityAction.IsPressed();
+    public bool PrimaryHeld => botDriven ? botPrimary && !PointerFireBlocked : gameplayMap != null && !PointerFireBlocked && primaryAction.IsPressed();
+    public bool AttachmentHeld => botDriven ? botAttachment && !PointerFireBlocked : gameplayMap != null && !PointerFireBlocked && attachmentAction.IsPressed();
+    public bool UltimateHeld => botDriven ? botUltimate && !InputSuppressed : gameplayMap != null && !InputSuppressed && ultimateAction.IsPressed();
+    public bool MobilityHeld => botDriven ? botMobility && !InputSuppressed : gameplayMap != null && !InputSuppressed && mobilityAction.IsPressed();
 
     /// <summary>Q/E held: -1 turns the camera left, +1 right (CameraTracking asks CameraKeysBlocked first).</summary>
     public float CameraTurnAxis => gameplayMap != null ? CameraViewRules.TurnAxis(turnCameraLeftAction.IsPressed(), turnCameraRightAction.IsPressed()) : 0f;
@@ -84,11 +103,12 @@ public class PlayerInputRouter : MonoBehaviour
 
     /// <summary>True while dead, typing into a text field (chat), or while any tool has claimed focus
     /// (SetToolFocus). Everything above except ShopToggled and MapToggled is gated on this being false;
-    /// those two have narrower gates (ShopSuppressed, MapSuppressed).
+    /// those two have narrower gates (ShopSuppressed, MapSuppressed). A bot is only stopped by being dead: the
+    /// chat box and the panels on the host's screen are its human's.
     ///
     /// Deliberately NOT gated on PlayerOverheat.CanAct: overheat silencing is an ability-level rule the
     /// ability system enforces, and an overheated player must still be able to walk away.</summary>
-    public bool InputSuppressed => !isAlive || IsTypingInChat() || toolFocusOwners.Count > 0;
+    public bool InputSuppressed => !isAlive || (!botDriven && (IsTypingInChat() || toolFocusOwners.Count > 0));
 
     /// <summary>Whether a mouse-button click is kept from firing: input suppressed, or the pointer over a clickable panel. The
     /// crosshair shows exactly where this is false (CrosshairRules.ShowCrosshair), so the arrow is back wherever a click is for the UI.</summary>
@@ -121,6 +141,48 @@ public class PlayerInputRouter : MonoBehaviour
             toolFocusOwners.Add(owner);
         else
             toolFocusOwners.Remove(owner);
+    }
+
+    /// <summary>Hands this body to the host's bot for good: the device map goes off (the host's keyboard and mouse are its human's)
+    /// and input comes only from SetBotInput and PressBotVent.</summary>
+    public void BeginBotDrive()
+    {
+        botDriven = true;
+        pointerOverUi = false;
+        gameplayMap?.Disable();
+    }
+
+    /// <summary>The bot's input, given every frame: a world-space move (flattened, clamped to length 1) and which of the four held
+    /// buttons are down. A button going down or coming up raises the same Pressed/Released events a key would, through the same gates.
+    /// Ignored until BeginBotDrive.</summary>
+    public void SetBotInput(Vector3 worldMove, bool primaryHeld, bool attachmentHeld, bool ultimateHeld, bool mobilityHeld)
+    {
+        if (!botDriven)
+            return;
+
+        worldMove.y = 0f;
+        botMove = Vector3.ClampMagnitude(worldMove, 1f);
+
+        bool wasPrimary = botPrimary, wasAttachment = botAttachment, wasUltimate = botUltimate, wasMobility = botMobility;
+        // Stored before the events, as a key reads IsPressed inside its own started callback: a listener asking Held sees it down.
+        botPrimary = primaryHeld;
+        botAttachment = attachmentHeld;
+        botUltimate = ultimateHeld;
+        botMobility = mobilityHeld;
+
+        if (primaryHeld && !wasPrimary) EmitPointerGated(PrimaryPressed);
+        else if (!primaryHeld && wasPrimary) Emit(PrimaryReleased);
+        if (attachmentHeld && !wasAttachment) EmitPointerGated(AttachmentPressed);
+        if (ultimateHeld && !wasUltimate) Emit(UltimatePressed);
+        if (mobilityHeld && !wasMobility) Emit(MobilityPressed);
+        else if (!mobilityHeld && wasMobility) Emit(MobilityReleased);
+    }
+
+    /// <summary>The bot's press of the Vent button (VentPressed), gated like the key. Ignored until BeginBotDrive.</summary>
+    public void PressBotVent()
+    {
+        if (botDriven)
+            Emit(VentPressed);
     }
 
     private void Awake()
@@ -178,23 +240,22 @@ public class PlayerInputRouter : MonoBehaviour
 
     private void OnEnable()
     {
-        if (gameplayMap == null)
-            return; // Awake already logged why
-
-        // Only the local player reads input: a remote copy's map is disabled outright so the Input
-        // System stops polling devices for it.
-        if (photonView.IsMine)
+        // Only the person at this keyboard reads devices: every other copy's map is disabled outright so the Input System stops
+        // polling devices for it. That includes a bot's body on the host, which is IsMine there: enabled, the human's own keys
+        // would drive every bot. A null map means Awake already logged why.
+        if (gameplayMap != null)
         {
-            gameplayMap.Enable();
-            if (playerLifecycle != null)
-            {
-                isAlive = playerLifecycle.IsAlive;
-                playerLifecycle.AliveChanged += HandleAliveChanged;
-            }
+            if (BodyRole.IsLocalHuman(photonView) && !botDriven)
+                gameplayMap.Enable();
+            else
+                gameplayMap.Disable();
         }
-        else
+
+        // Every body this client controls follows its alive gate, a bot's too.
+        if (photonView != null && photonView.IsMine && playerLifecycle != null)
         {
-            gameplayMap.Disable();
+            isAlive = playerLifecycle.IsAlive;
+            playerLifecycle.AliveChanged += HandleAliveChanged;
         }
     }
 
@@ -212,9 +273,9 @@ public class PlayerInputRouter : MonoBehaviour
     /// for the local player.</summary>
     private void Update()
     {
-        // Only the local player's clicks can be a UI click on THIS machine; skips the redundant
-        // EventSystem queries for the other copies in a full room.
-        if (photonView != null && !photonView.IsMine)
+        // Only the local human's clicks can be a UI click on THIS machine; skips the redundant
+        // EventSystem queries for the other copies in a full room, the host's bots included.
+        if (botDriven || (photonView != null && !BodyRole.IsLocalHuman(photonView)))
             return;
 
         pointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();

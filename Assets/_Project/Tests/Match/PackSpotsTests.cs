@@ -95,13 +95,20 @@ namespace Overpower.Tests
         private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public;
 
         [Test]
-        public void TheManagerAsksBeforeAskingForAnUltimatePack() =>
-            Assert.IsTrue(IlWiring.Uses(typeof(HealthPackManager), "TryRequestLocal", typeof(HealthPackRules).GetMethod(nameof(HealthPackRules.MayTakeUltimate))));
+        public void TheManagerAsksBeforeAskingForAnUltimatePack()
+        {
+            MethodInfo mayTake = typeof(HealthPackManager).GetMethod("MayTake", Any);
+            Assert.IsTrue(IlWiring.Uses(typeof(HealthPackManager), "TryRequestLocal", mayTake));
+            Assert.IsTrue(IlWiring.Uses(typeof(HealthPackManager), "MayTake", typeof(HealthPackRules).GetMethod(nameof(HealthPackRules.MayTakeUltimate))));
+        }
 
         [Test]
-        public void TheEchoOfAnUltimatePackFillsTheMeter() =>
-            Assert.IsTrue(IlWiring.Uses(typeof(HealthPackManager), nameof(HealthPackManager.OnRoomPropertiesUpdate),
-                typeof(UltimateCharge).GetMethod(nameof(UltimateCharge.AddFraction))));
+        public void TheEchoOfAnUltimatePackFillsTheMeter()
+        {
+            MethodInfo apply = typeof(HealthPackManager).GetMethod("ApplyPack", Any);
+            Assert.IsTrue(IlWiring.Uses(typeof(HealthPackManager), nameof(HealthPackManager.OnRoomPropertiesUpdate), apply));
+            Assert.IsTrue(IlWiring.Uses(typeof(HealthPackManager), "ApplyPack", typeof(UltimateCharge).GetMethod(nameof(UltimateCharge.AddFraction))));
+        }
 
         [Test]
         public void TheManagerBuildsTheSpotsOfThisMap() =>

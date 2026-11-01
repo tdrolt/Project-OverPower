@@ -237,5 +237,18 @@ namespace Overpower.Match
         /// <summary>The telemetry `adopt` line: a team holding no other capital in play just took one that isn't its own.</summary>
         public static bool IsAdoption(int newOwner, int capitalTeamOfZone, int otherCapitalsInPlayHeldByNewOwner) =>
             newOwner >= 0 && capitalTeamOfZone >= 0 && capitalTeamOfZone != newOwner && otherCapitalsInPlayHeldByNewOwner == 0;
+
+        /// <summary>A body's team went onto the eliminated list at this edge: known, not on the list before, on it now.</summary>
+        public static bool TeamJustEliminated(bool teamKnown, bool wasEliminated, bool isEliminated) =>
+            teamKnown && !wasEliminated && isEliminated;
+
+        /// <summary>Three teams became two and this body's team is not the one that went out, so it is told the rule changed (a team that
+        /// just lost is already getting its lost panel).</summary>
+        public static bool TwoTeamsLeftReaches(MatchPhase before, MatchPhase now, bool teamJustEliminated) =>
+            before == MatchPhase.ThreeTeams && now == MatchPhase.TwoTeams && !teamJustEliminated;
+
+        /// <summary>The same edge sends a living body home, out of the corner that is closing.</summary>
+        public static bool SendsHomeOnPhaseChange(MatchPhase before, MatchPhase now, bool teamJustEliminated, bool alive) =>
+            alive && TwoTeamsLeftReaches(before, now, teamJustEliminated);
     }
 }

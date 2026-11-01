@@ -2034,6 +2034,12 @@ namespace Overpower.UI
         public string lobbyRoomYouSuffix = " (you)";
         [Tooltip("Written after the host's name on the host's seat.")]
         public string lobbyRoomHostSuffix = " \u00b7 host";
+        [Tooltip("Written after a bot's name on its seat, in the lobby only: in a match a bot's name stands alone, like a player's.")]
+        public string lobbyRoomBotSuffix = " <color=#8F9399>BOT</color>";
+        [Tooltip("The host's button under each team: puts one bot in that team's first empty seat. The host's click on a bot's seat takes the bot out.")]
+        public string lobbyRoomAddBotText = "+ Add bot";
+        [Tooltip("The host's button in the side box: a bot in every empty team seat.")]
+        public string lobbyRoomFillBotsText = "Fill with bots";
         [Tooltip("The heading over the spectator seats.")]
         public string lobbyRoomSpectatorsText = "Spectators";
         [Tooltip("The heading of the side box: {0} is how many players have no seat yet.")]

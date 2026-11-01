@@ -1,7 +1,9 @@
 using Photon.Pun;
+using Photon.Realtime;
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.Match;
+using Overpower.Net;
 
 namespace Overpower.Abilities
 {
@@ -107,19 +109,19 @@ namespace Overpower.Abilities
 
             ClearOldThrow();
 
-            GameObject placed = NetworkedDeployable.Spawn(zonePrefab.name, cast.Payload.Point, null);
+            GameObject placed = NetworkedDeployable.Spawn(zonePrefab.name, cast.Payload.Point, null, Owner.ActorNumber, Owner.TeamId);
             ownZone = placed != null ? placed.GetComponent<AoeZone>() : null;
         }
 
-        // The throw reaches everyone through one Player Property on the caster (no RPC): every copy of
-        // the zone - including one placed later on a client that joins after the throw - reads it.
+        // The throw reaches everyone through one Player Property on the caster (no RPC; a bot's through the room, mirrored back
+        // into its Player): every copy of the zone - including one placed later on a client that joins after the throw - reads it.
         private void ThrowOwnZone(Vector3 point)
         {
             if (ownZone == null)
                 return;
 
             ownZone.Throw(point);
-            PhotonNetwork.LocalPlayer.SetCustomProperties(new ExitGames.Client.Photon.Hashtable
+            PlayerProps.Set(Owner.PhotonView.Owner, new ExitGames.Client.Photon.Hashtable
             {
                 { AoeZoneRecast.PropertyKey, AoeZoneRecast.Encode(ownZone.photonView.ViewID, point) }
             });
@@ -127,10 +129,11 @@ namespace Overpower.Abilities
 
         // A new zone supersedes the last throw's value (keyed to the old zone's id, so it could never
         // grab this one anyway; removing it keeps a reused view id from ever matching).
-        private static void ClearOldThrow()
+        private void ClearOldThrow()
         {
-            if (PhotonNetwork.InRoom && PhotonNetwork.LocalPlayer.CustomProperties.ContainsKey(AoeZoneRecast.PropertyKey))
-                PhotonNetwork.LocalPlayer.SetCustomProperties(new ExitGames.Client.Photon.Hashtable { { AoeZoneRecast.PropertyKey, null } });
+            Player caster = Owner.PhotonView.Owner;
+            if (PhotonNetwork.InRoom && caster != null && caster.CustomProperties.ContainsKey(AoeZoneRecast.PropertyKey))
+                PlayerProps.Set(caster, new ExitGames.Client.Photon.Hashtable { { AoeZoneRecast.PropertyKey, null } });
         }
 
         public override string ShopStatsText()

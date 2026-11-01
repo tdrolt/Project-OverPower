@@ -76,7 +76,7 @@ namespace Overpower.Abilities
                 return; // Only the caster's own machine ever places the real networked object.
 
             Quaternion rotation = Quaternion.LookRotation(cast.Payload.Direction, Vector3.up);
-            NetworkedDeployable.Spawn(coverPrefab.name, cast.Payload.Point, rotation, null);
+            NetworkedDeployable.Spawn(coverPrefab.name, cast.Payload.Point, rotation, null, Owner.ActorNumber, Owner.TeamId);
         }
 
         /// <summary>

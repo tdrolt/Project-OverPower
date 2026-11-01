@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
+using Overpower.Abilities;
 using Overpower.Net;
 
 namespace Overpower.Vision
@@ -25,6 +26,8 @@ namespace Overpower.Vision
         private float coneRange, coneAngle; // > 0 range: a flame cone, shown while its caster is shown or it reaches my team
 
         private PhotonView ownView;
+        private NetworkedDeployable placedBy;
+        private int placerTeam = -1;
         private PhotonView followCaster; // set: shown exactly while that player is shown (their abilities' visuals)
 
         /// <summary>True for my team's shots: always drawn.</summary>
@@ -70,6 +73,14 @@ namespace Overpower.Vision
         /// <summary>Shown exactly while this player is shown, as AttachToCaster; null goes back to the spot rule.</summary>
         public void FollowCaster(PhotonView casterView) => followCaster = casterView;
 
+        /// <summary>The team of whoever placed this, for a field the host instantiated for a bot: the view's Owner is then the host's
+        /// player, not the placer. Negative = not given.</summary>
+        public void SetPlacerTeam(int team) => placerTeam = team;
+
+        /// <summary>Whose team a placed thing is: the one set here, else the deployable's own, else the instantiating player's.</summary>
+        public static int PlacerTeamOf(int declared, int deployable, int instantiator) =>
+            declared >= 0 ? declared : deployable >= 0 ? deployable : instantiator;
+
         /// <summary>For the Flamethrower cone: also shown while the cone reaches any of my team.</summary>
         public void SetCone(float range, float fullAngleDegrees)
         {
@@ -88,6 +99,7 @@ namespace Overpower.Vision
         private void Awake()
         {
             ownView = GetComponent<PhotonView>();
+            placedBy = GetComponent<NetworkedDeployable>();
             RefreshRenderers();
         }
 
@@ -111,13 +123,18 @@ namespace Overpower.Vision
         {
             TeamSight sight = TeamSight.Local;
             bool bound = followCaster != null; // a caster who left (destroyed view) no longer binds: the spot rules
-            bool force = ForceVisible || (ownersTeamAlwaysSees && sight != null && ownView != null
-                && Teams.TryGetTeam(ownView.Owner, out int ownerTeam) && sight.IsFriendlyTeam(ownerTeam));
+            bool force = ForceVisible || (ownersTeamAlwaysSees && sight != null && ownView != null && sight.IsFriendlyTeam(PlacedByTeam()));
             bool casterShown = bound && sight != null && (sight.CanSeePlayer(followCaster)
                 || (coneRange > 0f && TeamSight.ConeReachesMyTeam(transform.position, transform.forward, coneRange, coneAngle)));
             bool spotSeen = sight != null && !bound && !force
                 && (seenRadius > 0f ? TeamSight.DiscShownAt(-1, transform.position, seenRadius, discHurtsMyTeam) : sight.CanSeeShot(transform.position));
             SetVisible(Decide(force, sight != null, bound, casterShown, spotSeen));
+        }
+
+        private int PlacedByTeam()
+        {
+            Teams.TryGetTeam(ownView.Owner, out int instantiator);
+            return PlacerTeamOf(placerTeam, placedBy != null ? placedBy.OwnerTeam : -1, instantiator);
         }
 
         /// <summary>Switches the renderers on (to their authored state) or off. A trail, and sparks a world-space particle system left

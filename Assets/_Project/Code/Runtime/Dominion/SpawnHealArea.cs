@@ -99,6 +99,25 @@ namespace Overpower.Dominion
             return DominionHealRules.InOwnSpawn(inArea, teamCount, inOwnCapital);
         }
 
+        /// <summary>The middle of the team's own spawn on the ground, for a bot that must walk back to it: a registered area of the team (the 2v2
+        /// pocket) or, in a 3v3v3 match, its capital tower. False for a team with neither, and while the capital tower has not registered.</summary>
+        public static bool TryGetCentre(int forTeam, out Vector3 centre)
+        {
+            centre = default;
+            if (forTeam < 0) return false;
+            for (int i = 0; i < registered.Count; i++)
+            {
+                SpawnHealArea area = registered[i];
+                if (area == null || area.team != forTeam) continue;
+                centre = area.transform.position;
+                return true;
+            }
+            BuildingManager manager = BuildingManager.Instance;
+            if (manager == null || manager.Map == null || DominionMode.TeamCountOfCurrentRoom() != 3) return false;
+            int capital = manager.Map.CapitalOf(forTeam);
+            return capital != Overpower.Match.TerritoryMap.Neutral && manager.TryGetZoneCentre(capital, out centre);
+        }
+
         /// <summary>True when the scene has registered at least one healing area for this team.</summary>
         public static bool HasAreaFor(int forTeam)
         {

@@ -39,8 +39,8 @@ namespace Overpower.Abilities
         /// -1 while unknown.</summary>
         public int TeamId => Teams.TryGetTeam(PhotonView.Owner, out int teamId) ? teamId : -1;
 
-        /// <summary>True on the machine this player belongs to - the only machine whose owner hooks
-        /// (TryBuildCast, OwnerTick) ever run.</summary>
+        /// <summary>True on the machine that runs this body (the host for a bot) - the only machine whose owner hooks
+        /// (TryBuildCast, OwnerTick) ever run. Not "the human at this keyboard": that is BodyRole.IsLocalHuman.</summary>
         public bool IsMine => PhotonView.IsMine;
 
         public AbilityOwner(GameObject root)

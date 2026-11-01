@@ -79,6 +79,10 @@ namespace Overpower.Telemetry
         public const string IsMaster = "master";
         /// <summary>True on the session line of a spectator host (no team, no player row in the report).</summary>
         public const string Spectator = "spec";
+        /// <summary>True on the session, join and leave lines of a bot: a seat the host plays, with no client of its own, whose file the host writes.</summary>
+        public const string Bot = "bot";
+        /// <summary>Which of the three builds a bot plays (BotPlayer.Build), on its session and join lines.</summary>
+        public const string BotBuild = "bbuild";
         public const string Commit = "commit";
         public const string UnityVersion = "uv";
         public const string Platform = "plat";

@@ -43,7 +43,7 @@ namespace Overpower.Telemetry
 
         private void Awake()
         {
-            if (!photonView.IsMine)
+            if (!BodyRole.IsLocalHuman(photonView))
             {
                 enabled = false;
                 return;

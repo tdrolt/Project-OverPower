@@ -4,6 +4,7 @@ using System.Text;
 using Overpower.Data;
 using Overpower.Lobby;
 using Overpower.Match;
+using Overpower.Net;
 using Photon.Pun;
 using Photon.Realtime;
 using TMPro;
@@ -54,7 +55,8 @@ namespace Overpower.UI
         private GameObject built;                       // the screen's parts that depend on the room's mode
         private GameModeDefinition builtFor;
         private TextMeshProUGUI titleLabel, hostLabel, noRoleHeading, noRoleNote, startHint;
-        private LobbyButton modeButton, leaveSeatButton, leaveLobbyButton, howToButton, startButton;
+        private LobbyButton modeButton, leaveSeatButton, leaveLobbyButton, howToButton, startButton, fillBotsButton;
+        private readonly Dictionary<int, LobbyButton> addBotButtons = new Dictionary<int, LobbyButton>();
         private Transform noRoleList;
         private readonly List<TextMeshProUGUI> noRoleNames = new List<TextMeshProUGUI>();
         private readonly Dictionary<string, SeatView> seatViews = new Dictionary<string, SeatView>();
@@ -175,6 +177,7 @@ namespace Overpower.UI
             seatViews.Clear();
             seatOrder.Clear();
             noRoleNames.Clear();
+            addBotButtons.Clear();
             builtFor = mode;
 
             VerticalLayoutGroup column = LobbyUiKit.VGroup(content, "Layout", theme.lobbyRoomGap, TextAnchor.UpperLeft,
@@ -271,6 +274,12 @@ namespace Overpower.UI
             LobbyUiKit.Size(name.gameObject, -1f, theme.lobbyRoomTeamNameSize * DisplayLine);
             for (int i = 0; i < mode.SeatsPerTeam; i++)
                 BuildSeat(box.Inner, LobbySeatRules.SeatKey(team, i), false, theme.lobbyRoomSeatHeight, theme.lobbyRoomSeatTextSize);
+
+            LobbyButton addBot = kit.MakeButton(box.Inner, "Add bot", theme.lobbyRoomAddBotText, kit.Body, theme.lobbyRoomSideButtonTextSize, theme.lobbyOffWhiteColor,
+                theme.lobbyRoomSideFill, theme.lobbyCornerRadius, theme.lobbyBorderColor, theme.lobbyBorderWidth);
+            LobbyUiKit.Size(addBot.Root, -1f, theme.lobbyRoomSideButtonHeight);
+            addBot.Button.onClick.AddListener(() => AddBots(team));
+            addBotButtons[team] = addBot;
         }
 
         /// <summary>The coloured edge across the top of a team column: the top of a rounded box in the team's colour, cut off after the stripe's height
@@ -330,7 +339,7 @@ namespace Overpower.UI
             LobbyButton button = kit.MakeButton(parent, "Seat " + key, theme.lobbyRoomEmptySeatText, kit.Body, textSize, theme.lobbyDimColor, theme.lobbyRoomSeatFill,
                 theme.lobbyCornerRadius, theme.lobbyRoomSeatFill, 0.05f); // a hair of outline only so the box has an outline layer to recolour
             LobbyUiKit.Size(button.Root, spectator ? 0f : -1f, height, spectator ? 1f : -1f);
-            button.Button.onClick.AddListener(() => roomManager.Seats.TryTake(key));
+            button.Button.onClick.AddListener(() => OnSeatClicked(key));
 
             var dash = new GameObject("Dashed", typeof(RectTransform), typeof(Image));
             dash.transform.SetParent(button.Root.transform, false);
@@ -377,6 +386,41 @@ namespace Overpower.UI
                 theme.lobbyRoomSideFill, theme.lobbyCornerRadius, theme.lobbyBorderColor, theme.lobbyBorderWidth);
             LobbyUiKit.Size(leaveSeatButton.Root, -1f, theme.lobbyRoomSideButtonHeight);
             leaveSeatButton.Button.onClick.AddListener(() => roomManager.Seats.LeaveSeat());
+
+            fillBotsButton = kit.MakeButton(box.Inner, "Fill with bots", theme.lobbyRoomFillBotsText, kit.Body, theme.lobbyRoomSideButtonTextSize, theme.lobbyOffWhiteColor,
+                theme.lobbyRoomSideFill, theme.lobbyCornerRadius, theme.lobbyBorderColor, theme.lobbyBorderWidth);
+            LobbyUiKit.Size(fillBotsButton.Root, -1f, theme.lobbyRoomSideButtonHeight);
+            fillBotsButton.Button.onClick.AddListener(() => AddBots(null));
+        }
+
+        private void OnSeatClicked(string key)
+        {
+            LobbySeats seats = roomManager.Seats;
+            int holder = seats.Seats.TryGetValue(key, out int actor) ? actor : 0;
+            if (LobbyRoomRules.ClickRemovesBot(PhotonNetwork.IsMasterClient, holder))
+                seats.RemoveBot(holder);
+            else
+                seats.TryTake(key);
+        }
+
+        /// <summary>Add bot (one, on team) or Fill with bots (team null). Names never repeat a build's name or a weapon's.</summary>
+        private void AddBots(int? team)
+        {
+            BotConfig bots = roomManager.BotSettings;
+            if (bots == null)
+            {
+                Debug.LogWarning("[BOTS] RoomManager has no BotConfig - no bots");
+                return;
+            }
+            var buildNames = new List<string>();
+            foreach (BotConfig.Build build in bots.Builds)
+            {
+                if (build == null) continue;
+                buildNames.Add(build.Name);
+                if (build.FamilyWeapon != null) buildNames.Add(build.FamilyWeapon.DisplayName);
+                if (build.UpgradeWeapon != null) buildNames.Add(build.UpgradeWeapon.DisplayName);
+            }
+            roomManager.Seats.AddBots(team, bots.Names, buildNames);
         }
 
         private void BuildFooter(Transform parent)
@@ -469,7 +513,7 @@ namespace Overpower.UI
                     bool mine = actor == me;
                     Player holder = room.GetPlayer(actor);
                     string text = LobbyRoomRules.SeatText(holder != null ? holder.NickName : null, mine, master != null && actor == master.ActorNumber,
-                        theme.lobbyRoomYouSuffix, theme.lobbyRoomHostSuffix);
+                        theme.lobbyRoomYouSuffix, theme.lobbyRoomHostSuffix, holder is BotPlayer, theme.lobbyRoomBotSuffix);
                     ApplySeat(view, mine ? SeatState.Mine : SeatState.Taken, text);
                 }
                 else
@@ -497,6 +541,15 @@ namespace Overpower.UI
             for (int i = noRole.Count; i < noRoleNames.Count; i++) noRoleNames[i].gameObject.SetActive(false);
 
             leaveSeatButton.SetEnabled(seats.MySeat != null);
+
+            // Only the host adds bots; a button greys once there is no empty seat for it.
+            foreach (var pair in addBotButtons)
+            {
+                pair.Value.Root.SetActive(iAmHost);
+                if (iAmHost) pair.Value.SetEnabled(BotSeatRules.FreeTeamSeats(seats.Layout, seats.Seats, pair.Key).Count > 0);
+            }
+            fillBotsButton.Root.SetActive(iAmHost);
+            if (iAmHost) fillBotsButton.SetEnabled(BotSeatRules.FreeTeamSeats(seats.Layout, seats.Seats, null).Count > 0);
 
             // The bottom right: the host's Start game with what it does (or why it is greyed); everyone else reads who they wait for.
             startButton.Root.SetActive(iAmHost);

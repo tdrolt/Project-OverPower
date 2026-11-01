@@ -223,7 +223,7 @@ namespace Overpower.Lobby
                     ? Overpower.Dominion.DominionDirector.Instance.Stage : Overpower.Dominion.DominionStage.None;
                 Hashtable deadProps = Overpower.Dominion.DominionRoomWrites.LateJoinerPlayerProps(dominionStage, LobbySeatRules.TryTeamOfSeat(seat, out _),
                     Overpower.Dominion.DominionDirector.Instance != null ? Overpower.Dominion.DominionDirector.Instance.ArrivalStampMs(PhotonNetwork.LocalPlayer) : PhotonNetwork.ServerTimestamp);
-                if (deadProps != null) PhotonNetwork.LocalPlayer.SetCustomProperties(deadProps);
+                if (deadProps != null) PlayerProps.Set(PhotonNetwork.LocalPlayer, deadProps);
 
                 SeatWrite write = LobbySeatRules.LateJoinWrite(PhotonNetwork.LocalPlayer.ActorNumber, seat, stage);
                 bool sent = PhotonNetwork.CurrentRoom.SetCustomProperties(ToHashtable(write.Props), ToHashtable(write.Expected));
@@ -318,6 +318,7 @@ namespace Overpower.Lobby
         private void ReactToStart()
         {
             if (WaitForTheRoomsScene()) return; // nobody's body is spawned in the scene the lobby was in
+            SpawnBots();
             string seat = seats.SeatInRoom();
             if (seat == null)
             {
@@ -338,8 +339,20 @@ namespace Overpower.Lobby
             else if (LobbySeatRules.IsSpectatorSeat(seat))
             {
                 Debug.Log($"[LOBBY] spectating (seat {seat}) - no body");
-                PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { Teams.SpectatorKey, true } });
+                PlayerProps.Set(PhotonNetwork.LocalPlayer, new Hashtable { { Teams.SpectatorKey, true } });
                 roomManager.SeatView?.Begin();
+            }
+        }
+
+        /// <summary>The host plays every bot seat, whatever its own seat (a host who spectates still runs the bots): one body each on the
+        /// seat's team, none for a bot that already has one.</summary>
+        private void SpawnBots()
+        {
+            if (!PhotonNetwork.IsMasterClient) return;
+            foreach (var (actor, team) in seats.BotSeatsInRoom())
+            {
+                if (PlayerLookup.GetPhotonViewFor(actor) != null) continue;
+                roomManager.SpawnBotOnTeam(actor, team);
             }
         }
     }

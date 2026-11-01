@@ -79,7 +79,7 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
         {
             // A REJOINED player keeps their loadout (D21): the room kept their Player Properties, so this is
             // the late joiner's read, never the starting-kit publish below, which would overwrite what they bought.
-            ApplyFromProperties(PhotonNetwork.LocalPlayer.CustomProperties, onlyKeysPresent: false);
+            ApplyFromProperties(photonView.Owner.CustomProperties, onlyKeysPresent: false);
         }
         else if (photonView.IsMine)
         {
@@ -104,7 +104,7 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
             props[LoadoutProperties.ArmorAbsorbLevelKey] = playerHealth != null ? playerHealth.AbsorbLevel : 0;
             props[LoadoutProperties.ArmorRechargeLevelKey] = playerHealth != null ? playerHealth.RechargeLevel : 0;
 
-            PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+            PlayerProps.Set(photonView.Owner, props);
             LogLoadout();
         }
         else if (photonView.Owner != null)
@@ -160,7 +160,7 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
             props[LoadoutProperties.ArmorRechargeLevelKey] = playerHealth.RechargeLevel;
         }
 
-        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+        PlayerProps.Set(photonView.Owner, props);
         LogLoadout();
     }
 
@@ -176,7 +176,7 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
         if (!weaponFiring.SetWeapon(weaponId))
             return;
 
-        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { LoadoutProperties.WeaponKey, weaponId } });
+        PlayerProps.Set(photonView.Owner, new Hashtable { { LoadoutProperties.WeaponKey, weaponId } });
         LogLoadout();
     }
 
@@ -193,7 +193,7 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
         if (EquippedAbilityId(slot) != abilityId)
             return;
 
-        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { key, abilityId } });
+        PlayerProps.Set(photonView.Owner, new Hashtable { { key, abilityId } });
         LogLoadout();
     }
 
@@ -208,7 +208,7 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
 
         playerHealth.SetArmorLevels(absorbLevel, rechargeLevel);
 
-        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
+        PlayerProps.Set(photonView.Owner, new Hashtable
         {
             { LoadoutProperties.ArmorAbsorbLevelKey, absorbLevel },
             { LoadoutProperties.ArmorRechargeLevelKey, rechargeLevel }

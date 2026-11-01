@@ -195,7 +195,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // player exists (reliably so for a late joiner), so its first attempt to show an already-decided match result
         // can find no local view and silently skip it. Catching up here, once this player (and the PlayerLookup
         // registration above) exists, closes that gap.
-        if (photonView.IsMine)
+        if (BodyRole.IsLocalHuman(photonView))
             MatchDirector.Instance?.CatchUpLocalPlayer();
 
         // Once per player per match. A team of -1 here means the Custom Property had not arrived
@@ -220,7 +220,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             // RespawnDelayRules.DeathCountOnRejoin) - and wait the flat rejoin time instead of the scaled one.
             // KNOWN LIMIT (accepted, rare): a drop that spans go-live restores the WARM-UP's sb deaths - the go-live reset of sb and of
             // deathCount happened on a client that was away, and the new process has only what the room still holds.
-            PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(ScoreboardRules.Key, out object keptScore);
+            photonView.Owner.CustomProperties.TryGetValue(ScoreboardRules.Key, out object keptScore);
             deathCount = RespawnDelayRules.DeathCountOnRejoin(keptScore as int[]);
             rejoinRespawnPending = true;
             death = true; // a body that is already "dead" must not die again on the next lethal tick
@@ -235,7 +235,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             TryRespawnAfterRejoin();
         }
 
-        if (photonView.IsMine)
+        if (BodyRole.IsLocalHuman(photonView))
         {
             // Transitional home: pointing the camera at the local player is spawn-time wiring rather than lifecycle;
             // a future camera-rig component should claim it.
@@ -249,7 +249,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
                 }
             }
         }
-        else
+        else if (!photonView.IsMine)
         {
             rigidbody.isKinematic = false;
         }
@@ -392,8 +392,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (!photonView.IsMine)
             return;
 
-        int teamID = (int)PhotonNetwork.LocalPlayer.CustomProperties[PlayerTeam.TeamKey];
-        int actorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
+        int teamID = (int)photonView.Owner.CustomProperties[PlayerTeam.TeamKey];
+        int actorNumber = photonView.OwnerActorNr;
 
         // Dominion's sudden death has no respawns: the death is for good, before any countdown or last-stand logic below is considered.
         if (!RespawnAllowedNow())
@@ -467,11 +467,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (!photonView.IsMine || matchUI == null || !matchUI.IsWaitingForRespawn || !death)
             return;
 
-        int actorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
+        int actorNumber = photonView.OwnerActorNr;
 
         object teamIDObj;
         int teamID = -1;
-        if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(PlayerTeam.TeamKey, out teamIDObj) && teamIDObj != null)
+        if (photonView.Owner != null && photonView.Owner.CustomProperties.TryGetValue(PlayerTeam.TeamKey, out teamIDObj) && teamIDObj != null)
         {
             teamID = (int)teamIDObj;
         }
@@ -554,7 +554,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // 2. Interrupt everything the player was doing.
         GetComponent<AbilityRunner>()?.ResetForMatchStart();
         playerDisplacement?.Cancel();
-        NetworkedDeployable.DestroyAllPlacedByLocalPlayer();
+        NetworkedDeployable.DestroyAllPlacedBy(photonView.OwnerActorNr);
 
         // 3. The economy and loadout, back to the starter kit - loadout BEFORE health, so armour capacity is
         // already at level 0 when ResetForRespawn decides what "full armour" means.
@@ -572,7 +572,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         // 4. Back to your own team's spawn - guarded like MoveToSpawnPoint. Everyone moves at once, so the own slot, never the free-slot pick.
         RoomManager roomManager = FindObjectOfType<RoomManager>();
-        Transform teamSpawn = roomManager != null ? roomManager.SpawnPointFor(team, team, false) : null;
+        Transform teamSpawn = roomManager != null ? roomManager.SpawnPointFor(team, team, photonView.OwnerActorNr, false) : null;
         if (teamSpawn != null)
             TeleportToSpawnPoint(teamSpawn.position, teamSpawn.rotation);
 
@@ -620,11 +620,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // touched - AbilityRunner.ResetForMatchStart only interrupts the modules and refills cooldowns), placed deployables go.
         GetComponent<AbilityRunner>()?.ResetForMatchStart();
         playerDisplacement?.Cancel();
-        NetworkedDeployable.DestroyAllPlacedByLocalPlayer();
+        NetworkedDeployable.DestroyAllPlacedBy(photonView.OwnerActorNr);
         playerHealth.ResetForRespawn();
 
         RoomManager roomManager = FindObjectOfType<RoomManager>();
-        Transform teamSpawn = roomManager != null ? roomManager.SpawnPointFor(team, team, false) : null; // everyone moves at once: own slot
+        Transform teamSpawn = roomManager != null ? roomManager.SpawnPointFor(team, team, photonView.OwnerActorNr, false) : null; // everyone moves at once: own slot
         if (teamSpawn != null)
             TeleportToSpawnPoint(teamSpawn.position, teamSpawn.rotation);
 
@@ -676,7 +676,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         GetComponent<AbilityRunner>()?.ResetForMatchStart();
         playerDisplacement?.Cancel();
-        NetworkedDeployable.DestroyAllPlacedByLocalPlayer();
+        NetworkedDeployable.DestroyAllPlacedBy(photonView.OwnerActorNr);
 
         deathStampMs = PhotonNetwork.ServerTimestamp;
         SetAlive(false, deathStampMs);
@@ -688,7 +688,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
     /// <summary>The stamp this player's arrival-death carries (DominionRoomWrites.ArrivalDeathStamp, through the director which reads the room).</summary>
     private int ArrivalStampMs() =>
-        Overpower.Dominion.DominionDirector.Instance != null ? Overpower.Dominion.DominionDirector.Instance.ArrivalStampMs(PhotonNetwork.LocalPlayer) : PhotonNetwork.ServerTimestamp;
+        Overpower.Dominion.DominionDirector.Instance != null ? Overpower.Dominion.DominionDirector.Instance.ArrivalStampMs(photonView.Owner) : PhotonNetwork.ServerTimestamp;
 
     /// <summary>The Dominion stage in the room right now (None outside a Dominion room).</summary>
     private static Overpower.Dominion.DominionStage DominionStageNow() =>
@@ -854,8 +854,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         // No fallback string: theme's own null already logged an error in Start, and playerHud's a
         // second one - showing wrong or missing-theme text here would just be a second symptom.
-        if (atUnderAttackSpawn && theme != null)
-            playerHud?.ShowToast(theme.capitalUnderAttackRespawnToast);
+        if (BodyRole.IsLocalHuman(photonView))
+        {
+            if (atUnderAttackSpawn && theme != null)
+                playerHud?.ShowToast(theme.capitalUnderAttackRespawnToast);
+        }
 
         // Logged because "respawning where you died" cannot be verified from the editor. Reads rigidbody.position, not
         // transform.position: logging transform.position right after writing it always "looks" right, even on the
@@ -912,7 +915,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
                 spawnIndex = buildings.Map.CapitalTeamOf(spawnCapital);
         }
 
-        Transform home = roomManager.SpawnPointFor(spawnIndex, -1, avoidOccupied);
+        Transform home = roomManager.SpawnPointFor(spawnIndex, pt.teamID, photonView.OwnerActorNr, avoidOccupied);
         if (home == null)
             return;
 
@@ -936,7 +939,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             return null;
 
         int spawnIndex = manager.Map.CapitalTeamOf(capital);
-        Transform normal = roomManager.SpawnPointFor(spawnIndex);
+        Transform normal = roomManager.SpawnPointFor(spawnIndex, teamID, photonView.OwnerActorNr, true);
 
         ZonePresenceTracker presence = ZonePresenceTracker.Instance;
         if (presence == null)
@@ -1049,7 +1052,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         var props = new Hashtable { { AliveKey, alive } };
         if (deathStamp.HasValue)
             props[LastStandAtKey] = deathStamp.Value; // one write, so no reader sees dead without its moment
-        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+        PlayerProps.Set(photonView.Owner, props);
     }
 
     /// Owner-only, published the same way as SetAlive: the "out for the last stand" fact MatchDirector's team
@@ -1062,7 +1065,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (!photonView.IsMine)
             return;
 
-        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
+        PlayerProps.Set(photonView.Owner, new Hashtable
         {
             { LastStandKey, outForLastStand },
             { LastStandAtKey, outForLastStand ? (object)(diedAtMs ?? PhotonNetwork.ServerTimestamp) : null },
@@ -1162,7 +1165,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // owner is gone - exactly the body this must hide.
         if (photonView == null || photonView.AmOwner || otherPlayer == null || photonView.Owner != otherPlayer)
             return;
-        if (PresenceRules.IsPresent(otherPlayer.IsInactive))
+        if (PresenceRules.IsPresent(Presence.IsDropped(otherPlayer)))
             return;
         Debug.Log($"[REJOIN] actor {otherPlayer.ActorNumber} dropped - its body is hidden and counts as not alive until it rejoins");
         ApplyAliveState(false);

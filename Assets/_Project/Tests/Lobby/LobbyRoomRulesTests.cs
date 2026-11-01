@@ -26,6 +26,22 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ABotSeatCarriesTheBadgeAfterTheName()
+        {
+            Assert.AreEqual("Mira BOT", LobbyRoomRules.SeatText("Mira", false, false, You, Host, true, " BOT"));
+            Assert.AreEqual("Mira", LobbyRoomRules.SeatText("Mira", false, false, You, Host, false, " BOT"));
+        }
+
+        [Test]
+        public void OnlyTheHostsClickOnABotSeatRemovesTheBot()
+        {
+            Assert.IsTrue(LobbyRoomRules.ClickRemovesBot(true, 1001));
+            Assert.IsFalse(LobbyRoomRules.ClickRemovesBot(false, 1001), "a guest's click asks for the seat as before");
+            Assert.IsFalse(LobbyRoomRules.ClickRemovesBot(true, 3), "a human's seat is never emptied by the host's click");
+            Assert.IsFalse(LobbyRoomRules.ClickRemovesBot(true, 0), "an empty seat");
+        }
+
+        [Test]
         public void ATeamIsCalledByItsNameOrByItsNumberPlusOne()
         {
             var names = new[] { "White", "Purple", "Cyan" };

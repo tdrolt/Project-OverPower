@@ -464,8 +464,8 @@ namespace Overpower.TestRange
 
         /// <summary>
         /// A dummy has no owner and sends no RPC, so a hit from the LOCAL player's actor number feeds
-        /// CombatEvents and NoteDealtDamage directly instead of PlayerCombatCredit's round trip. That
-        /// lets armor recharge, the zip gun's cooldown reset and ultimate charge be exercised
+        /// that player's CombatFeed, CombatEvents and NoteDealtDamage directly instead of PlayerCombatCredit's
+        /// round trip. That lets armor recharge, the zip gun's cooldown reset and ultimate charge be exercised
         /// single-client against the test range.
         /// </summary>
         private void NotifyLocalCombatCredit(in DamageInfo info, DamageResult result)
@@ -474,7 +474,8 @@ namespace Overpower.TestRange
                 info.SourceActorNumber != PhotonNetwork.LocalPlayer.ActorNumber)
                 return;
 
-            CombatEvents.RaiseDamageDealt(result.Total);
+            CombatFeed feed = CombatFeed.For(PhotonNetwork.LocalPlayer.ActorNumber);
+            feed.RaiseDamageDealt(result.Total);
             // The same "how much" event PlayerCombatCredit.RPC_DamageCredit raises for a real victim,
             // so DamageNumberView need not know whether transform is a player or a dummy.
             CombatEvents.RaiseHitReported(transform, result.Total, result.Mark == MarkOutcome.Cashed);
@@ -487,7 +488,7 @@ namespace Overpower.TestRange
             localHealth?.NoteDealtDamage();
 
             if (result.Lethal)
-                CombatEvents.RaiseTakedown(true);
+                feed.RaiseTakedown(true);
         }
 
         private IEnumerator ResetAfterDelay()

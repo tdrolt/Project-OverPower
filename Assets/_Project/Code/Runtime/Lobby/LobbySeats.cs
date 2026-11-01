@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using ExitGames.Client.Photon;
 using Overpower.Data;
+using Overpower.Net;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
@@ -46,6 +47,17 @@ namespace Overpower.Lobby
             if (!hasLayout || !PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null || PhotonNetwork.LocalPlayer == null) return null;
             Dictionary<string, int> fresh = SeatsFrom(PhotonNetwork.CurrentRoom.CustomProperties, layout);
             return LobbySeatRules.SeatOf(PhotonNetwork.LocalPlayer.ActorNumber, layout, fresh);
+        }
+
+        /// <summary>Every bot seat with its team, as the room's properties hold them right now (team seats only).</summary>
+        public List<(int actor, int team)> BotSeatsInRoom()
+        {
+            var bots = new List<(int, int)>();
+            if (!hasLayout) ReadLayout();
+            if (!hasLayout || !PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null) return bots;
+            foreach (var pair in SeatsFrom(PhotonNetwork.CurrentRoom.CustomProperties, layout))
+                if (BotRosterRules.IsBotActor(pair.Value) && LobbySeatRules.TryTeamOfSeat(pair.Key, out int team)) bots.Add((pair.Value, team));
+            return bots;
         }
 
         /// <summary>The name the player typed: what to save for the next lobby, not the numbered copy ("Tudor 2") this lobby may
@@ -99,6 +111,40 @@ namespace Overpower.Lobby
         {
             if (!CanWrite()) return false;
             return Send(LobbySeatRules.LeaveSeat(PhotonNetwork.LocalPlayer.ActorNumber, layout, seats));
+        }
+
+        /// <summary>The host's Add bot (one bot, the first empty seat of team) or Fill with bots (team null: every empty team seat). Names
+        /// come from namePool (never one already in the room, never a build's name), builds by chance. True means the write was sent.</summary>
+        public bool AddBots(int? team, IReadOnlyList<string> namePool, IReadOnlyList<string> buildNames)
+        {
+            if (!CanWrite() || !PhotonNetwork.IsMasterClient) return false;
+            List<string> free = BotSeatRules.FreeTeamSeats(layout, seats, team);
+            if (free.Count == 0) return false;
+            if (team.HasValue) free.RemoveRange(1, free.Count - 1);
+            var taken = new List<string>();
+            foreach (Player p in PhotonNetwork.PlayerList) taken.Add(p.NickName);
+            if (buildNames != null) taken.AddRange(buildNames);
+            var who = new List<(string nick, int build)>();
+            foreach (string _ in free)
+            {
+                string nick = BotSeatRules.PickName(namePool, taken, UnityEngine.Random.Range(0, int.MaxValue));
+                taken.Add(nick);
+                who.Add((nick, BotSeatRules.PickBuild(UnityEngine.Random.Range(0, BotSeatRules.BuildCount))));
+            }
+            Hashtable room = PhotonNetwork.CurrentRoom.CustomProperties;
+            room.TryGetValue(BotRosterRules.NextKey, out object nextSeen);
+            bool sent = Send(BotSeatRules.AddBots(free, who, nextSeen, BotRosterRules.Roster(room), layout, seats));
+            Debug.Log($"[BOTS] add {free.Count} bot(s) to {string.Join(", ", free)}: " + (sent ? "sent" : "not sent"));
+            return sent;
+        }
+
+        /// <summary>The host takes a bot out of the lobby (its seat and its whole record). True means the write was sent.</summary>
+        public bool RemoveBot(int actor)
+        {
+            if (!CanWrite() || !PhotonNetwork.IsMasterClient) return false;
+            bool sent = Send(BotSeatRules.RemoveBot(actor, layout, seats, PhotonNetwork.CurrentRoom.CustomProperties));
+            Debug.Log($"[BOTS] remove bot {actor}: " + (sent ? "sent" : "not sent"));
+            return sent;
         }
 
         /// <summary>Seats change only before Start: this refuses locally once the room's stage is no longer the lobby (the write
@@ -228,7 +274,7 @@ namespace Overpower.Lobby
             seats = SeatsFrom(PhotonNetwork.CurrentRoom.CustomProperties, layout);
             noRole.Clear();
             foreach (Player p in PhotonNetwork.PlayerList)
-                if (!p.IsInactive && LobbySeatRules.SeatOf(p.ActorNumber, layout, seats) == null)
+                if (!Presence.IsDropped(p) && !(p is BotPlayer) && LobbySeatRules.SeatOf(p.ActorNumber, layout, seats) == null)
                     noRole.Add(p.ActorNumber);
             noRole.Sort();
             NoteOwnSeat();
@@ -267,7 +313,7 @@ namespace Overpower.Lobby
                 if (presence.ContainsKey(pair.Value)) continue;
                 presence[pair.Value] = !PhotonNetwork.CurrentRoom.Players.TryGetValue(pair.Value, out Player holder)
                     ? SeatHolderPresence.LeftForGood
-                    : holder.IsInactive ? SeatHolderPresence.Inactive : SeatHolderPresence.Present;
+                    : Presence.IsDropped(holder) ? SeatHolderPresence.Inactive : SeatHolderPresence.Present;
             }
             foreach (SeatWrite write in LobbySeatRules.SweepWrites(seats, presence, StageOfRoom()))
             {
@@ -299,7 +345,7 @@ namespace Overpower.Lobby
             string current = PhotonNetwork.NickName ?? "";
             var others = new List<string>();
             foreach (Player p in PhotonNetwork.PlayerListOthers)
-                if (!p.IsInactive) others.Add(p.NickName);
+                if (!Presence.IsDropped(p)) others.Add(p.NickName);
             string format = config != null ? config.DuplicateNameFormat : LobbyConfig.DefaultDuplicateNameFormat;
             string unique = PlayerNameRules.UniqueName(current, others, format);
             if (unique == current) return;

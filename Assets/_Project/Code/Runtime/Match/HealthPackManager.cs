@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Overpower.Arena;
 using Overpower.Data;
+using Overpower.Net;
 using Overpower.UI;
 using Photon.Pun;
 using Photon.Realtime;
@@ -15,7 +16,8 @@ namespace Overpower.Match
     /// packs, and on the 2v2 map extra health packs. Walk over one hurt (an ultimate pack: with room in your meter) and alive and it
     /// gives, then it is gone for everyone until it returns.
     /// State: ONE Room Property per pack, "hp" + index, written ONLY by the master with a check-and-set; a player asks through
-    /// its own Player Property "hpReq" and heals when it READS the echo naming it, never on the send. No RPC. Every client
+    /// its own Player Property "hpReq" and heals when it READS the echo naming it, never on the send (a bot has no connection to ask with:
+    /// the host takes for it, TryTakeForBot, and heals it on the same read). No RPC. Every client
     /// builds and draws the packs itself from the room and the server clock alone, so all agree; a pack whose zone the map
     /// shrink put out of play is hidden and cannot be taken. The decisions and the values' layout live in HealthPackRules.
     /// </summary>
@@ -66,6 +68,15 @@ namespace Overpower.Match
         private UltimateCharge localUltimate;
         private readonly Dictionary<int, int> lastHandledByActor = new Dictionary<int, int>();
 
+        // The host's side of each bot's takes, the counters the human keeps in nextRequestId / lastHealedRequestId.
+        private sealed class BotTakes
+        {
+            public int latestRequestId;
+            public int lastHealedRequestId;
+        }
+
+        private readonly Dictionary<int, BotTakes> botTakes = new Dictionary<int, BotTakes>();
+
         /// <summary>Diagnostics for tests and recordings.</summary>
         public int HealsApplied { get; private set; }
         public int UltimateGrantsApplied { get; private set; }
@@ -96,6 +107,56 @@ namespace Overpower.Match
             worldPosition = pack.centre;
             ready = pack.view.ShownReady;
             return true;
+        }
+
+        /// <summary>One pack as a bot brain needs it: its id (what TryTakeForBot takes), where it stands, which kind, and whether it can be
+        /// taken at this moment.</summary>
+        public readonly struct PackStatus
+        {
+            public readonly int Id;
+            public readonly Vector3 Position;
+            public readonly bool IsUltimate;
+            public readonly bool Available;
+
+            public PackStatus(int id, Vector3 position, bool isUltimate, bool available)
+            {
+                Id = id;
+                Position = position;
+                IsUltimate = isUltimate;
+                Available = available;
+            }
+        }
+
+        /// <summary>Fills <paramref name="into"/> (cleared first) with every pack in play; empty until the server clock has synced.</summary>
+        public void ListPacks(List<PackStatus> into)
+        {
+            into.Clear();
+            int now = PhotonNetwork.InRoom ? PhotonNetwork.ServerTimestamp : 0;
+            if (config == null || now == 0)
+                return;
+
+            MatchDirector match = MatchDirector.Instance;
+            foreach (Pack pack in packs.Values)
+                if (InPlay(pack, match))
+                    into.Add(new PackStatus(pack.zone, pack.centre, pack.ultimate, IsPackAvailable(pack, now, match)));
+        }
+
+        /// <summary>How close a body has to be to a pack to take it.</summary>
+        public float PickupRadius => config != null ? config.PickupRadius : 0f;
+
+        /// <summary>Whether this body would take the pack but for where it stands: alive, hurt enough (an ultimate pack: a meter with room left),
+        /// the pack ready and in play. What a bot brain asks before it walks to a pack.</summary>
+        public bool BodyMayTake(PhotonView body, int packId)
+        {
+            int now = PhotonNetwork.InRoom ? PhotonNetwork.ServerTimestamp : 0;
+            if (config == null || body == null || now == 0 || !packs.TryGetValue(packId, out Pack pack))
+                return false;
+            PlayerHealth health = body.GetComponent<PlayerHealth>();
+            if (health == null)
+                return false;
+
+            MatchDirector match = MatchDirector.Instance;
+            return MayTake(pack, health, body.GetComponent<UltimateCharge>(), IsPackAvailable(pack, now, match), InPlay(pack, match));
         }
 
         private void Awake()
@@ -275,7 +336,7 @@ namespace Overpower.Match
                 if (Time.unscaledTime < nextLocalSearchAt) return;
                 nextLocalSearchAt = Time.unscaledTime + LocalPlayerSearchSeconds;
                 foreach (PlayerHealth candidate in FindObjectsByType<PlayerHealth>(FindObjectsSortMode.None))
-                    if (candidate.HasLocalAuthority) { localHealth = candidate; break; }
+                    if (BodyRole.IsLocalHuman(candidate.GetComponent<PhotonView>())) { localHealth = candidate; break; }
                 if (localHealth == null) return;
                 localUltimate = localHealth.GetComponent<UltimateCharge>();
             }
@@ -292,10 +353,7 @@ namespace Overpower.Match
 
                 bool inPlay = InPlay(pack, match);
                 bool available = IsPackAvailable(pack, now, match);
-                bool mayTake = pack.ultimate
-                    ? HealthPackRules.MayTakeUltimate(localHealth.IsAlive, localUltimate == null || localUltimate.IsFull, available, inPlay)
-                    : HealthPackRules.MayTake(localHealth.IsAlive, localHealth.Health, localHealth.MaxHealth, config.MinimumMissingHealth, available, inPlay);
-                if (!mayTake)
+                if (!MayTake(pack, localHealth, localUltimate, available, inPlay))
                     continue;
                 if (pack.attempts >= config.MaxAttemptsPerVisit)
                     continue;
@@ -307,8 +365,43 @@ namespace Overpower.Match
                 pack.requestSentAt = Time.unscaledTime;
                 pack.attempts++;
                 RequestsSent++;
-                PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RequestKey, new[] { pack.zone, nextRequestId } } });
+                PlayerProps.Set(PhotonNetwork.LocalPlayer, new Hashtable { { RequestKey, new[] { pack.zone, nextRequestId } } });
             }
+        }
+
+        /// <summary>The body's own side of a take, one rule for the human's request and the bot's: alive, and hurt enough (an ultimate pack: a meter
+        /// with room left), with the pack ready and in play.</summary>
+        private bool MayTake(Pack pack, PlayerHealth health, UltimateCharge ultimate, bool available, bool inPlay) =>
+            pack.ultimate
+                ? HealthPackRules.MayTakeUltimate(health.IsAlive, ultimate == null || ultimate.IsFull, available, inPlay)
+                : HealthPackRules.MayTake(health.IsAlive, health.Health, health.MaxHealth, config.MinimumMissingHealth, available, inPlay);
+
+        /// <summary>The host takes a pack for a bot standing at it. The body-side check is the human's (MayTake) and the decision is the master's
+        /// (HealthPackRules.Decide through Grant), run here directly because the host is the master. The take is written to the room and the bot is
+        /// healed when the host reads that value back, as for anyone else. False when this is not the host, the pack is unknown, out of reach or not
+        /// for this body, or the room refused the write.</summary>
+        public bool TryTakeForBot(PhotonView botBody, int packId)
+        {
+            int now = PhotonNetwork.InRoom ? PhotonNetwork.ServerTimestamp : 0;
+            if (config == null || now == 0 || !PhotonNetwork.IsMasterClient || !BodyRole.IsBot(botBody) || !botBody.IsMine
+                || !packs.TryGetValue(packId, out Pack pack))
+                return false;
+            PlayerHealth health = botBody.GetComponent<PlayerHealth>();
+            if (health == null)
+                return false;
+
+            float distance = FlatDistance(BodyPosition(health), pack.centre);
+            MatchDirector match = MatchDirector.Instance;
+            if (distance > config.PickupRadius
+                || !MayTake(pack, health, botBody.GetComponent<UltimateCharge>(), IsPackAvailable(pack, now, match), InPlay(pack, match)))
+                return false;
+
+            int actor = botBody.OwnerActorNr;
+            if (!botTakes.TryGetValue(actor, out BotTakes takes))
+                botTakes[actor] = takes = new BotTakes();
+            // Counted before the write: an offline room reads its own value back inside Grant.
+            int requestId = ++takes.latestRequestId;
+            return Grant(pack, actor, requestId, health.IsAlive, distance <= config.PickupRadius + config.HostSlackMetres, now, match);
         }
 
         /// <summary>The Rigidbody's own position: the Transform lags a physics step behind a teleport.</summary>
@@ -325,6 +418,7 @@ namespace Overpower.Match
         public override void OnJoinedRoom()
         {
             packsSettled = false; // a new room may be another mode
+            botTakes.Clear();
             if (PhotonNetwork.LocalPlayer == null
                 || !PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(RequestKey, out object raw)
                 || !(raw is int[] last) || last.Length < 2)
@@ -355,27 +449,33 @@ namespace Overpower.Match
                 return;
 
             bool alive = !(targetPlayer.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object a) && a is bool isAlive && !isAlive);
-            MatchDirector match = MatchDirector.Instance;
+            Grant(pack, targetPlayer.ActorNumber, requestId, alive, RequesterInRange(targetPlayer.ActorNumber, pack), now, MatchDirector.Instance);
+        }
+
+        /// <summary>The master's decision for one request, from a player's property or a bot's own call: decided against the pack's latest value
+        /// (this master's own write still on its way included), written with a check-and-set. True when the write was sent.</summary>
+        private bool Grant(Pack pack, int actor, int requestId, bool alive, bool inRange, int now, MatchDirector match)
+        {
             bool inPlay = InPlay(pack, match);
-            bool inRange = RequesterInRange(targetPlayer.ActorNumber, pack);
 
             int[] roomValue = ReadRoomValue(pack.key);
             int[] basis = pack.pending != null && Time.unscaledTime < pack.pendingUntil ? pack.pending : roomValue;
             HealthPackRules.Decision decision = HealthPackRules.Decide(basis, now, alive, inPlay, inRange,
-                                                                       targetPlayer.ActorNumber, requestId, RespawnMsOf(pack), LiveAtMs(match));
+                                                                       actor, requestId, RespawnMsOf(pack), LiveAtMs(match));
             if (!decision.Granted)
-                return;
+                return false;
 
             var props = new Hashtable { { pack.key, decision.NewValue } };
             // Check-and-set on what the master decided from (absent = never taken): a stale basis is refused by
             // the server instead of overwriting.
             var expected = new Hashtable { { pack.key, roomValue } };
             if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props, expected))
-                return;
+                return false;
 
             pack.pending = decision.NewValue;
             pack.pendingUntil = Time.unscaledTime + config.PendingWriteSeconds;
             GrantsWritten++;
+            return true;
         }
 
         private bool RequesterInRange(int actor, Pack pack)
@@ -414,24 +514,50 @@ namespace Overpower.Match
                     PickupRingsView.Play(PlayerLookup.GetPhotonViewFor(value[1]), config, config.UltimatePackColour,
                                          theme != null && theme.arenaLook != null ? theme.arenaLook.fxAlpha : null);
 
-                if (localHealth == null)
-                    continue;
-                if (!HealthPackRules.EchoIsMyFreshTake(value, PhotonNetwork.LocalPlayer.ActorNumber, nextRequestId,
-                                                       lastHealedRequestId, PhotonNetwork.ServerTimestamp, RespawnMsOf(pack)))
-                    continue;
-
-                lastHealedRequestId = nextRequestId;
-                if (pack.ultimate)
+                if (localHealth != null
+                    && HealthPackRules.EchoIsMyFreshTake(value, PhotonNetwork.LocalPlayer.ActorNumber, nextRequestId,
+                                                         lastHealedRequestId, PhotonNetwork.ServerTimestamp, RespawnMsOf(pack)))
                 {
-                    if (localUltimate != null)
-                    {
-                        localUltimate.AddFraction(config.UltimateChargeFraction);
-                        UltimateGrantsApplied++;
-                    }
+                    lastHealedRequestId = nextRequestId;
+                    ApplyPack(pack, localHealth, localUltimate);
                 }
-                else if (localHealth.Heal(pack.healAmount) > 0f)
-                    HealsApplied++;
+
+                HealBotTaker(pack, value);
             }
+        }
+
+        /// <summary>The taker is a bot this host took the pack for: heal it on the same read of the room value that heals a human.</summary>
+        private void HealBotTaker(Pack pack, int[] value)
+        {
+            if (value.Length < HealthPackRules.ValueLength)
+                return;
+            int actor = value[HealthPackRules.TakerActorIndex];
+            if (!botTakes.TryGetValue(actor, out BotTakes takes))
+                return;
+            PhotonView body = PlayerLookup.GetPhotonViewFor(actor);
+            if (body == null || !body.IsMine
+                || !HealthPackRules.EchoIsMyFreshTake(value, actor, takes.latestRequestId, takes.lastHealedRequestId,
+                                                      PhotonNetwork.ServerTimestamp, RespawnMsOf(pack)))
+                return;
+
+            takes.lastHealedRequestId = takes.latestRequestId;
+            PlayerHealth health = body.GetComponent<PlayerHealth>();
+            if (health != null)
+                ApplyPack(pack, health, body.GetComponent<UltimateCharge>());
+        }
+
+        private void ApplyPack(Pack pack, PlayerHealth health, UltimateCharge ultimate)
+        {
+            if (pack.ultimate)
+            {
+                if (ultimate != null)
+                {
+                    ultimate.AddFraction(config.UltimateChargeFraction);
+                    UltimateGrantsApplied++;
+                }
+            }
+            else if (health.Heal(pack.healAmount) > 0f)
+                HealsApplied++;
         }
 
         // ---- helpers -------------------------------------------------------------------------------

@@ -208,6 +208,29 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         return Overpower.Dominion.DominionTerritoryRules.IsSpawn(Overpower.Dominion.DominionMode.IsActive(), isCapital);
     }
 
+    // Made once: a lambda written at the call would be a new object every time a bot asks.
+    private System.Func<int, bool> zoneLinkClosed;
+    private System.Func<int, bool> zoneOutOfPlay;
+
+    /// <summary>Whether <paramref name="team"/> may take <paramref name="zone"/> from where the map stands right now: the question a tower asks
+    /// of a team standing in it each frame (TerritoryMap.MayCapture: next to a zone the team owns that is not under attack, or its own capital;
+    /// never a zone out of play), and the zone must be capturable in this room at all. What a bot brain asks before it picks a zone to walk to.
+    /// False while the territory is not known yet.</summary>
+    public bool MayTeamCapture(int team, int zone)
+    {
+        if (map == null || CurrentOwners == null || !IsCapturableZone(zone))
+            return false;
+
+        if (zoneLinkClosed == null)
+        {
+            System.Func<int, bool> capturable = IsCapturableZone;
+            System.Func<int, bool> underAttack = other => ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(other);
+            zoneLinkClosed = other => ZoneThreat.ZoneClosesLink(other, capturable, underAttack);
+            zoneOutOfPlay = other => MatchDirector.Instance != null && MatchDirector.Instance.IsOutOfPlay(other);
+        }
+        return map.MayCapture(team, zone, CurrentOwners, zoneLinkClosed, zoneOutOfPlay);
+    }
+
     /// <summary>The tower's own tier as set in the scene: PhaseTwoCutRules finds the cut from this, never from the
     /// phase-two stand-in (TierOf below), or a cut corner's Tier III towers would stop reading as Tier III to the very
     /// rule that finds them. 0 while the tower with that id hasn't registered yet (RegisterCapture runs in

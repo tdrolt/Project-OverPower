@@ -76,6 +76,19 @@ namespace Overpower.Telemetry
         // Spectators this master has already noted with a marker (cleared when the room is left).
         private readonly HashSet<int> spectatorsNoted = new HashSet<int>();
 
+        // Bots this master has already noted with a marker (cleared when the room is left).
+        private readonly HashSet<int> botsNoted = new HashSet<int>();
+
+        // A bot has no client, so the host writes its file: one writer per bot actor, with the lines queued while it cannot open yet.
+        private sealed class BotLog
+        {
+            public readonly TelemetryWriter Writer = new TelemetryWriter();
+            public readonly PendingLineBuffer Pending = new PendingLineBuffer(MaxPendingLines);
+        }
+
+        private readonly Dictionary<int, BotLog> botLogs = new Dictionary<int, BotLog>();
+        private bool botLogOpened;
+
         // The game modes, to name a lobby's mode in the log folder and the lobby-created marker (read from the RoomManager once, lazily).
         private GameModeCatalogue modeCatalogue;
 
@@ -107,6 +120,9 @@ namespace Overpower.Telemetry
 
         /// <summary>True once this client's file has been opened and the session header written.</summary>
         public bool IsRecording => writer.IsOpen;
+
+        /// <summary>True once the host has opened a file for a bot (MatchLogZip then adds the bots' files to the host's zip).</summary>
+        public bool HasBotLogs => botLogOpened;
 
         /// <summary>Raised right before the writer closes in every path that can end it (quit, leaving the room, destroy), so a
         /// recorder with buffered totals (PlayerTelemetry's `shots`/`dot` accumulators) gets one last chance to flush through Log.
@@ -160,19 +176,21 @@ namespace Overpower.Telemetry
 
         private void Update()
         {
-            if (config == null || !config.Enabled || !writer.IsOpen) return;
+            if (config == null || !config.Enabled || !(writer.IsOpen || botLogOpened)) return;
 
             flushTimer += Time.unscaledDeltaTime;
             if (flushTimer < config.FlushIntervalSeconds) return;
 
             flushTimer = 0f;
             writer.Flush();
+            FlushBotLogs();
         }
 
         private void OnApplicationQuit()
         {
             BeforeClose?.Invoke();
             writer.Close();
+            CloseBotLogs();
         }
 
         private void OnDestroy()
@@ -188,6 +206,7 @@ namespace Overpower.Telemetry
 
             BeforeClose?.Invoke();
             writer.Close();
+            CloseBotLogs();
             if (Instance == this) Instance = null;
         }
 
@@ -203,6 +222,9 @@ namespace Overpower.Telemetry
             string roomName = PhotonNetwork.CurrentRoom.Name; int me = PhotonNetwork.LocalPlayer.ActorNumber;
             if (localJoin.OnJoinedRoom(TelemetryWrittenMemory.Process, roomName, me, writer.IsOpen))
                 LogJoinOrLeave(TelemetryKeys.Join, PhotonNetwork.LocalPlayer);
+            // A scene that loads inside the room finds its bots already there: no enter callback comes for them.
+            foreach (Player player in PhotonNetwork.CurrentRoom.Players.Values)
+                NoteBot(player);
         }
 
         public override void OnLeftRoom()
@@ -210,12 +232,16 @@ namespace Overpower.Telemetry
             BeforeClose?.Invoke();
             writer.Close();
             writer = new TelemetryWriter(); // Fresh writer for the next match (see the field's comment).
+            CloseBotLogs();
+            botLogs.Clear();
+            botLogOpened = false;
             CurrentFolder = null;
             matchId = null;
             matchStartMs = 0;
             pending.Clear();
             localJoin.Reset();
             spectatorsNoted.Clear();
+            botsNoted.Clear();
             TelemetryWrittenMemory.Process.ForgetAll(); // leaving the room: the next one (or this one again) is a new beginning
             if (claimIdentityRoutine != null)
             {
@@ -231,7 +257,11 @@ namespace Overpower.Telemetry
             DropMarker(LobbyMarkerNotes.LobbyCreated(LobbyNameOfRoom(), ModeNameOfRoom()));
         }
 
-        public override void OnPlayerEnteredRoom(Player newPlayer) => LogJoinOrLeave(TelemetryKeys.Join, newPlayer);
+        public override void OnPlayerEnteredRoom(Player newPlayer)
+        {
+            LogJoinOrLeave(TelemetryKeys.Join, newPlayer);
+            NoteBot(newPlayer);
+        }
 
         public override void OnPlayerLeftRoom(Player otherPlayer) => LogJoinOrLeave(TelemetryKeys.Leave, otherPlayer);
 
@@ -252,7 +282,10 @@ namespace Overpower.Telemetry
                 // The new host notes the change, and every spectator it can already see (the old host may have left before it did).
                 DropMarker(LobbyMarkerNotes.HostChanged(newMasterClient.ActorNumber, newMasterClient.NickName ?? ""));
                 foreach (Player player in PhotonNetwork.PlayerList)
+                {
                     NoteSpectator(player);
+                    NoteBot(player);
+                }
             }
         }
 
@@ -290,6 +323,15 @@ namespace Overpower.Telemetry
             DropMarker(LobbyMarkerNotes.SpectatorSeen(player.ActorNumber));
         }
 
+        /// <summary>Master only: one marker per bot the host sees, so the report knows a bot is a seat the host plays and not a player whose
+        /// log went missing.</summary>
+        private void NoteBot(Player player)
+        {
+            if (!(player is BotPlayer) || !PhotonNetwork.IsMasterClient) return;
+            if (!botsNoted.Add(player.ActorNumber)) return;
+            DropMarker(LobbyMarkerNotes.BotSeen(player.ActorNumber, player.NickName ?? ""));
+        }
+
         private void LogJoinOrLeave(string eventName, Player player)
         {
             if (player == null) return;
@@ -301,6 +343,12 @@ namespace Overpower.Telemetry
             // doesn't need it: whichever client logged the join has it.
             if (eventName == TelemetryKeys.Join)
                 line.String(TelemetryKeys.Nick, player.NickName ?? "");
+            if (player is BotPlayer bot)
+            {
+                line.Bool(TelemetryKeys.Bot, true);
+                if (eventName == TelemetryKeys.Join)
+                    line.Int(TelemetryKeys.BotBuild, bot.Build);
+            }
             Log(line);
         }
 
@@ -516,9 +564,9 @@ namespace Overpower.Telemetry
             CurrentFolder = folder;
 
             if (TelemetryWrittenMemory.Process.FirstTime("session", PhotonNetwork.CurrentRoom.Name, actor))
-                WriteSessionLine();
+                WriteSessionLine(PhotonNetwork.LocalPlayer, writer);
             if (pending.Dropped > 0)
-                WriteDroppedNote(pending.Dropped);
+                WriteDroppedNote(pending.Dropped, actor, writer);
             foreach (string waiting in pending.Lines)
                 writer.Write(waiting);
             pending.Clear();
@@ -594,33 +642,96 @@ namespace Overpower.Telemetry
         }
 
         /// <summary>The one line that says how many of the earliest pending lines were dropped (PendingLineBuffer).</summary>
-        private void WriteDroppedNote(int count)
+        private void WriteDroppedNote(int count, int actor, TelemetryWriter target)
         {
             line.Begin(TelemetryKeys.Marker, Now);
-            line.Int(TelemetryKeys.Actor, PhotonNetwork.LocalPlayer.ActorNumber);
+            line.Int(TelemetryKeys.Actor, actor);
             line.String(TelemetryKeys.Note, LobbyMarkerNotes.EarlyLinesDropped(count));
-            writer.Write(line.End());
+            target.Write(line.End());
         }
 
-        private void WriteSessionLine()
+        /// <summary>The header of one player's file: this client's own, or a bot's (marked bot, never the master).</summary>
+        private void WriteSessionLine(Player player, TelemetryWriter target)
         {
-            bool spectator = Teams.IsSpectator(PhotonNetwork.LocalPlayer);
+            bool spectator = Teams.IsSpectator(player);
             int team = -1;
-            if (!spectator && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int own)) team = own;
+            if (!spectator && Teams.TryGetTeam(player, out int own)) team = own;
 
             line.Begin(TelemetryKeys.Session, Now);
             line.Int(TelemetryKeys.Schema, TelemetryKeys.SchemaVersion);
             line.String(TelemetryKeys.MatchId, matchId);
-            line.Int(TelemetryKeys.Actor, PhotonNetwork.LocalPlayer.ActorNumber);
-            line.String(TelemetryKeys.Nick, PhotonNetwork.LocalPlayer.NickName ?? "");
+            line.Int(TelemetryKeys.Actor, player.ActorNumber);
+            line.String(TelemetryKeys.Nick, player.NickName ?? "");
             line.Int(TelemetryKeys.Team, team);
-            line.Bool(TelemetryKeys.IsMaster, PhotonNetwork.IsMasterClient);
+            line.Bool(TelemetryKeys.IsMaster, !(player is BotPlayer) && PhotonNetwork.IsMasterClient);
             if (spectator) line.Bool(TelemetryKeys.Spectator, true);
+            if (player is BotPlayer bot)
+            {
+                line.Bool(TelemetryKeys.Bot, true);
+                line.Int(TelemetryKeys.BotBuild, bot.Build);
+            }
             line.String(TelemetryKeys.Commit, ReadCommitHash());
             line.String(TelemetryKeys.UnityVersion, Application.unityVersion);
             line.String(TelemetryKeys.Platform, Application.platform.ToString());
             line.Raw(TelemetryKeys.Tuning, TuningSnapshot.Json(territoryConfig, gameplayConfig, armorConfig, config, weapons, abilities));
-            writer.Write(line.End());
+            target.Write(line.End());
+        }
+
+        // ---------------------------------------------------------------- bot files
+
+        /// <summary>Opens a bot's own file ("{actor}_{nick}.jsonl", session line marked bot) once the match is known and the bot is on a
+        /// team in a started lobby, as a player's opens; the host writes it because the bot has no client. The lines queued meanwhile
+        /// follow the header.</summary>
+        private void TryOpenBotFile(int actor, BotLog log)
+        {
+            if (log.Writer.IsOpen || log.Writer.Disabled) return;
+            if (string.IsNullOrEmpty(matchId) || !PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null) return;
+            if (!(PhotonNetwork.CurrentRoom.GetPlayer(actor) is BotPlayer bot)) return;
+            if (!TelemetryRoleRule.MayOpenFile(false, Teams.TryGetTeam(bot, out _), true, LobbyStageNow)) return;
+
+            string folder = CurrentFolder ?? ResolveMatchFolder();
+            log.Writer.Open(Path.Combine(folder, $"{actor}_{Sanitize(bot.NickName)}.jsonl"));
+            if (log.Writer.Disabled) return;
+            botLogOpened = true;
+
+            if (TelemetryWrittenMemory.Process.FirstTime("session", PhotonNetwork.CurrentRoom.Name, actor))
+                WriteSessionLine(bot, log.Writer);
+            if (log.Pending.Dropped > 0)
+                WriteDroppedNote(log.Pending.Dropped, actor, log.Writer);
+            foreach (string waiting in log.Pending.Lines)
+                log.Writer.Write(waiting);
+            log.Pending.Clear();
+            log.Writer.Flush();
+        }
+
+        /// <summary>PlayerTelemetry on a bot's body writes through here instead of <see cref="Log"/>: the bot's facts go to the bot's own
+        /// file, never into the host's. Queued like Log until that file can open.</summary>
+        public void LogBot(int actor, TelemetryLine botLine)
+        {
+            if (config == null || !config.Enabled) return;
+            if (!botLogs.TryGetValue(actor, out BotLog log))
+                botLogs[actor] = log = new BotLog();
+            if (log.Writer.Disabled) return;
+
+            string text = botLine.End();
+            if (!log.Writer.IsOpen)
+                TryOpenBotFile(actor, log);
+            if (log.Writer.IsOpen)
+                log.Writer.Write(text);
+            else
+                log.Pending.Add(text);
+        }
+
+        private void FlushBotLogs()
+        {
+            foreach (BotLog log in botLogs.Values)
+                log.Writer.Flush();
+        }
+
+        private void CloseBotLogs()
+        {
+            foreach (BotLog log in botLogs.Values)
+                log.Writer.Close();
         }
 
         private static string ReadCommitHash()
@@ -791,6 +902,10 @@ namespace Overpower.Telemetry
 
         /// <summary>Flushes whatever is buffered to disk now, regardless of FlushIntervalSeconds' timer (MatchLogZip calls it before
         /// reading the folder). No-op if the writer never opened or is disabled.</summary>
-        public void FlushNow() => writer.Flush();
+        public void FlushNow()
+        {
+            writer.Flush();
+            FlushBotLogs();
+        }
     }
 }

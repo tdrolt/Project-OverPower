@@ -55,8 +55,8 @@ namespace Overpower.Weapons
         public Action<ProjectileHitInfo> OnAbilityHit { get; }
 
         /// <summary>ActorNumber of whoever pulled the trigger (or cast the ability). Inside the fire
-        /// RPC this comes from PhotonMessageInfo.Sender, never PhotonNetwork.LocalPlayer - see
-        /// DamageInfo's own note on why getting this wrong hands kill credit to the victim.</summary>
+        /// RPC this comes from the shooting body's photonView.Owner, never PhotonNetwork.LocalPlayer
+        /// or PhotonMessageInfo.Sender - see DamageInfo's own note.</summary>
         public int ShooterActorNumber { get; }
 
         /// <summary>The shooter's team, so the sweep can fly straight through teammates instead of

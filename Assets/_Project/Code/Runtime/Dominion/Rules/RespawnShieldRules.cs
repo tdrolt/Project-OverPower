@@ -110,8 +110,8 @@ namespace Overpower.Dominion
             return unchecked(effectPlacedMs - shieldStartMs) < 0;
         }
 
-        /// <summary>What the attacker's client does when its own player's stun, slow, burn or push reaches its copy of someone else: Report =
-        /// tell the attacker's shield (the victim is a living enemy and the effect is this client's own player's), with whether the victim's shield
+        /// <summary>What the attacker's client does when the stun, slow, burn or push of a seat it plays reaches someone else's body: Report =
+        /// tell the attacker's shield (the victim is a living enemy and the effect is that seat's), with whether the victim's shield
         /// stopped it and whether the effect was set up before the attacker's current shield (A25/A26).</summary>
         public readonly struct EffectReportDecision
         {
@@ -122,13 +122,14 @@ namespace Overpower.Dominion
             { Report = report; VictimShielded = victimShielded; FromBeforeRespawn = fromBeforeRespawn; }
         }
 
-        /// <summary>The attacker's side of A25/A26 for a status or push, judged on the attacker's own copy of the victim (isMine = that copy is the
-        /// local player's own, so nothing is reported - the victim's own client has the real answer). A teammate, a dead victim or someone else's
-        /// effect is no business of this client's shield. The effect's setup time is compared with myShieldStartMs, the dShs this client wrote.</summary>
-        public static EffectReportDecision EffectReport(bool victimIsMine, bool sourceIsMe, bool victimAlive, bool sameTeam,
+        /// <summary>The attacker's side of A25/A26 for a status or push, judged on the body this client simulates the effect on (victimIsSource = that
+        /// body is the attacker's own, so nothing is reported). An effect of a seat this client does not simulate, a teammate and a dead victim are no
+        /// business of this client's shield. sourceSimulatedHere = this client simulates the attacker's body: its own player's, or on the host a bot's.
+        /// The effect's setup time is compared with myShieldStartMs, the attacker's dShs.</summary>
+        public static EffectReportDecision EffectReport(bool victimIsSource, bool sourceSimulatedHere, bool victimAlive, bool sameTeam,
                                                         bool victimShielded, int effectPlacedMs, int myShieldStartMs)
         {
-            if (victimIsMine || !sourceIsMe || !victimAlive || OriginOf(false, sameTeam) != Origin.Enemy)
+            if (victimIsSource || !sourceSimulatedHere || !victimAlive || OriginOf(false, sameTeam) != Origin.Enemy)
                 return new EffectReportDecision(false, false, false);
             return new EffectReportDecision(true, victimShielded, IsFromBeforeRespawn(effectPlacedMs, myShieldStartMs));
         }

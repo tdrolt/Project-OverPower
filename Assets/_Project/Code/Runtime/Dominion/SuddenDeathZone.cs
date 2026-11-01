@@ -13,9 +13,10 @@ namespace Overpower.Dominion
     /// The sudden-death circle, on every client; added at runtime next to DominionDirector. It works the circle out from the room alone (the start
     /// dSd, the server clock and the config), so it is the same size on every screen at the same moment. It draws a red ring and a red tint outside
     /// it (flat meshes with no collider: they hide no player and block no shot or sight), answers IsSuddenDeath / CurrentRadius /
-    /// SecondsUntilStopped / Centre for the minimap, banner and shrink timer, and costs this client's own living player on a playing team Damage
-    /// Per Second Outside. That cost is victim-side through PlayerHealth's one funnel, as a SuddenDeath hit with no attacker; Invulnerability does
-    /// not stop it (A30). It is added up every frame and applied every DamageTickSeconds, so the rate is exact whatever the frame rate.
+    /// SecondsUntilStopped / Centre for the minimap, banner and shrink timer, and costs every living body this client simulates (its own player's and,
+    /// on the host, each bot's) on a playing team Damage Per Second Outside. That cost is victim-side through PlayerHealth's one funnel, as a
+    /// SuddenDeath hit with no attacker; Invulnerability does not stop it (A30). It is added up every frame and applied every DamageTickSeconds,
+    /// so the rate is exact whatever the frame rate.
     /// </summary>
     public sealed class SuddenDeathZone : MonoBehaviour
     {
@@ -63,8 +64,9 @@ namespace Overpower.Dominion
         private float drawnRadius = -1f;
         private bool setupErrorLogged;
 
-        private float owedDamage;
-        private float sinceDamageTick;
+        // One account per body this client simulates, by actor: the human's and, on the host, each bot's.
+        private readonly Dictionary<int, OutsideDamageMeter> meters = new Dictionary<int, OutsideDamageMeter>();
+        private readonly List<PhotonView> controlled = new List<PhotonView>();
 
         private void Awake()
         {
@@ -152,32 +154,33 @@ namespace Overpower.Dominion
         {
             if (!IsSuddenDeath || !PhotonNetwork.InRoom)
             {
-                owedDamage = sinceDamageTick = 0f;
+                meters.Clear();
                 return;
             }
-            PhotonView view = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
-            PlayerHealth health = view != null ? view.GetComponent<PlayerHealth>() : null;
-            PlayerLifecycle lifecycle = view != null ? view.GetComponent<PlayerLifecycle>() : null;
             DominionConfig config = DominionMode.Config();
-            if (health == null || lifecycle == null || config == null || !Teams.TryGetPlayingTeam(PhotonNetwork.LocalPlayer, out int team))
+            BodyRole.ControlledBodies(controlled);
+            if (controlled.Count == 0) meters.Clear();
+            foreach (PhotonView view in controlled)
             {
-                owedDamage = sinceDamageTick = 0f;
-                return;
+                if (!meters.TryGetValue(view.OwnerActorNr, out OutsideDamageMeter meter))
+                    meters[view.OwnerActorNr] = meter = new OutsideDamageMeter();
+                PlayerHealth health = view.GetComponent<PlayerHealth>();
+                PlayerLifecycle lifecycle = view.GetComponent<PlayerLifecycle>();
+                if (health == null || lifecycle == null || config == null || !Teams.TryGetPlayingTeam(view.Owner, out int team))
+                {
+                    meter.Reset();
+                    continue;
+                }
+
+                Vector3 at = view.transform.position;
+                float cost = SuddenDeathRules.DamageAt(true, SuddenDeathRules.TeamPlays(team, DominionDirector.Instance.SuddenDeathTeams), lifecycle.IsAlive,
+                    new Vector2(at.x, at.z), Centre, CurrentRadius, config.DamagePerSecondOutside, deltaTime);
+                float due = meter.Add(cost, deltaTime, DamageTickSeconds);
+                if (due <= 0f) continue;
+                // No attacker (actor -1, team -1, no weapon): the funnel treats it as neither self nor teammate damage, and the credit and kill-feed code skips
+                // a source with no actor, as it does for a burn with no owner. Armour absorbs first, like for any hit; Invulnerability does not stop it.
+                health.ApplyDamage(new DamageInfo(due, -1, -1, -1, DamageSource.SuddenDeath, false, at));
             }
-
-            Vector3 at = view.transform.position;
-            owedDamage += SuddenDeathRules.DamageAt(true, SuddenDeathRules.TeamPlays(team, DominionDirector.Instance.SuddenDeathTeams), lifecycle.IsAlive,
-                new Vector2(at.x, at.z), Centre, CurrentRadius, config.DamagePerSecondOutside, deltaTime);
-            sinceDamageTick += deltaTime;
-            if (sinceDamageTick < DamageTickSeconds) return;
-
-            sinceDamageTick = 0f;
-            if (owedDamage <= 0f) return;
-            float amount = owedDamage;
-            owedDamage = 0f;
-            // No attacker (actor -1, team -1, no weapon): the funnel treats it as neither self nor teammate damage, and the credit and kill-feed code skips
-            // a source with no actor, as it does for a burn with no owner. Armour absorbs first, like for any hit; Invulnerability does not stop it.
-            health.ApplyDamage(new DamageInfo(amount, -1, -1, -1, DamageSource.SuddenDeath, false, at));
         }
 
         // ---------------------------------------------------------------- the red in the world

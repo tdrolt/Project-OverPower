@@ -86,6 +86,9 @@ namespace Overpower.Abilities
         private MaterialPropertyBlock anchorBlock;
         private MaterialPropertyBlock ropeBlock;
 
+        // The feed of the actor this body had when it subscribed, so OnDestroy leaves the same one.
+        private CombatFeed takedownFeed;
+
         public override bool IsActive => pulling;
 
         public override void OnEquip()
@@ -100,16 +103,17 @@ namespace Overpower.Abilities
             else if (projectilePrefab.GetComponent<ProjectileMotor>() == null)
                 Debug.LogError($"[ZipGunAbility] {name}: Projectile Prefab '{projectilePrefab.name}' has no ProjectileMotor.");
 
-            // A takedown (kill OR assist) refills the charge immediately instead of waiting out the cooldown.
-            // CombatEvents.LocalTakedown fires only on the machine that earned it, but HandleLocalTakedown still checks
-            // Owner.IsMine: this module is also instantiated on OTHER clients to visualise their loadout, and
-            // RefillCharges is owner only.
-            CombatEvents.LocalTakedown += HandleLocalTakedown;
+            // A takedown (kill OR assist) by THIS body refills the charge immediately instead of waiting out the cooldown.
+            // HandleTakedown still checks Owner.IsMine: this module is also instantiated on OTHER clients to visualise
+            // their loadout, and RefillCharges is owner only.
+            takedownFeed = CombatFeed.For(Owner.ActorNumber);
+            takedownFeed.Takedown += HandleTakedown;
         }
 
         private void OnDestroy()
         {
-            CombatEvents.LocalTakedown -= HandleLocalTakedown;
+            if (takedownFeed != null)
+                takedownFeed.Takedown -= HandleTakedown;
             if (pullRope != null)
                 Destroy(pullRope.gameObject);
         }
@@ -151,7 +155,7 @@ namespace Overpower.Abilities
             (Owner.Displacement as PlayerDisplacement)?.Cancel();
         }
 
-        private void HandleLocalTakedown(bool isKill)
+        private void HandleTakedown(bool isKill)
         {
             if (Owner.IsMine)
                 RefillCharges();

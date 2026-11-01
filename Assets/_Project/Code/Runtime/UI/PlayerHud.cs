@@ -8,6 +8,7 @@ using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Match;
+using Overpower.Net;
 using Overpower.Weapons;
 
 namespace Overpower.UI
@@ -15,7 +16,7 @@ namespace Overpower.UI
     /// <summary>
     /// The local player's own on-screen HUD: health, armor and overheat bars, the weapon slot and the three ability
     /// slots. Built in code like TestRangePanel (every listener sits on its control's line, so nothing is wired to the
-    /// wrong button). SCREEN SPACE, OWNER ONLY (created when photonView.IsMine), unlike HealthBarCanvas, the world-space
+    /// wrong button). SCREEN SPACE, OWNER ONLY (created when BodyRole.IsLocalHuman), unlike HealthBarCanvas, the world-space
     /// bar everyone sees. Polls every value in LateUpdate, so it reads this frame's final state, rather than subscribing
     /// per bar; writes are guarded by change checks so an unmoving bar allocates nothing. The exception is
     /// overheatFill.color, written every frame while warning (to pulse); Graphic.color no-ops when set to its own value.
@@ -236,8 +237,8 @@ namespace Overpower.UI
 
         private void Awake()
         {
-            // Every remote copy stays permanently dormant.
-            if (!photonView.IsMine)
+            // Every remote copy, and every bot body the host controls, stays permanently dormant.
+            if (!BodyRole.IsLocalHuman(photonView))
             {
                 enabled = false;
                 return;

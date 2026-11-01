@@ -151,11 +151,12 @@ namespace Overpower.UI
             foreach (KeyValuePair<int, Player> pair in PhotonNetwork.CurrentRoom.Players)
             {
                 Player p = pair.Value;
-                if (p.IsInactive) { if (!inactiveSince.ContainsKey(pair.Key)) inactiveSince[pair.Key] = Time.unscaledTime; }
+                bool dropped = Presence.IsDropped(p); // a bot is inactive to PUN but never dropped
+                if (dropped) { if (!inactiveSince.ContainsKey(pair.Key)) inactiveSince[pair.Key] = Time.unscaledTime; }
                 else inactiveSince.Remove(pair.Key);
                 if (!Teams.TryGetPlayingTeam(p, out int team) || team < 0 || team >= playersPerTeam.Length) continue;
                 bool timed = inactiveSince.TryGetValue(pair.Key, out float since);
-                if (DominionRules.CountsAsPresent(p.IsInactive, timed, since, Time.unscaledTime, grace)) playersPerTeam[team]++;
+                if (DominionRules.CountsAsPresent(dropped, timed, since, Time.unscaledTime, grace)) playersPerTeam[team]++;
             }
             return playersPerTeam;
         }
@@ -227,7 +228,7 @@ namespace Overpower.UI
         {
             if (PhotonNetwork.LocalPlayer == null) return;
             PhotonView view = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
-            LoadoutScreen shop = view != null ? view.GetComponent<LoadoutScreen>() : null;
+            LoadoutScreen shop = view != null && BodyRole.IsLocalHuman(view) ? view.GetComponent<LoadoutScreen>() : null;
             if (shop != null) shop.Toggle();
         }
 

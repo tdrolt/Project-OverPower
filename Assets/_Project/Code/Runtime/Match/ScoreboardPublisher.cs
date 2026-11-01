@@ -3,21 +3,23 @@ using Photon.Pun;
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
+using Overpower.Net;
 
 namespace Overpower.Match
 {
     /// <summary>
     /// The scoreboard's numbers (D12, hold Tab): counts THIS player's own kills, deaths, assists, damage dealt and
     /// zones captured, and publishes them as one Player Property, "sb" = int[] { kills, deaths, assists, damage,
-    /// captures } (ScoreboardRules.Key and its index constants). Owner only - every remote copy is dormant, and it
-    /// is the only writer of this player's "sb", so nobody can overwrite it and no RPC is needed. A late joiner
-    /// gets everyone's numbers with the room's Player Properties.
+    /// captures } (ScoreboardRules.Key and its index constants). Only the client that controls the body - the human's own,
+    /// or the host for a bot's - runs it; every other copy is dormant. It is the only writer of this player's "sb" (a
+    /// bot's goes through PlayerProps), so nobody can overwrite it and no RPC is needed. A late joiner gets everyone's
+    /// numbers with the room's Player Properties.
     ///
     /// Where each number comes from (all on this player's own client):
-    ///  - kills / assists / damage: CombatEvents.LocalPlayerCredit, raised ONLY when a real player's client sends
-    ///    this player its credit (PlayerCombatCredit.RPC_DamageCredit). Not LocalDamageDealt/LocalTakedown: the
-    ///    test-range dummies raise those too, and dummy hits must not count. Gated on IsMine like UltimateCharge
-    ///    (those static events belong to whoever is local).
+    ///  - kills / assists / damage: this body's CombatFeed credit, raised ONLY when a real player's client sends
+    ///    this player its credit (PlayerCombatCredit.RPC_DamageCredit). Not DamageDealt/Takedown: the
+    ///    test-range dummies raise those too, and dummy hits must not count. Gated on IsMine like UltimateCharge,
+    ///    and on this body's own feed, so the host's human and its bots never count each other's hits.
     ///  - deaths: PlayerHealth.Died, which every kind of death goes through.
     ///  - zones captured: BuildingCapture.ZoneFlipped, raised on every client when a zone flips; this client asks
     ///    BuildingManager.TryGetZoneAt whether its own body is in that zone (ScoreTally.NoteCapture). The capture
@@ -27,7 +29,8 @@ namespace Overpower.Match
     /// tally and publishes at once (the warm-up does not count, matching the match report).
     ///
     /// Publishing is throttled (ScorePublishThrottle, GameplayConfig.ScoreboardPublishesPerSecond); a kill, death
-    /// or capture goes out at once. Built and attached by PlayerHud, which is the owner-only UI root.
+    /// or capture goes out at once. Built and attached by PlayerHud, which is the owner-only UI root (for a bot, by whatever
+    /// spawns it).
     /// </summary>
     public sealed class ScoreboardPublisher : MonoBehaviour
     {
@@ -41,8 +44,10 @@ namespace Overpower.Match
         private ScoreTally tally;
         private ScorePublishThrottle throttle;
         private bool subscribed;
+        private CombatFeed feed;
 
-        /// <summary>Attaches the publisher to a player's root. Owner only; does nothing for a remote copy.</summary>
+        /// <summary>Attaches the publisher to a player's root. Only on the client that controls the body (a human's own, or a bot's on the
+        /// host); does nothing for a remote copy.</summary>
         public static ScoreboardPublisher Create(GameObject player, GameplayConfig config)
         {
             PhotonView view = player.GetComponent<PhotonView>();
@@ -68,19 +73,20 @@ namespace Overpower.Match
 
             // A rejoined player continues their own numbers - the room kept their "sb" Player Property.
             if (photonView != null && photonView.IsMine && photonView.Owner != null && photonView.Owner.HasRejoined
-                && PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(ScoreboardRules.Key, out object kept))
+                && photonView.Owner.CustomProperties.TryGetValue(ScoreboardRules.Key, out object kept))
                 tally.Restore(kept as int[]);
         }
 
         private void OnEnable()
         {
-            // Owner only - see the class comment.
+            // Controlled here only - see the class comment.
             if (photonView == null || !photonView.IsMine)
                 return;
 
             if (playerHealth != null)
                 playerHealth.Died += HandleDied;
-            CombatEvents.LocalPlayerCredit += HandlePlayerCredit;
+            feed = CombatFeed.For(photonView.OwnerActorNr);
+            feed.Credit += HandlePlayerCredit;
             BuildingCapture.ZoneFlipped += HandleZoneFlipped;
             subscribed = true;
         }
@@ -92,7 +98,8 @@ namespace Overpower.Match
 
             if (playerHealth != null)
                 playerHealth.Died -= HandleDied;
-            CombatEvents.LocalPlayerCredit -= HandlePlayerCredit;
+            feed.Credit -= HandlePlayerCredit;
+            feed = null;
             BuildingCapture.ZoneFlipped -= HandleZoneFlipped;
             subscribed = false;
         }
@@ -105,7 +112,7 @@ namespace Overpower.Match
             Publish();
         }
 
-        /// <summary>The fresh start at go-live: zero the tally and publish the zeros at once. Owner only.</summary>
+        /// <summary>The fresh start at go-live: zero the tally and publish the zeros at once. Controlling client only.</summary>
         public void ResetForMatchStart()
         {
             if (photonView == null || !photonView.IsMine)
@@ -146,10 +153,10 @@ namespace Overpower.Match
         // restored death count (and their next respawn wait) can be one short. Nothing retries a publish the server never saw.
         private void Publish()
         {
-            if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)
+            if (!PhotonNetwork.InRoom || photonView.Owner == null)
                 return; // Left the room: the change stays pending and goes out once there is a room again.
 
-            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { ScoreboardRules.Key, tally.ToArray() } });
+            PlayerProps.Set(photonView.Owner, new Hashtable { { ScoreboardRules.Key, tally.ToArray() } });
             throttle.MarkPublished(Time.unscaledTime);
         }
     }

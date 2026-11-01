@@ -11,7 +11,7 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Lets a player travel through TEAMMATES' teleport portals (D15); only the local player's copy acts. Traveller half:
+    /// Lets a player travel through TEAMMATES' teleport portals (D15); only the copy on the machine that runs the body acts. Traveller half:
     /// channel on a teammate's portal (same PortalChannelState, can-act and exit rules as the owner's TeleportAbility, gated
     /// by the owner's ReadyKey), then move via PlayerDisplacement.TeleportTo and write UseKey on yourself. Owner half: on a
     /// teammate's UseKey, spend one charge through your own TeleportAbility. No RPC: charges live only on the owner's machine,
@@ -32,8 +32,8 @@ namespace Overpower.Abilities
         // owners remember the last counter they saw from this actor, and a restarted count would be ignored.
         private static int tripCounter;
 
-        /// <summary>This client's own player's copy of this component (null until it exists). Lets a portal owner's
-        /// "trip completed" message reach the local player so it can join a group trip.</summary>
+        /// <summary>The copy on the body of the human at this keyboard (null until it exists; never a bot's). Lets a portal
+        /// owner's "trip completed" message reach the local player so it can join a group trip.</summary>
         public static AllyPortalTraveller Local { get; private set; }
 
         private PlayerLifecycle lifecycle;
@@ -63,8 +63,8 @@ namespace Overpower.Abilities
             // The static counter survives a rebuilt body but not a restarted game, while the portal owners still remember
             // the last counter this actor wrote ("tpUse" is a Player Property the room kept): count on from there, or the
             // first trips after a restart would be ignored as old.
-            if (photonView.IsMine && PhotonNetwork.LocalPlayer != null
-                && PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(UseKey, out object useRaw)
+            if (photonView.IsMine && photonView.Owner != null
+                && photonView.Owner.CustomProperties.TryGetValue(UseKey, out object useRaw)
                 && useRaw is int[] use && use.Length >= 2)
                 tripCounter = RejoinRules.SeedCounter(tripCounter, use[1]);
         }
@@ -72,7 +72,7 @@ namespace Overpower.Abilities
         private void OnEnable()
         {
             PhotonNetwork.AddCallbackTarget(this);
-            if (photonView != null && photonView.IsMine)
+            if (BodyRole.IsLocalHuman(photonView))
                 Local = this;
         }
 
@@ -130,17 +130,21 @@ namespace Overpower.Abilities
             // traveller still standing on the DEPARTURE portal, which lifted the arrival latch and let the trip repeat.
             Vector3 position = body.position;
 
-            foreach (Player other in PhotonNetwork.PlayerListOthers)
+            Player self = photonView.Owner;
+            foreach (Player other in PhotonNetwork.PlayerList)
             {
+                if (other.ActorNumber == photonView.OwnerActorNr)
+                    continue;
+
                 // A player whose connection dropped keeps their portals standing, but nobody is there to pay the charge
                 // (their "ready" flag would read whatever it last was): a portal of an absent player is not usable.
-                if (!PresenceRules.IsPresent(other.IsInactive))
+                if (!PresenceRules.IsPresent(Presence.IsDropped(other)))
                     continue;
 
                 // Unknown teams count as not teammates: a portal is never opened to a maybe-enemy. Enemy portals are
                 // still found (so PortalUseRules.MayUse is the one place that refuses them).
-                bool otherIsTeammate = Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _) && Teams.TryGetTeam(other, out _)
-                                       && Teams.AreSameTeam(PhotonNetwork.LocalPlayer, other);
+                bool otherIsTeammate = Teams.TryGetTeam(self, out _) && Teams.TryGetTeam(other, out _)
+                                       && Teams.AreSameTeam(self, other);
 
                 foreach (Portal p in Portal.ForOwner(other.ActorNumber))
                 {
@@ -177,7 +181,7 @@ namespace Overpower.Abilities
 
             channelState.LatchArrival(to);
             tripCounter++;
-            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { UseKey, new[] { portalOwner.ActorNumber, tripCounter, from.Seq } } });
+            PlayerProps.Set(photonView.Owner, new Hashtable { { UseKey, new[] { portalOwner.ActorNumber, tripCounter, from.Seq } } });
         }
 
         // ---- group travel -----------------------------------------------------------------
@@ -221,9 +225,10 @@ namespace Overpower.Abilities
             if (portalOwner == null)
                 return;
 
-            bool iAmOwner = ownerActor == PhotonNetwork.LocalPlayer.ActorNumber;
-            bool sameTeam = iAmOwner || (Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _) && Teams.TryGetTeam(portalOwner, out _)
-                                        && Teams.AreSameTeam(PhotonNetwork.LocalPlayer, portalOwner));
+            Player self = photonView.Owner;
+            bool iAmOwner = ownerActor == photonView.OwnerActorNr;
+            bool sameTeam = iAmOwner || (Teams.TryGetTeam(self, out _) && Teams.TryGetTeam(portalOwner, out _)
+                                        && Teams.AreSameTeam(self, portalOwner));
             // "Alive" only, by design: a stunned or silenced teammate standing on the portal travels along too.
             bool alive = lifecycle == null || lifecycle.IsAlive;
             bool onDeparture = PortalUseRules.IsOnPortal(from.transform.position, body.position, from.Radius, capsule.radius);
@@ -231,7 +236,7 @@ namespace Overpower.Abilities
             TeleportAbility ownAbility = iAmOwner && runner != null ? runner.StatusFor(AbilitySlot.Mobility) as TeleportAbility : null;
             bool latched = iAmOwner && ownAbility != null ? ownAbility.IsLatchedOn(from) : channelState.IsLatchedOn(from);
 
-            if (!PortalUseRules.JoinsGroupTrip(alive, sameTeam, onDeparture, isTheTraveller: travellerActor == PhotonNetwork.LocalPlayer.ActorNumber, latchedOnDeparture: latched))
+            if (!PortalUseRules.JoinsGroupTrip(alive, sameTeam, onDeparture, isTheTraveller: travellerActor == photonView.OwnerActorNr, latchedOnDeparture: latched))
                 return;
 
             Portal to = TeleportAbility.FindOther(Portal.ForOwner(ownerActor), from);
@@ -266,14 +271,14 @@ namespace Overpower.Abilities
 
         public void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
         {
-            if (photonView == null || !photonView.IsMine || targetPlayer == null || targetPlayer.IsLocal)
+            if (photonView == null || !photonView.IsMine || targetPlayer == null || targetPlayer.ActorNumber == photonView.OwnerActorNr)
                 return; // Only my own copy listens, and only to OTHER players' writes - never the echo of my own.
 
             if (!changedProps.TryGetValue(UseKey, out object raw) || !(raw is int[] use) || use.Length < 2)
                 return;
 
             lastSeenCounter.TryGetValue(targetPlayer.ActorNumber, out int lastSeen);
-            bool teammate = Teams.AreSameTeam(PhotonNetwork.LocalPlayer, targetPlayer);
+            bool teammate = Teams.AreSameTeam(photonView.Owner, targetPlayer);
 
             if (PortalUseRules.ShouldSpendForAllyTrip(lastSeen, use[1], use[0], photonView.OwnerActorNr, teammate))
                 (runner != null ? runner.StatusFor(AbilitySlot.Mobility) as TeleportAbility : null)?.SpendChargeForAllyTrip();

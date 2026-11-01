@@ -1,3 +1,4 @@
+using System.Reflection;
 using NUnit.Framework;
 using Overpower.Vision;
 using UnityEngine;
@@ -126,6 +127,25 @@ namespace Overpower.Tests
         {
             Assert.IsTrue(VisibleWhenSeen.Decide(false, true, true, true, false), "caster shown, own spot in fog");
             Assert.IsFalse(VisibleWhenSeen.Decide(false, true, true, false, true), "caster hidden, own spot seen");
+        }
+
+        // A bot's zone or fire field is instantiated by the host, so the view's owner is the host's player: the placer's team wins.
+        [Test] public void PlacerTeamOf_TheTeamTheFieldWasGiven_WinsOverEverything() => Assert.AreEqual(2, VisibleWhenSeen.PlacerTeamOf(2, 1, 0));
+        [Test] public void PlacerTeamOf_WithoutOne_IsTheDeployablesOwnTeam() => Assert.AreEqual(1, VisibleWhenSeen.PlacerTeamOf(-1, 1, 0));
+        [Test] public void PlacerTeamOf_WithNeither_IsTheInstantiatingPlayersTeam() => Assert.AreEqual(0, VisibleWhenSeen.PlacerTeamOf(-1, -1, 0));
+        [Test] public void PlacerTeamOf_ATeamZeroIsATeam_NotAMissingOne() => Assert.AreEqual(0, VisibleWhenSeen.PlacerTeamOf(0, 2, 1));
+        [Test] public void PlacerTeamOf_NobodyKnown_IsUnknown() => Assert.AreEqual(-1, VisibleWhenSeen.PlacerTeamOf(-1, -1, -1));
+
+        [Test]
+        public void AnOwnersZoneIsForcedShownByThePlacersTeam_NotTheViewsOwner()
+        {
+            MethodInfo placerTeam = typeof(VisibleWhenSeen).GetMethod(nameof(VisibleWhenSeen.PlacerTeamOf));
+            MethodInfo placedBy = typeof(VisibleWhenSeen).GetMethod("PlacedByTeam", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsTrue(IlWiring.Uses(typeof(VisibleWhenSeen), nameof(VisibleWhenSeen.Apply), placedBy), "Apply asks whose team a placed thing is");
+            Assert.IsTrue(IlWiring.Uses(typeof(VisibleWhenSeen), "PlacedByTeam", placerTeam), "from the placer's team first");
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VisibleWhenSeen), nameof(VisibleWhenSeen.Apply),
+                typeof(Overpower.Net.Teams).GetMethod(nameof(Overpower.Net.Teams.TryGetTeam), new[] { typeof(Photon.Realtime.Player), typeof(int).MakeByRefType() })),
+                "Apply no longer reads the view's owner itself");
         }
     }
 }

@@ -1,6 +1,7 @@
 using System.Collections;
 using Photon.Pun;
 using UnityEngine;
+using Overpower.Net;
 using Overpower.UI;
 
 /// <summary>
@@ -82,10 +83,11 @@ public class MatchUi : MonoBehaviour
                             "and the death card will draw in the default look.");
     }
 
-    /// <summary>The death card, built the first time something is shown on it; never on a remote body.</summary>
+    /// <summary>The death card, built the first time something is shown on it; never on a remote body or a bot's (the waiting flag
+    /// still works without it).</summary>
     private DeathCard EnsureCard()
     {
-        if (deathCard != null || (photonView != null && !photonView.IsMine))
+        if (deathCard != null || (photonView != null && !BodyRole.IsLocalHuman(photonView)))
             return deathCard;
         deathCard = gameObject.AddComponent<DeathCard>();
         deathCard.Init(theme);
@@ -122,6 +124,13 @@ public class MatchUi : MonoBehaviour
     {
         if (!photonView.IsMine)
             return;
+
+        // A bot's body only stops: the panels and the log zip are the person at this keyboard's.
+        if (!BodyRole.IsLocalHuman(photonView))
+        {
+            FreezeForRestOfMatch();
+            return;
+        }
 
         int myTeam = PlayerTeam.NoTeam;
         if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(PlayerTeam.TeamKey, out object raw)
@@ -244,7 +253,8 @@ public class MatchUi : MonoBehaviour
 
         HideWaitingPanel();
 
-        if (youLostPanel != null && !IsWaitingForRespawn)
+        // The panel is a screen overlay: on a bot's body it would cover the host's screen.
+        if (youLostPanel != null && !IsWaitingForRespawn && !BodyRole.IsBot(photonView))
         {
             youLostPanel.SetActive(true);
             Debug.Log("[MatchUi] youLostPanel.SetActive(true) called");
@@ -262,7 +272,7 @@ public class MatchUi : MonoBehaviour
     /// <summary>The Spectate button on this player's own lose panel, built the first time it is shown.</summary>
     private void EnsureSpectateView()
     {
-        if (youLostPanel == null || photonView == null || !photonView.IsMine || GetComponent<SpectateView>() != null)
+        if (youLostPanel == null || !BodyRole.IsLocalHuman(photonView) || GetComponent<SpectateView>() != null)
             return;
         gameObject.AddComponent<SpectateView>().Init(this, youLostPanel);
     }

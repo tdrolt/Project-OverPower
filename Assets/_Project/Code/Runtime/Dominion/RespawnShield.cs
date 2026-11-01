@@ -44,6 +44,7 @@ namespace Overpower.Dominion
         private bool shieldClearSent;     // owner: a clear is written and its echo may not be back yet: down for this client now, and not written again every frame
         private int stampSeen;            // every client: the dBlk value already popped
         private bool stampPrimed;         // the first read only takes the value in: a joiner never pops an old stamp
+        private CombatFeed feed;          // this body's own actor's feed, kept to leave the same one
 
         private void Awake()
         {
@@ -59,9 +60,18 @@ namespace Overpower.Dominion
                 () => { ClearShield(); Debug.Log("[DOMINION] respawn shield ended: this player left their spawn"); });
         }
 
-        private void OnEnable() => CombatEvents.LocalEnemyAffected += HandleEnemyAffected;
+        private void OnEnable()
+        {
+            if (photonView == null) return;
+            feed = CombatFeed.For(photonView.OwnerActorNr);
+            feed.EnemyAffected += HandleEnemyAffected;
+        }
 
-        private void OnDisable() => CombatEvents.LocalEnemyAffected -= HandleEnemyAffected;
+        private void OnDisable()
+        {
+            if (feed != null) feed.EnemyAffected -= HandleEnemyAffected;
+            feed = null;
+        }
 
         private static int PopupMs()
         {
@@ -69,8 +79,8 @@ namespace Overpower.Dominion
             return config != null ? Mathf.RoundToInt(config.BlockedPopupSeconds * 1000f) : 0;
         }
 
-        private static void WriteBlockedStamp(int now) =>
-            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnShieldRules.BlockedKey, now } });
+        private void WriteBlockedStamp(int now) =>
+            PlayerProps.Set(photonView.Owner, new Hashtable { { RespawnShieldRules.BlockedKey, now } });
 
         private void OnDestroy()
         {
@@ -145,7 +155,7 @@ namespace Overpower.Dominion
             // Start and end together in one write: A26 judges an old effect from the start, so nobody subtracts their own Shield Seconds from the end.
             ownEndMs = end; // up on this client at once, not a round trip later
             shieldClearSent = false; // a new shield is up again at once and may drop again when it leaves the spawn
-            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnShieldRules.StartKey, now }, { RespawnShieldRules.ShieldKey, end } });
+            PlayerProps.Set(photonView.Owner, new Hashtable { { RespawnShieldRules.StartKey, now }, { RespawnShieldRules.ShieldKey, end } });
             Debug.Log($"[DOMINION] respawn shield up for {config.ShieldSeconds:0.#} s (ends {end})");
         }
 
@@ -157,7 +167,7 @@ namespace Overpower.Dominion
             bool startedHere = ownEndMs != 0; // started on this client and maybe not echoed yet: the cleared value must still be written
             ownEndMs = 0;
             if (!RespawnShieldRules.MustWriteClear(startedHere, ReadInt(photonView.Owner, RespawnShieldRules.ShieldKey))) return;
-            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
+            PlayerProps.Set(photonView.Owner, new Hashtable
             {
                 { RespawnShieldRules.ShieldKey, RespawnShieldRules.EndAfterDamageDealt() },
                 { RespawnShieldRules.StartKey, 0 },
@@ -173,27 +183,38 @@ namespace Overpower.Dominion
 
         private void HandleEnemyAffected(bool victimShielded, bool fromBeforeRespawn)
         {
-            // LocalEnemyAffected is raised only on the machine whose player did the thing, so this is the owner of the shield that did it.
+            // The feed is this body's own actor's, so only what this body did arrives here, however many bodies this client simulates.
             if (!photonView.IsMine || !RespawnShieldRules.EndsOnEnemyAffected(IsUp, victimShielded, fromBeforeRespawn)) return;
             ClearShield();
             Debug.Log("[DOMINION] respawn shield ended: this player hit an enemy");
         }
 
-        /// <summary>The attacker's side of A25, called by a status or push this client simulates on its copy of a player it does not own. When the
-        /// effect is this client's own player's and the target is a living enemy, the attacker's shield hears of it (no message: the attacker's client
-        /// simulates the effect anyway, and the victim's own shield is read from dShd). effectPlacedMs is when the mine or fence behind the effect was
-        /// set up (0 = a direct effect), so an old one does not end the new bubble (A26). Returns that judgement for the caller's own marks.</summary>
+        /// <summary>The attacker's side of A25, called by a status or push on a player's body that this client simulates the effect on: the copy of a
+        /// player it does not own, or on the host a bot's or the human's own body hit by another seat the host plays. When the effect is a body this
+        /// client simulates (its own player's, or a bot's on the host) and the target is a living enemy, the attacker's shield hears of it (no message:
+        /// the attacker's client simulates the effect anyway, and the victim's own shield is read from dShd). effectPlacedMs is when the mine or fence
+        /// behind the effect was set up (0 = a direct effect), so an old one does not end the new bubble (A26). Returns that judgement for the caller's
+        /// own marks.</summary>
         public static RespawnShieldRules.EffectReportDecision NoteMyEffectOnCopy(PhotonView victim, int sourceActor, int effectPlacedMs = 0)
         {
             if (victim == null || victim.Owner == null || !PhotonNetwork.InRoom) return default;
-            Player me = PhotonNetwork.LocalPlayer;
-            if (me == null) return default;
+            Player attacker = PhotonNetwork.CurrentRoom.GetPlayer(sourceActor);
+            if (!IsSimulatedHere(sourceActor) || attacker == null) return default;
             PlayerLifecycle victimLife = victim.GetComponent<PlayerLifecycle>();
             RespawnShieldRules.EffectReportDecision decision = RespawnShieldRules.EffectReport(
-                victim.IsMine, sourceActor == me.ActorNumber, victimLife == null || victimLife.IsAlive, Teams.AreSameTeam(me, victim.Owner),
-                IsUpFor(victim.Owner), effectPlacedMs, ShieldStartOf(me));
-            if (decision.Report) CombatEvents.RaiseEnemyAffected(decision.VictimShielded, decision.FromBeforeRespawn);
+                victim.OwnerActorNr == sourceActor, true, victimLife == null || victimLife.IsAlive, Teams.AreSameTeam(attacker, victim.Owner),
+                IsUpFor(victim.Owner), effectPlacedMs, ShieldStartOf(attacker));
+            if (decision.Report) CombatFeed.For(sourceActor).RaiseEnemyAffected(decision.VictimShielded, decision.FromBeforeRespawn);
             return decision;
+        }
+
+        // The attacker's body runs on this client: the human's own, or on the host a bot's.
+        private static bool IsSimulatedHere(int actor)
+        {
+            Player local = PhotonNetwork.LocalPlayer;
+            if (local != null && local.ActorNumber == actor) return true;
+            PhotonView body = PlayerLookup.GetPhotonViewFor(actor);
+            return BodyRole.IsBot(body) && body.IsMine;
         }
 
         /// <summary>The server ms that player's shield ends (0 = none). Read from dShd.</summary>

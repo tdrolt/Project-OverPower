@@ -121,8 +121,8 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
 
     private void OnEnable()
     {
-        // Only your own player's cooldowns are yours to reset from the test range.
-        if (photonView.IsMine)
+        // Only your own player's cooldowns are yours to reset from the test range, not the host's bots'.
+        if (BodyRole.IsLocalHuman(photonView))
             TestRangeResetRegistry.Register(this);
 
         if (input == null)
@@ -299,7 +299,8 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     /// machine in a room must agree on it.
     ///
     /// No gate here, on purpose (class comment). Everything about the caster comes from the parameters
-    /// or info.Sender; inside this body PhotonNetwork.LocalPlayer is the receiver.
+    /// or this body's view, never info.Sender (the host, for a bot's cast); inside this body
+    /// PhotonNetwork.LocalPlayer is the receiver.
     /// </summary>
     [PunRPC]
     private void RPC_CastAbility(byte slot, int abilityId, byte phase, Vector3 origin, Vector3 direction,
@@ -346,9 +347,9 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
             Seed = seed, IntArg = intArg, FloatArg = floatArg
         };
 
-        int casterActor = info.Sender != null ? info.Sender.ActorNumber : -1;
-        Teams.TryGetTeam(info.Sender, out int casterTeam);
-        bool isCasterClient = info.Sender != null && info.Sender.IsLocal;
+        int casterActor = photonView.OwnerActorNr;
+        Teams.TryGetTeam(photonView.Owner, out int casterTeam);
+        bool isCasterClient = photonView.IsMine;
         float secondsLate = Mathf.Max(0f, (float)(PhotonNetwork.Time - info.SentServerTime));
 
         module.ExecuteCast(new CastEvent(payload, phase, casterActor, casterTeam, isCasterClient, secondsLate));
@@ -468,7 +469,7 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         return CastGate.ForAbility(ActorBlock(), module.HasChargeGate, module.HasCharge, module.IsReady);
     }
 
-    /// <summary>F1's "Reset Cooldowns". Registered for the owner only.</summary>
+    /// <summary>F1's "Reset Cooldowns". Registered for the local human's body only.</summary>
     public void ResetForTestRange() => ResetCooldowns();
 
     /// <summary>The cleanup a death-then-respawn runs through HandleAliveChanged, without publishing a

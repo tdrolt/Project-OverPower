@@ -332,5 +332,14 @@ namespace Overpower.Dominion
 
         /// <summary>The server time a stage that started at startMs and lasts <paramref name="seconds"/> ends (wrap-safe).</summary>
         public static int StageEndMs(int startMs, float seconds) => unchecked(startMs + (int)Math.Round(seconds * 1000f));
+
+        /// <summary>Seconds from nowMs until targetMs on the server clock (wrap-safe). 0 when there is no target (0), when the clock has not synced
+        /// (nowMs 0), or when the target has passed.</summary>
+        public static float SecondsUntil(int targetMs, int nowMs)
+        {
+            if (targetMs == 0 || nowMs == 0) return 0f;
+            int remaining = unchecked(targetMs - nowMs);
+            return remaining <= 0 ? 0f : remaining / 1000f;
+        }
     }
 }

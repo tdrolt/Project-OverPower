@@ -11,7 +11,7 @@ using Overpower.UI;
 namespace Overpower.Telemetry
 {
     /// <summary>
-    /// Zips THIS client's own match-log files (its "{actor}_*.jsonl" and "bug_{actor}_*.png", see MatchLogZipRule) into
+    /// Zips THIS client's own match-log files (its "{actor}_*.jsonl" and "bug_{actor}_*.png", see MatchLogZipRule; on the host also the bots' files) into
     /// "&lt;Match logs root&gt;/OverPower-log_&lt;match folder name&gt;_&lt;actor&gt;_&lt;nick&gt;.zip", directly in the root rather than the dated
     /// per-match subfolder (see TryZip), so each tester finds and sends one file; and sends a copy (no chat) of the .jsonl to the
     /// collector (TryUpload, TelemetryConfig > Upload). Called from MatchUi.ShowMatchResult (the win/lose panel), the lobby-list return,
@@ -36,6 +36,9 @@ namespace Overpower.Telemetry
         // there, before OnLeftRoom clears it). MatchLogZipRule.ResolveZipFolder falls back to it, and OnOpenFolderClicked reads it
         // for the overlay's button.
         private string lastKnownFolder;
+
+        // Whether this client (the host) wrote bot logs into the folder; kept like lastKnownFolder, since MatchTelemetry forgets them on leaving.
+        private bool wroteBotLogs;
 
         // The actor number and nick while still in the room: after a deliberate leave (back to the name screen) Photon reports the
         // actor as -1, and the last zip must still find this client's own files.
@@ -81,6 +84,8 @@ namespace Overpower.Telemetry
             MatchTelemetry mt = MatchTelemetry.Instance;
             if (mt != null && !string.IsNullOrEmpty(mt.CurrentFolder))
                 lastKnownFolder = mt.CurrentFolder;
+            if (mt != null && mt.HasBotLogs)
+                wroteBotLogs = true;
             if (PhotonNetwork.LocalPlayer != null && PhotonNetwork.LocalPlayer.ActorNumber > 0)
             {
                 lastKnownActor = PhotonNetwork.LocalPlayer.ActorNumber;
@@ -162,6 +167,8 @@ namespace Overpower.Telemetry
                     return;
 
                 mt?.FlushNow(); // Flush THIS client's buffer to disk before reading the folder.
+                if (mt != null && mt.HasBotLogs)
+                    wroteBotLogs = true;
 
                 // Remember them HERE too, while in the room: Photon sets the actor to -1 before OnLeftRoom on a deliberate leave, so
                 // HandleBeforeClose never sees a valid one there - the zip made at the button press does.
@@ -174,6 +181,8 @@ namespace Overpower.Telemetry
                 List<string> ownNames = MatchLogZipRule.SelectOwnFiles(allNames, actor);
                 if (ownNames.Count == 0)
                     return; // No matching file exists: do nothing.
+                if (wroteBotLogs)
+                    ownNames.AddRange(MatchLogZipRule.SelectBotFiles(allNames));
 
                 string sanitizedNick = MatchTelemetry.Sanitize(nick);
                 // Named after the match folder, not a clock read (see MatchLogZipRule.ZipFileName): every zip of the match comes out

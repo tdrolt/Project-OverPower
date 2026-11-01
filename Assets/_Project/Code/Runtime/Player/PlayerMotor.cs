@@ -144,7 +144,7 @@ public class PlayerMotor : MonoBehaviour
     private void Update()
     {
         if (!photonView.IsMine)
-            return; // only the local player's own keyboard drives this
+            return; // only the client that moves this body (for a bot, the host)
 
         IsMoving = MovementInput() != Vector3.zero;
         UpdateBackpedal();
@@ -286,6 +286,7 @@ public class PlayerMotor : MonoBehaviour
     ///
     /// The raw read is PlayerInputRouter's, which also owns the alive and chat-focus gates, so a dead
     /// or typing player's axis already reads zero here; this keeps only the camera-relative conversion.
+    /// A bot's move is world-space already and skips it: Camera.main on the host follows its human.
     /// </summary>
     public Vector3 MovementInput()
     {
@@ -298,6 +299,9 @@ public class PlayerMotor : MonoBehaviour
             }
             return Vector3.zero;
         }
+
+        if (router.BotDriven)
+            return router.BotWorldMove;
 
         Vector2 rawInput = router.MoveAxis;
         float horizontalInput = rawInput.x;

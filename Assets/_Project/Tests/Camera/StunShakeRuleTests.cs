@@ -67,6 +67,8 @@ namespace Overpower.Tests
                 "applying a status asks the rule and acts on its answer");
             Assert.IsTrue(IlWiring.Uses(typeof(PlayerStatusEffects), nameof(PlayerStatusEffects.Apply), typeof(CameraTracking).GetMethod(nameof(CameraTracking.Shake))),
                 "and shakes the local camera");
+            Assert.IsTrue(IlWiring.Uses(typeof(PlayerStatusEffects), nameof(PlayerStatusEffects.Apply), typeof(Overpower.Net.BodyRole).GetMethod(nameof(Overpower.Net.BodyRole.IsLocalHuman))),
+                "the victim is the human at this keyboard: a stunned bot on the host is IsMine there and must not shake the host's camera");
             Assert.IsTrue(IlWiring.Uses(typeof(PlayerStatusEffects), nameof(PlayerStatusEffects.Apply),
                 typeof(Overpower.Arena.ArenaLook).GetField(nameof(Overpower.Arena.ArenaLook.stunShakeOn))), "the switch comes from the Arena Look");
 

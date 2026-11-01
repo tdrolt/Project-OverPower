@@ -7,6 +7,7 @@ using Overpower.Data;
 using Overpower.Match;
 using Overpower.Net;
 using Overpower.UI;
+using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 /// <summary>
 /// One player's health, armor and damage funnel: ApplyDamage is the only place damage maths happens.
@@ -157,6 +158,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     public int AbsorbLevel => absorbLevel;
     public int RechargeLevel => rechargeLevel;
     public float SecondsSinceCombat => secondsSinceCombat;
+    /// <summary>The armour tiers and their prices (a bot's shop buys by the same numbers as the shop screen).</summary>
+    public ArmorConfig ArmorSettings => armorConfig;
     public bool IsOutOfCombat => gameplayConfig != null && secondsSinceCombat >= gameplayConfig.OutOfCombatSeconds;
     /// <summary>Alive on EVERY client: the owner's own death latch and the replicated alive state, see PlayerAliveRule.</summary>
     public bool IsAlive => PlayerAliveRule.IsAlive(isDead, lifecycle != null, lifecycle != null && lifecycle.IsAlive);
@@ -511,12 +514,13 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         // Every client simulates every shot fired at every player, including its own shots against an enemy it does
         // NOT own: this is the one moment the SHOOTER's client can learn where its shot landed, since the real damage
         // math below (and Damaged / the credit RPC) only runs on the victim's machine. Raised BEFORE the IsMine/isDead
-        // return on purpose, so it fires on a copy the shooter does not own. A self-hit raises nothing.
+        // return on purpose, so it fires on a copy the shooter does not own, and on the host for a bot body it simulates
+        // itself. A self-hit raises nothing; a bot's shot raises nothing (these are the local human's screen only).
         //
         // Only for a source whose HitPoint is a genuine point of impact (Projectile, Splash, Contact). Burn and Zone
         // carry the field's own centre (FireField, ElectricFence), which would anchor the next
         // number at that stationary point instead of falling back to the victim's centre.
-        if (!photonView.IsMine && PhotonNetwork.LocalPlayer != null
+        if (!BodyRole.IsLocalHuman(photonView) && PhotonNetwork.LocalPlayer != null
             && info.SourceActorNumber == PhotonNetwork.LocalPlayer.ActorNumber
             && info.Source != DamageSource.Burn && info.Source != DamageSource.Zone)
         {
@@ -621,7 +625,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             isDead = true;   // Latched before raising Died so a re-entrant hit cannot double-kill.
             armor.Clear();   // A corpse has no armor; ResetForRespawn decides what comes back.
             secondsSinceCombat = CombatClockRule.AfterDeath(RegenGate, ShopGate, LongestArmourDelay); // dying takes you out of combat
-            sourcePlayer?.AddScore(1);
+            // Nothing reads the PUN score; a bot's would be a room write, which only the host may make.
+            if (PlayerProps.RouteFor(sourcePlayer) == PlayerProps.Route.Server)
+                PlayerProps.Set(sourcePlayer, new Hashtable { { PunPlayerScores.PlayerScoreProp, sourcePlayer.GetScore() + 1 } });
             // Death clears the victim's marks BEFORE Died fires, so the death credit flush
             // (PlayerCombatCredit.HandleDied reads MarkSecondsLeftFor per attacker while building each message)
             // reports 0 for everyone and every diamond hides on the kill.

@@ -1,4 +1,5 @@
 using Overpower.Match;
+using Overpower.Net;
 using Photon.Pun;
 using TMPro;
 using UnityEngine;
@@ -153,7 +154,7 @@ namespace Overpower.UI
                 return null;
 
             PhotonView view = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
-            cachedLocalPlayer = view != null ? view.gameObject : null;
+            cachedLocalPlayer = view != null && BodyRole.IsLocalHuman(view) ? view.gameObject : null;
             return cachedLocalPlayer;
         }
 

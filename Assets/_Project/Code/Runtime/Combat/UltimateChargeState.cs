@@ -6,7 +6,7 @@ namespace Overpower.Combat
     /// The meter behind the Space-bar ultimate: accrues from damage dealt, damage taken, kills and
     /// assists, clamps at a cap, and is spent only when full. Plain C#, unit tested without the Unity
     /// engine. UltimateCharge (Player) is the thin owner-only MonoBehaviour that feeds it from
-    /// PlayerHealth.Damaged (taken) and CombatEvents (dealt, kill, assist) and exposes it to the three
+    /// PlayerHealth.Damaged (taken) and its own CombatFeed (dealt, kill, assist) and exposes it to the three
     /// ultimate modules.
     ///
     /// Its own type, not a ChargePool: that counts discrete charges recharging on a timer; this is one
@@ -43,7 +43,7 @@ namespace Overpower.Combat
             this.perAssist = perAssist;
         }
 
-        /// <summary>CombatEvents.LocalDamageDealt - armor + health actually removed from the victim.</summary>
+        /// <summary>CombatFeed.DamageDealt - armor + health actually removed from the victim.</summary>
         public void AddDamageDealt(float amount) => Add(amount * perDamageDealt);
 
         /// <summary>PlayerHealth.Damaged - armor + health actually removed from this player. Never
@@ -54,10 +54,10 @@ namespace Overpower.Combat
         /// <summary>An ultimate charge pack: this share of the whole meter (0.3 = 30%).</summary>
         public void AddFraction(float fraction) => Add(maxCharge * fraction);
 
-        /// <summary>CombatEvents.LocalTakedown(true).</summary>
+        /// <summary>CombatFeed.Takedown(true).</summary>
         public void AddKill() => Add(perKill);
 
-        /// <summary>CombatEvents.LocalTakedown(false).</summary>
+        /// <summary>CombatFeed.Takedown(false).</summary>
         public void AddAssist() => Add(perAssist);
 
         /// <summary>

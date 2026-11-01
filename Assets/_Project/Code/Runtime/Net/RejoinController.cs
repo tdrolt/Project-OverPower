@@ -85,7 +85,7 @@ namespace Overpower.Net
         public override void OnPlayerLeftRoom(Player otherPlayer)
         {
             // Removed next frame: PUN hands the body to the master in its own callback, which may run after this one.
-            if (otherPlayer != null && !PresenceRules.IsPresent(otherPlayer.IsInactive) && PhotonNetwork.IsMasterClient
+            if (otherPlayer != null && !PresenceRules.IsPresent(Presence.IsDropped(otherPlayer)) && PhotonNetwork.IsMasterClient
                 && !bodiesToRemove.Contains(otherPlayer.ActorNumber))
                 bodiesToRemove.Add(otherPlayer.ActorNumber);
         }
@@ -96,7 +96,7 @@ namespace Overpower.Net
                 return;
             // A drop the previous master never got to clean up.
             foreach (Player p in PhotonNetwork.CurrentRoom.Players.Values)
-                if (!PresenceRules.IsPresent(p.IsInactive) && !bodiesToRemove.Contains(p.ActorNumber))
+                if (!PresenceRules.IsPresent(Presence.IsDropped(p)) && !bodiesToRemove.Contains(p.ActorNumber))
                     bodiesToRemove.Add(p.ActorNumber);
         }
 
@@ -109,7 +109,7 @@ namespace Overpower.Net
                 if (!PhotonNetwork.IsMasterClient || PhotonNetwork.CurrentRoom == null)
                     continue;
                 Player owner = PhotonNetwork.CurrentRoom.GetPlayer(actor);
-                if (owner == null || !owner.IsInactive)
+                if (owner == null || !Presence.IsDropped(owner))
                     continue; // already back, or gone for good (PUN removes its objects itself)
 
                 PhotonView view = PlayerLookup.GetPhotonViewFor(actor);

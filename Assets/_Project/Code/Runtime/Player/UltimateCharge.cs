@@ -6,10 +6,10 @@ using Overpower.Combat;
 /// Thin owner-only wrapper around UltimateChargeState: the meter every ultimate module reads in
 /// AbilityModule.IsReady (IsFull) and spends in TryBuildCast (Spend).
 ///
-/// OWNER-ONLY STATE, LIKE STUN OR OVERHEAT: CombatEvents fires only on the machine that earned the
-/// damage or takedown, so a remote copy of THIS player subscribing would hear events raised by
-/// whichever OTHER player is local there and add their damage and kills to this meter. Every
-/// subscription is gated on photonView.IsMine.
+/// OWNER-ONLY STATE, LIKE STUN OR OVERHEAT: this body's CombatFeed (its own actor's) is raised only on
+/// the machine that simulates it, so every subscription is gated on photonView.IsMine. The feed is
+/// per actor because the host simulates its human and every bot: one shared event would charge them
+/// all from each other's hits.
 ///
 /// NOT RESET ON RESPAWN: PlayerLifecycle.HandleAliveChanged refills cooldowns but deliberately
 /// never touches this; dying must not cost the ultimate you were building toward.
@@ -27,7 +27,7 @@ public class UltimateCharge : MonoBehaviour
 
     [SerializeField, Tooltip("Charge earned per point of damage YOU deal - armor + health actually " +
              "removed from the victim, the same figure the zip gun's reset and armor recharge " +
-             "already key off (CombatEvents.LocalDamageDealt). Claude's number.")]
+             "already key off (CombatFeed.DamageDealt). Claude's number.")]
     private float chargePerDamageDealt = 1f;
 
     [SerializeField, Tooltip("Charge earned per point of damage YOU take - armor + health actually " +
@@ -35,17 +35,18 @@ public class UltimateCharge : MonoBehaviour
              "should help less than landing them, or turtling would out-charge fighting. Claude's number.")]
     private float chargePerDamageTaken = 0.5f;
 
-    [SerializeField, Tooltip("Charge earned for landing the killing blow (CombatEvents.LocalTakedown" +
+    [SerializeField, Tooltip("Charge earned for landing the killing blow (CombatFeed.Takedown" +
              "(true)). Claude's number.")]
     private float chargePerKill = 150f;
 
     [SerializeField, Tooltip("Charge earned for an assist - damage within the assist window, but " +
-             "someone else finished it (CombatEvents.LocalTakedown(false)). Claude's number.")]
+             "someone else finished it (CombatFeed.Takedown(false)). Claude's number.")]
     private float chargePerAssist = 75f;
 
     private PhotonView photonView;
     private PlayerHealth playerHealth;
     private UltimateChargeState state;
+    private CombatFeed feed; // the one OnEnable subscribed to, so OnDisable leaves that same one
 
     public float Current => state.Current;
     public float Max => state.Max;
@@ -78,16 +79,21 @@ public class UltimateCharge : MonoBehaviour
 
         if (playerHealth != null)
             playerHealth.Damaged += HandleDamaged;
-        CombatEvents.LocalDamageDealt += HandleDamageDealt;
-        CombatEvents.LocalTakedown += HandleTakedown;
+        feed = CombatFeed.For(photonView.OwnerActorNr);
+        feed.DamageDealt += HandleDamageDealt;
+        feed.Takedown += HandleTakedown;
     }
 
     private void OnDisable()
     {
         if (playerHealth != null)
             playerHealth.Damaged -= HandleDamaged;
-        CombatEvents.LocalDamageDealt -= HandleDamageDealt;
-        CombatEvents.LocalTakedown -= HandleTakedown;
+        if (feed != null)
+        {
+            feed.DamageDealt -= HandleDamageDealt;
+            feed.Takedown -= HandleTakedown;
+            feed = null;
+        }
     }
 
     /// <summary>Owner only. Refused unless full; called by an ultimate's own TryBuildCast only.</summary>

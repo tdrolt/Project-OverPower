@@ -123,6 +123,9 @@ namespace Overpower.UI
         private void EnsureBuilt()
         {
             if (cardCanvas != null) return;
+            Photon.Pun.PhotonView body = GetComponent<Photon.Pun.PhotonView>();
+            // A bot body the host controls never darkens the host's screen: only the body of the person at this keyboard draws it.
+            if (!Overpower.Net.BodyRole.IsLocalHuman(body) && body != null) return;
             if (theme == null) theme = PopupCard.ThemeOrDefault(null);
             lifecycle = GetComponent<PlayerLifecycle>();
             shop = GetComponent<LoadoutScreen>();
@@ -144,7 +147,7 @@ namespace Overpower.UI
             // fitter takes the larger, which would keep the small shop-open card too tall for the strip under the shop.
             card.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.Unconstrained;
             foreach (Image image in card.GetComponentsInChildren<Image>(true)) image.raycastTarget = false;
-            int team = Overpower.Net.Teams.TryGetTeam(Photon.Pun.PhotonNetwork.LocalPlayer, out int t) ? t : -1;
+            int team = Overpower.Net.Teams.TryGetTeam(body != null ? body.Owner : Photon.Pun.PhotonNetwork.LocalPlayer, out int t) ? t : -1;
             LobbyUiKit.TopStripe(card, TeamTextColour(team), theme.dominionBarEdgeThickness, theme.dominionCardRadius);
 
             title = PopupCard.Line(kit, card, "Title", "", kit.Display, theme.deathCardTitleSize, theme.lobbyOffWhiteColor, true);

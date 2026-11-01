@@ -3,6 +3,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using Overpower.Combat;
+using Overpower.Net;
 
 /// <summary>
 /// Turns victim-side damage back into credit for the attacker who dealt it. PlayerHealth.ApplyDamage
@@ -13,8 +14,9 @@ using Overpower.Combat;
 ///
 /// Runs entirely on the VICTIM's own client: it listens to its own PlayerHealth, accumulates what
 /// each attacker took off in a DamageCreditLedger, and tells each attacker their share through a
-/// targeted RPC (the same frame an isolated hit lands, or immediately on death). OnEnable returns
-/// for a non-owner, so credit is counted exactly once however many clients simulated the hit.
+/// targeted RPC (the same frame an isolated hit lands, or immediately on death); a bot attacker's
+/// share goes to the host that plays it (SendCredit). OnEnable returns for a non-owner, so credit is
+/// counted exactly once however many clients simulated the hit.
 ///
 /// Lives on the player ROOT beside PlayerHealth: PUN delivers an RPC only to a component on the
 /// PhotonView's own GameObject, not PBRCharacter, which has its own PhotonView for its animator.
@@ -125,7 +127,7 @@ public class PlayerCombatCredit : MonoBehaviourPun
 
     /// <summary>
     /// The kill/assist flush. The killer is whoever DamageInfo.SourceActorNumber names on the LETHAL
-    /// hit, the value PlayerHealth.ApplyDamage used for AddScore(1), so kill credit never disagrees
+    /// hit, the value PlayerHealth.ApplyDamage scores the kill for, so kill credit never disagrees
     /// with the scoreboard. Every other actor who hit within the assist window gets a takedown marker
     /// too, even if their damage was already flushed: AssistersSince answers from last-hit time alone.
     /// </summary>
@@ -181,6 +183,18 @@ public class PlayerCombatCredit : MonoBehaviourPun
         return (0f, false, false);
     }
 
+    /// <summary>Where one attacker's credit goes. A bot cannot receive an RPC (the server has no such actor), so its credit
+    /// travels through its own body to the host that plays it, or straight to that body when this client is the host.</summary>
+    public enum CreditRoute { AttackersClient, BotBodyHere, BotBodyOnHost }
+
+    public static CreditRoute RouteFor(bool attackerIsBot, bool thisClientIsHost) =>
+        !attackerIsBot ? CreditRoute.AttackersClient : thisClientIsHost ? CreditRoute.BotBodyHere : CreditRoute.BotBodyOnHost;
+
+    /// <summary>A credit message on a bot's body is that bot's own when its controller (the host) did not send it: a victim's
+    /// client sent it through the bot's body (BotBodyOnHost). One the host sent is that bot as the VICTIM crediting a human,
+    /// which is why the host credits its own bots without any message (BotBodyHere).</summary>
+    public static bool IsCreditForThisBot(bool bodyIsBot, bool senderControlsThisBody) => bodyIsBot && !senderControlsThisBody;
+
     /// <summary>Targets exactly one attacker, so credit is seen by nobody else. A left-room actor
     /// resolves to null and is skipped. The seconds left on THIS attacker's mark ride on the same
     /// message as the damage/takedown, never a separate RPC.</summary>
@@ -191,7 +205,22 @@ public class PlayerCombatCredit : MonoBehaviourPun
             return;
 
         float markSecondsLeft = playerHealth != null ? playerHealth.MarkSecondsLeftFor(actorNumber) : 0f;
-        photonView.RPC(nameof(RPC_DamageCredit), attacker, amount, takedown, cashedMark, markSecondsLeft, endsShield);
+        CreditRoute route = RouteFor(attacker is BotPlayer, PhotonNetwork.IsMasterClient);
+        if (route == CreditRoute.AttackersClient)
+        {
+            photonView.RPC(nameof(RPC_DamageCredit), attacker, amount, takedown, cashedMark, markSecondsLeft, endsShield);
+            return;
+        }
+
+        PhotonView attackerView = PlayerLookup.GetPhotonViewFor(actorNumber);
+        PlayerCombatCredit attackerCredit = attackerView != null ? attackerView.GetComponent<PlayerCombatCredit>() : null;
+        if (attackerCredit == null)
+            return;
+
+        if (route == CreditRoute.BotBodyHere)
+            attackerCredit.Credit(attackerView, actorNumber, false, amount, takedown, cashedMark, markSecondsLeft, endsShield);
+        else
+            attackerView.RPC(nameof(RPC_DamageCredit), PhotonNetwork.MasterClient, amount, takedown, cashedMark, markSecondsLeft, endsShield);
     }
 
     /// <summary>
@@ -199,9 +228,12 @@ public class PlayerCombatCredit : MonoBehaviourPun
     /// through the victim's PhotonView, merely targeted at the attacker. Inside an RPC body "local" is
     /// the RECEIVER, and the receiver is not this component's own object: reach for the attacker's OWN
     /// PlayerHealth through PlayerLookup (as RPC_HandleDeathMaster does), never `this` or `GetComponent`.
+    /// The one exception is a bot attacker's credit (IsCreditForThisBot): it comes through the bot's own
+    /// body to the host, so there `this` is the attacker.
     ///
-    /// info.Sender is checked against this object's owner (the victim) as an anti-spoof sanity check:
-    /// only the owner of this networked object should credit damage through it.
+    /// info.Sender is checked against this object's controller (the victim's own client, or the host
+    /// for a bot victim) as an anti-spoof sanity check: only the client that simulates this networked
+    /// object should credit damage through it.
     ///
     /// Parameters are only ever APPENDED (cashedMark, markSecondsLeft, then endsShield); the RpcList
     /// indexes method NAMES, so appending leaves it untouched. But PUN type-checks incoming arguments
@@ -215,32 +247,52 @@ public class PlayerCombatCredit : MonoBehaviourPun
     [PunRPC]
     private void RPC_DamageCredit(float amount, byte takedown, bool cashedMark, float markSecondsLeft, bool endsShield, PhotonMessageInfo info)
     {
-        if (info.Sender == null || info.Sender != photonView.Owner)
+        if (info.Sender == null)
             return;
 
-        PhotonView localView = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
-        PlayerHealth localHealth = localView != null ? localView.GetComponent<PlayerHealth>() : null;
+        if (IsCreditForThisBot(BodyRole.IsBot(photonView), info.Sender == photonView.Controller))
+        {
+            if (PhotonNetwork.IsMasterClient)
+                Credit(photonView, photonView.OwnerActorNr, false, amount, takedown, cashedMark, markSecondsLeft, endsShield);
+            return;
+        }
+
+        if (info.Sender != photonView.Controller)
+            return;
+
+        int localActor = PhotonNetwork.LocalPlayer.ActorNumber;
+        Credit(PlayerLookup.GetPhotonViewFor(localActor), localActor, true, amount, takedown, cashedMark, markSecondsLeft, endsShield);
+    }
+
+    /// <summary>What a credit message gives the attacker's body: its combat clock and its own CombatFeed. The screen
+    /// events (`transform` is then the VICTIM as this attacker sees it) only when the attacker is the human at this keyboard.</summary>
+    private void Credit(PhotonView attackerView, int attackerActor, bool toScreen, float amount, byte takedown, bool cashedMark,
+                        float markSecondsLeft, bool endsShield)
+    {
+        PlayerHealth attackerHealth = attackerView != null ? attackerView.GetComponent<PlayerHealth>() : null;
+        CombatFeed feed = CombatFeed.For(attackerActor);
 
         if (amount > 0f)
         {
-            localHealth?.NoteDealtDamage();
-            CombatEvents.RaiseDamageDealt(amount);
-            // `transform` is the VICTIM as this attacker sees it (see the RPC comment above).
-            CombatEvents.RaiseHitReported(transform, amount, cashedMark);
+            attackerHealth?.NoteDealtDamage();
+            feed.RaiseDamageDealt(amount);
+            if (toScreen)
+                CombatEvents.RaiseHitReported(transform, amount, cashedMark);
             // Damage that landed on an enemy (A25/A26). A hit the victim's shield stopped never gets here
             // (no credit is sent); endsShield is false when every hit came from an effect set up before the respawn.
-            CombatEvents.RaiseEnemyAffected(false, !endsShield);
+            feed.RaiseEnemyAffected(false, !endsShield);
         }
 
         // Always, even when amount is 0 (a death flush with no fresh damage still must hide a live
         // diamond), but after the sender check so a spoofed sender cannot clear or draw a diamond.
-        CombatEvents.RaiseMarkReported(transform, markSecondsLeft);
+        if (toScreen)
+            CombatEvents.RaiseMarkReported(transform, markSecondsLeft);
 
-        CombatEvents.RaisePlayerCredit(amount, takedown);
+        feed.RaiseCredit(amount, takedown);
 
         if (takedown == 1)
-            CombatEvents.RaiseTakedown(true);
+            feed.RaiseTakedown(true);
         else if (takedown == 2)
-            CombatEvents.RaiseTakedown(false);
+            feed.RaiseTakedown(false);
     }
 }

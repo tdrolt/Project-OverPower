@@ -11,9 +11,10 @@ using Overpower.Vision;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// One player's trigger. THE RULE: anything the sender meant travels as an RPC PARAMETER or comes from PhotonMessageInfo.Sender. Never read
-    /// transform, Camera.main, Input.mousePosition or PhotonNetwork.LocalPlayer inside an RPC body and expect the sender's values - they resolve
-    /// on the RECEIVING machine, so shots visibly diverge between clients.
+    /// One player's trigger. THE RULE: anything the sender meant travels as an RPC PARAMETER; who fired comes from this body's photonView.Owner
+    /// (ShooterOf), never PhotonMessageInfo.Sender, which is the host for every bot's shot. Never read transform, Camera.main, Input.mousePosition
+    /// or PhotonNetwork.LocalPlayer inside an RPC body and expect the sender's values - they resolve on the RECEIVING machine, so shots visibly
+    /// diverge between clients.
     /// Projectiles are simulated locally on every client and are NOT networked objects (PhotonNetwork.Instantiate per bullet would be dozens of
     /// networked objects a second for nine players); the fire RPC carries everything a receiver needs to build the identical shot.
     /// Deliberately NOT IPunObservable: the player's PhotonView uses AutoFindAll and would silently absorb a second observable. PlayerNetSync is the only one.
@@ -386,6 +387,14 @@ namespace Overpower.Weapons
             return CastGate.ForActor(alive, stunned, silenced);
         }
 
+        /// <summary>Who fired this body's shots: its owner, the same on every client (a bot's BotPlayer). Never info.Sender, the host for a bot,
+        /// which would credit the host and fly through the host's teammates.</summary>
+        private void ShooterOf(out int actor, out int team)
+        {
+            actor = photonView.OwnerActorNr;
+            Teams.TryGetTeam(photonView.Owner, out team);
+        }
+
         /// <summary>
         /// The laser's overheat rule from the GDD: every shot costs double heat (already added above), and half of it comes back if the beam connects.
         /// The SHOOTER decides, from its own ray, the instant it fires. Heat is local state only its owner reads, so nothing crosses the network. The
@@ -410,10 +419,8 @@ namespace Overpower.Weapons
             if (beam == null)
                 return;
 
-            // Outside an RPC body, so LocalPlayer really is the shooter here - these are the same
-            // values RPC_FireWeapon will read from info.Sender on every other machine.
-            int shooterActor = PhotonNetwork.LocalPlayer != null ? PhotonNetwork.LocalPlayer.ActorNumber : -1;
-            Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int shooterTeam);
+            // The same shooter RPC_FireWeapon builds on every machine, so the refund ray passes through the same friends.
+            ShooterOf(out int shooterActor, out int shooterTeam);
 
             ProjectileContext[] shots = BuildShots(weapon, direction, targetPoint, coneAngle, seed,
                                                     shooterActor, shooterTeam, chargeFraction,
@@ -464,8 +471,8 @@ namespace Overpower.Weapons
         private void RaiseShotShown(float fireIntervalSeconds) => ShotShown?.Invoke(fireIntervalSeconds);
 
         /// <summary>
-        /// Builds this shot on EVERY client, including the shooter's own. Every value it needs arrives as a parameter or from info.Sender; nothing in this
-        /// body reads local state that would differ per machine.
+        /// Builds this shot on EVERY client, including the shooter's own. Every value it needs arrives as a parameter or from this body's owner; nothing
+        /// in this body reads local state that would differ per machine.
         /// coneAngleDegrees is load-bearing: the seed alone cannot make the spread identical everywhere. PlayerAim ticks its cone only for its owner
         /// (Update early-returns on !IsMine) and the standing-still bonus depends on movement no other client knows about, so receivers would roll the
         /// same random number against a DIFFERENT cone width and the shots would diverge. The shooter's cone width is something the sender meant, so it
@@ -486,10 +493,7 @@ namespace Overpower.Weapons
                 return;
             }
 
-            // From the SENDER. PhotonNetwork.LocalPlayer here would be the receiver, which hands
-            // kill credit to the victim - see DamageInfo.SourceActorNumber.
-            int shooterActor = info.Sender != null ? info.Sender.ActorNumber : -1;
-            Teams.TryGetTeam(info.Sender, out int shooterTeam);
+            ShooterOf(out int shooterActor, out int shooterTeam);
 
             // damageMultiplier/rangeMultiplier are the SHOOTER's OverPower state (GDD p.20) at the moment it fired, carried as RPC parameters so every
             // client - including the shooter's own - builds an identical shot. Never re-read locally: a receiver cannot know another player's OverPower state.

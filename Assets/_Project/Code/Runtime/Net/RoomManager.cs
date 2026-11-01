@@ -46,6 +46,13 @@ public class RoomManager : MonoBehaviourPunCallbacks
     [Tooltip("Every Dominion number (round and break length, points, bounties, respawns, shop). Read by the Dominion round flow.")]
     [SerializeField] private DominionConfig dominionConfig;
 
+    [Header("Bots")]
+    [Tooltip("Every number that shapes how a bot plays, their names and their three builds.")]
+    [SerializeField] private BotConfig botConfig;
+
+    /// <summary>The bots' names, builds and every number of how they play.</summary>
+    public BotConfig BotSettings => botConfig;
+
     /// <summary>Every game mode a lobby can be created with (the create screen lists them).</summary>
     public GameModeCatalogue ModeCatalogue => modeCatalogue;
 
@@ -76,6 +83,9 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// <summary>The client side of coming back after a drop. The name screen asks it whether to offer a rejoin.</summary>
     public RejoinController Rejoin { get; private set; }
 
+    /// <summary>Keeps this client's bot players in step with the room (added first in Awake).</summary>
+    public BotRoster Bots { get; private set; }
+
     /// <summary>Seconds the room keeps a dropped player's place: RoomOptions.PlayerTtl, and how long the name screen offers
     /// "Rejoin your match". One home: GameplayConfig.</summary>
     public float RejoinWindowSeconds => gameplayConfig != null ? gameplayConfig.RejoinWindowSeconds : 0f;
@@ -88,6 +98,10 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     void Awake()
     {
+        // First of the room components: Photon calls them in the order they registered, and a bot must be in the player list
+        // before anything below reads its seat.
+        Bots = gameObject.AddComponent<BotRoster>();
+        gameObject.AddComponent<Overpower.Bots.BotDirector>().Init(this, botConfig, gameplayConfig, visionConfig);
         // Created in Awake, not Start: the name screen (NameScreen.Start) subscribes to it and Start order is not fixed.
         Rejoin = gameObject.AddComponent<RejoinController>();
         Rejoin.Init(theme, RejoinWindowSeconds);
@@ -219,7 +233,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
         // A new player arrives seatless: no team and no body until the host starts the game (LobbyStart spawns
         // them on their seat's team). A team or spectator flag left on the local player by a previous room is cleared here.
-        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { Teams.TeamKey, null }, { Teams.SpectatorKey, null } });
+        PlayerProps.Set(PhotonNetwork.LocalPlayer, new Hashtable { { Teams.TeamKey, null }, { Teams.SpectatorKey, null } });
     }
 
     /// <summary>The rejoin branch of OnJoinedRoom (also run when a rejoined player's scene was swapped for the mode's: see ResumeInRoomAfterSceneLoad).</summary>
@@ -230,7 +244,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
         if (GameStart != null && GameStart.GameRunningWithoutMySeat)
         {
             Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back but no longer has a seat - joining the running game as a late joiner");
-            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { Teams.TeamKey, null }, { Teams.SpectatorKey, null } });
+            PlayerProps.Set(PhotonNetwork.LocalPlayer, new Hashtable { { Teams.TeamKey, null }, { Teams.SpectatorKey, null } });
             return;
         }
         // A player who held a spectator seat comes back as a spectator: no body, no watchdog (LobbyStart starts the spectator view
@@ -444,7 +458,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
         var props = new Hashtable();
         foreach (var pair in MatchPropertyReset.Build())
             props[pair.Key] = pair.Value;
-        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+        PlayerProps.Set(PhotonNetwork.LocalPlayer, props);
     }
 
     /// <summary>Spawns this client's body on a team (LobbyStart calls it when the game starts; the rejoin watchdog
@@ -479,20 +493,36 @@ public class RoomManager : MonoBehaviourPunCallbacks
         SetupPlayerTeamComponent(player, teamID);
     }
 
+    /// <summary>The host makes a bot's body: the player prefab and the players' spawn rules, with the bot's actor in the instantiation data
+    /// (BotSeat hands the body to the bot on every client). The bot's team goes into its room record, as a player writes their own.</summary>
+    public PhotonView SpawnBotOnTeam(int botActor, int teamID)
+    {
+        if (!PhotonNetwork.IsMasterClient || !RoomSceneIsLoaded || !ValidateTeamResources(teamID)) return null;
+        BotPlayer bot = BotRoster.Ensure(botActor);
+        if (bot == null) return null;
+        PlayerProps.Set(bot, new Hashtable { { Teams.TeamKey, teamID } });
+        Transform spawnPoint = SpawnPointFor(teamID, teamID, botActor) ?? teamSpawnPoints[teamID];
+        GameObject body = PhotonNetwork.Instantiate(playerPrefab.name, spawnPoint.position, Quaternion.identity, 0, new object[] { teamID, botActor });
+        Debug.Log($"[BOTS] spawned {bot.NickName} ({botActor}) on team {teamID}");
+        return body.GetComponent<PhotonView>();
+    }
+
     /// <summary>Where THIS player stands when they appear for a team: the team's spawn point, or - when that point has child points (a map where a team's
     /// players should not pile onto one spot, e.g. the Dominion lane) - the child that is theirs. Teammates take different children (SpawnSlotRules: the order
     /// of their actor numbers), the same one every time they come back, unless another living player stands on it (SpawnSlotRules.FreeSlotFor: then the
     /// first free child). Null when the team has no spawn point. avoidOccupied is false for a move that sends everyone home in the same moment: each
     /// client would check teammates' positions from before the move and two of them could pick the same free child, where rank children never collide.</summary>
-    public Transform SpawnPointFor(int spawnIndex, int ownTeam = -1, bool avoidOccupied = true)
+    public Transform SpawnPointFor(int spawnIndex, int ownTeam = -1, int actor = -1, bool avoidOccupied = true)
     {
         if (teamSpawnPoints == null || spawnIndex < 0 || spawnIndex >= teamSpawnPoints.Length || teamSpawnPoints[spawnIndex] == null)
             return null;
         Transform home = teamSpawnPoints[spawnIndex];
         if (home.childCount == 0 || PhotonNetwork.LocalPlayer == null)
             return home;
+        // A bot's body is placed by the host: its own actor, not the host's, decides its slot.
+        if (actor < 0) actor = PhotonNetwork.LocalPlayer.ActorNumber;
         var teammates = new System.Collections.Generic.List<int>();
-        if (ownTeam < 0 && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int propertyTeam))
+        if (ownTeam < 0 && Teams.TryGetTeam(actor, out int propertyTeam))
             ownTeam = propertyTeam;
         if (ownTeam >= 0)
             foreach (Photon.Realtime.Player other in PhotonNetwork.PlayerList)
@@ -505,29 +535,29 @@ public class RoomManager : MonoBehaviourPunCallbacks
             var seatPairs = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, int>>();
             foreach (System.Collections.DictionaryEntry entry in PhotonNetwork.CurrentRoom.CustomProperties)
                 if (entry.Key is string key && entry.Value is int actorNumber) seatPairs.Add(new System.Collections.Generic.KeyValuePair<string, int>(key, actorNumber));
-            foreach (int actor in SpawnSlotRules.TeammatesFromSeats(seatPairs, ownTeam))
-                if (!teammates.Contains(actor)) teammates.Add(actor);
+            foreach (int mate in SpawnSlotRules.TeammatesFromSeats(seatPairs, ownTeam))
+                if (!teammates.Contains(mate)) teammates.Add(mate);
         }
-        if (!teammates.Contains(PhotonNetwork.LocalPlayer.ActorNumber))
-            teammates.Add(PhotonNetwork.LocalPlayer.ActorNumber);
-        int ownSlot = SpawnSlotRules.SlotFor(teammates, PhotonNetwork.LocalPlayer.ActorNumber, home.childCount);
+        if (!teammates.Contains(actor))
+            teammates.Add(actor);
+        int ownSlot = SpawnSlotRules.SlotFor(teammates, actor, home.childCount);
         if (!avoidOccupied)
             return home.GetChild(ownSlot);
         var slots = new System.Collections.Generic.List<Vector3>(home.childCount);
         foreach (Transform slot in home) slots.Add(slot.position);
         float clearRadius = gameplayConfig != null ? gameplayConfig.SpawnSlotClearRadius : 0f;
-        return home.GetChild(SpawnSlotRules.FreeSlotFor(slots, OtherLivingBodies(), clearRadius, ownSlot));
+        return home.GetChild(SpawnSlotRules.FreeSlotFor(slots, OtherLivingBodies(actor), clearRadius, ownSlot));
     }
 
     // Every other living body, whatever its team: two capsules inside each other are pushed apart by physics whoever owns them.
-    // This client's own body is left out, since it is the one being placed.
-    private static System.Collections.Generic.List<Vector3> OtherLivingBodies()
+    // The body being placed is left out.
+    private static System.Collections.Generic.List<Vector3> OtherLivingBodies(int placedActor)
     {
         var standing = new System.Collections.Generic.List<Vector3>();
         foreach (PlayerLifecycle body in FindObjectsByType<PlayerLifecycle>(FindObjectsSortMode.None))
         {
             PhotonView view = body.GetComponent<PhotonView>();
-            if (body.IsAlive && (view == null || !view.IsMine))
+            if (body.IsAlive && (view == null || view.OwnerActorNr != placedActor))
                 standing.Add(body.transform.position);
         }
         return standing;
@@ -579,7 +609,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
     {
         Hashtable teamProperty = new Hashtable();
         teamProperty.Add("teamID", teamID);
-        PhotonNetwork.LocalPlayer.SetCustomProperties(teamProperty);
+        PlayerProps.Set(PhotonNetwork.LocalPlayer, teamProperty);
     }
 
     /// <summary>Which team the local player is on (-1 when none), for callers like the rejoin branch and MatchDirector's teams-fixed and

@@ -1,6 +1,7 @@
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
+using Overpower.Net;
 using Overpower.UI;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
@@ -40,7 +41,8 @@ public class PlayerNameTag : MonoBehaviourPunCallbacks
                             "canvas and its bar, or they will have no name and no friend-or-enemy colour.");
         else
         {
-            plate.SetOwnPlate(NameplateRules.ShowsOwnBars(photonView.IsMine));
+            // The local human's, not IsMine: on the host every bot's body is IsMine too, and its plate is a teammate's or an enemy's.
+            plate.SetOwnPlate(NameplateRules.ShowsOwnBars(BodyRole.IsLocalHuman(photonView)));
             plate.SetName(photonView.Owner != null ? photonView.Owner.NickName : string.Empty);
         }
 
@@ -82,7 +84,7 @@ public class PlayerNameTag : MonoBehaviourPunCallbacks
         }
 
         UiTheme theme = health.Theme;
-        Color nameColour = NameplateRules.NameColour(photonView.IsMine, localTeam, theirTeam, theme.nameplateSelfNameColor,
+        Color nameColour = NameplateRules.NameColour(BodyRole.IsLocalHuman(photonView), localTeam, theirTeam, theme.nameplateSelfNameColor,
             theme.nameplateTeammateNameColor, theme.nameplateEnemyNameColor, theme.nameplateUnknownNameColor);
         plate.SetColours(nameColour, NameplateRules.EdgeColour(theirTeam, theme));
     }
