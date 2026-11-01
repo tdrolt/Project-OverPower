@@ -6,6 +6,9 @@ namespace Overpower.Bots
     /// <summary>Whom a bot fights: the closest enemy its team can see, kept until another is clearly closer (no flicking between two).</summary>
     public static class BotTargetRules
     {
+        /// <summary>Whether an enemy is worth shooting at all: alive and not behind its respawn shield.</summary>
+        public static bool Targetable(bool alive, bool shielded) => alive && !shielded;
+
         /// <summary>The actor to fight among (actor, distance) pairs its team can see; -1 when none.</summary>
         public static int Pick(IReadOnlyList<(int actor, float distance)> visible, int current, float switchMetres)
         {

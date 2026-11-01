@@ -26,6 +26,14 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void AShieldedOrDeadEnemyIsNoTarget()
+        {
+            Assert.IsTrue(BotTargetRules.Targetable(true, false));
+            Assert.IsFalse(BotTargetRules.Targetable(true, true), "its respawn shield stops every shot: a player would not waste time on it");
+            Assert.IsFalse(BotTargetRules.Targetable(false, false));
+        }
+
+        [Test]
         public void TheAimSettlesFromTheFirstErrorToTheSettledOne()
         {
             Assert.AreEqual(2f, BotAimRules.ErrorMetres(0f, 2f, 0.5f, 3f), 1e-4f);

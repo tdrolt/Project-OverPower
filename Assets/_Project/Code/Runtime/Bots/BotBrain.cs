@@ -209,7 +209,7 @@ namespace Overpower.Bots
                 PhotonView body = PlayerLookup.GetPhotonViewFor(player.ActorNumber);
                 if (body == null) continue;
                 PlayerHealth theirHealth = body.GetComponent<PlayerHealth>();
-                if (theirHealth == null || !theirHealth.IsAlive) continue;
+                if (!BotTargetRules.Targetable(theirHealth != null && theirHealth.IsAlive, RespawnShield.IsUpFor(player))) continue;
                 enemyBodies[player.ActorNumber] = body;
                 if (!TeamSightQuery.CanTeamSeeBody(team, body)) continue;
                 lastSeen[player.ActorNumber] = (body.transform.position, Time.time);
