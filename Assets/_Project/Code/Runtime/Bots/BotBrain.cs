@@ -100,6 +100,18 @@ namespace Overpower.Bots
             public Vector3? AimAt;
         }
 
+        /// <summary>What this bot has done so far, for the checks and Tudor's tuning: key presses per ability slot, trigger pulls, Vent
+        /// presses, packs taken, purchases and times it backed off.</summary>
+        public struct Tally
+        {
+            public int Attachment, Movement, Ultimate, Pulls, Vents, Packs, Purchases, Retreats;
+            public override string ToString() =>
+                $"attach {Attachment} move {Movement} ult {Ultimate} pulls {Pulls} vents {Vents} packs {Packs} buys {Purchases} retreats {Retreats}";
+        }
+
+        private Tally tally;
+        public Tally Done => tally;
+
         public BotPlayer Bot => bot;
         public int Target => target;
         public BotStance Stance => stance;
@@ -192,7 +204,9 @@ namespace Overpower.Bots
             See();
             PickTarget();
             bool cornered = NearestVisibleEnemyMetres() <= cfg.CorneredMetres;
+            BotStance was = stance;
             stance = BotHealthRules.Stance(stance, Health01, cfg.RetreatHealth, cfg.ReturnHealth, cornered);
+            if (stance == BotStance.Retreat && was != BotStance.Retreat) tally.Retreats++;
             ChooseGoal();
             ChooseAbilities();
         }
@@ -706,11 +720,18 @@ namespace Overpower.Bots
         {
             if (pending.Slot == PressSlot.None) return;
             pending.Stage++;
+            if (pending.Stage == 2)
+            {
+                if (pending.Slot == PressSlot.Attachment) tally.Attachment++;
+                else if (pending.Slot == PressSlot.Mobility) tally.Movement++;
+                else tally.Ultimate++;
+            }
             if (pending.Stage > 3) pending = default;
         }
 
         private void AimAndFire()
         {
+            bool wasPulling = primaryHeld;
             primaryHeld = false;
             Vector3 desired;
             float distance = 0f;
@@ -766,6 +787,7 @@ namespace Overpower.Bots
             canAct &= abilities == null || !abilities.CasterLocked;
             primaryHeld = BotFireRules.ShouldFire(true, BotFireRules.Reacted(Time.time - targetSeenSince, cfg.ReactionSeconds), aimed, distance, range,
                 overheat != null ? overheat.Normalised : 0f, cfg.StopFiringHeat, targetHealth01, cfg.FinishTargetHealth, canAct);
+            if (primaryHeld && !wasPulling) tally.Pulls++;
         }
 
         private void Vent()
@@ -780,6 +802,7 @@ namespace Overpower.Bots
             wasSilenced = silenced;
             if (!BotVentRules.PressNow(silenced, overheat.IsVentWindowOpen, ventWillHit, ventPressed)) return;
             ventPressed = true;
+            tally.Vents++;
             router?.PressBotVent();
         }
 
@@ -787,7 +810,9 @@ namespace Overpower.Bots
         {
             if (wantedPack < 0 || HealthPackManager.Instance == null || !goal.HasValue) return;
             if (Flat(goal.Value, Position) > HealthPackManager.Instance.PickupRadius) return;
-            if (HealthPackManager.Instance.TryTakeForBot(view, wantedPack)) wantedPack = -1;
+            if (!HealthPackManager.Instance.TryTakeForBot(view, wantedPack)) return;
+            wantedPack = -1;
+            tally.Packs++;
         }
 
         // ---- moving ----
@@ -872,6 +897,7 @@ namespace Overpower.Bots
             if (!ctx.IsFree && ctx.Check(offer.Price) != PurchaseBlock.None) return;
             if (offer.Price > 0 && (wallet == null || !wallet.TrySpend(offer.Price))) return;
             Apply(offer.Step, cap);
+            tally.Purchases++;
             Debug.Log($"[BOTS] {bot.NickName} bought {offer.Step} for {offer.Price}");
         }
 
