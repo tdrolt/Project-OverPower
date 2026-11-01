@@ -52,7 +52,7 @@ MonoBehaviour:
   secondsPerStack: 1
   vulnerabilitySeconds: 4
   beamRange: 28.8
-  beamWidth: 0.6825
+  beamWidth: 1.365
   hitMask:
     serializedVersion: 2
     m_Bits: 4294967295
