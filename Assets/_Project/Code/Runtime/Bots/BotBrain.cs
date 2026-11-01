@@ -44,7 +44,8 @@ namespace Overpower.Bots
         private GoldWallet wallet;
         private BotSeat seat;
 
-        private readonly NavMeshPath path = new NavMeshPath();
+        // Made in Awake: Unity refuses a NavMeshPath built during construction, and the refusal would leave every field after it unset.
+        private NavMeshPath path;
         private Vector3[] corners = new Vector3[0];
         private bool hasPath;
         private Vector3? goal;
@@ -117,6 +118,7 @@ namespace Overpower.Bots
 
         private void Awake()
         {
+            path = new NavMeshPath();
             view = GetComponent<PhotonView>();
             router = GetComponent<PlayerInputRouter>();
             aim = GetComponent<PlayerAim>();
