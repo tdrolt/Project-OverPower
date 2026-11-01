@@ -85,6 +85,44 @@ namespace Overpower.Data
         [Tooltip("How fast the cross turns, in degrees per second.")]
         [SerializeField] private float spinDegreesPerSecond = 60f;
 
+        [Tooltip("How thick the edge round the floating cross and icosahedron is, in metres: it makes their shape read on any floor. 0 = no edge.")]
+        [SerializeField, Min(0f)] private float shapeOutlineMetres = 0.05f;
+
+        [Tooltip("The colour of that edge.")]
+        [SerializeField] private Color shapeOutlineColour = Color.black;
+
+        [Header("Ultimate pack pickup rings")]
+        [Tooltip("How many rings rise round a player who takes an ultimate charge pack. Everyone who can see that player sees them.")]
+        [SerializeField, Range(1, 6)] private int pickupRingCount = 3;
+
+        [Tooltip("Seconds each ring takes to rise from the feet and fade out.")]
+        [SerializeField, Min(0.05f)] private float pickupRingSeconds = 0.8f;
+
+        [Tooltip("Seconds between one ring starting and the next.")]
+        [SerializeField, Min(0f)] private float pickupRingDelaySeconds = 0.15f;
+
+        [Tooltip("A ring's radius at the feet, in metres.")]
+        [SerializeField, Min(0.05f)] private float pickupRingStartRadius = 0.7f;
+
+        [Tooltip("A ring's radius at the top, in metres: wider than at the start, so the rings open out as they climb.")]
+        [SerializeField, Min(0.05f)] private float pickupRingEndRadius = 1.2f;
+
+        [Tooltip("How high the rings rise above the floor, in metres.")]
+        [SerializeField, Min(0f)] private float pickupRingRiseMetres = 2.6f;
+
+        [Tooltip("How thick each ring's line is, in metres.")]
+        [SerializeField, Min(0.01f)] private float pickupRingWidthMetres = 0.08f;
+
+        public float ShapeOutlineMetres => shapeOutlineMetres;
+        public Color ShapeOutlineColour => shapeOutlineColour;
+        public int PickupRingCount => pickupRingCount;
+        public float PickupRingSeconds => pickupRingSeconds;
+        public float PickupRingDelaySeconds => pickupRingDelaySeconds;
+        public float PickupRingStartRadius => pickupRingStartRadius;
+        public float PickupRingEndRadius => pickupRingEndRadius;
+        public float PickupRingRiseMetres => pickupRingRiseMetres;
+        public float PickupRingWidthMetres => pickupRingWidthMetres;
+
         [Header("Ultimate charge packs")]
         [Tooltip("How much of the ultimate meter a pack gives, as a share of the whole meter: 0.3 = 30%. A pack is never taken with a full meter; it stays for the others.")]
         [SerializeField, Range(0f, 1f)] private float ultimateChargeFraction = 0.3f;

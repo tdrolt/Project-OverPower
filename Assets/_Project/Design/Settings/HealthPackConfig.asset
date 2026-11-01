@@ -33,6 +33,15 @@ MonoBehaviour:
   bobCyclesPerSecond: 0.6
   crossLeanDegrees: 65
   spinDegreesPerSecond: 60
+  shapeOutlineMetres: 0.05
+  shapeOutlineColour: {r: 0, g: 0, b: 0, a: 1}
+  pickupRingCount: 3
+  pickupRingSeconds: 0.8
+  pickupRingDelaySeconds: 0.15
+  pickupRingStartRadius: 0.7
+  pickupRingEndRadius: 1.2
+  pickupRingRiseMetres: 2.6
+  pickupRingWidthMetres: 0.08
   ultimateChargeFraction: 0.3
   ultimateRespawnSeconds: 30
   ultimatePackColour: {r: 1, g: 0.85, b: 0.25, a: 1}
@@ -40,15 +49,15 @@ MonoBehaviour:
   - sceneName: Game Scene
     healAmount: 50
     ultimateSpots:
-    - {x: 65.05, y: 44.84}
-    - {x: 57.69, y: 57.59}
-    - {x: 72.41, y: 57.59}
+    - {x: 65.05, y: 43.79}
+    - {x: 56.79, y: 58.13}
+    - {x: 73.31, y: 58.13}
     healthSpots: []
   - sceneName: Dominion 2v2
     healAmount: 25
     ultimateSpots:
-    - {x: 63.55, y: 54.9}
-    - {x: 66.65, y: 51.7}
+    - {x: 58.6, y: 55.3}
+    - {x: 71.6, y: 51.3}
     healthSpots:
     - {x: 73.3, y: 65}
     - {x: 56.9, y: 41.6}

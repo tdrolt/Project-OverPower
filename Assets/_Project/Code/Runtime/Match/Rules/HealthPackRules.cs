@@ -66,6 +66,17 @@ namespace Overpower.Match
         /// <summary>An ultimate charge pack: alive, ready, in play, and a meter with room left (a full one leaves it for the others).</summary>
         public static bool MayTakeUltimate(bool alive, bool meterFull, bool available, bool inPlay) => alive && !meterFull && available && inPlay;
 
+        /// <summary>Every client shows the rings when an ultimate pack's room value says it was just taken (within a second of this clock).</summary>
+        public static bool ShowsPickupRings(bool ultimatePack, int[] value, int nowMs)
+        {
+            if (!ultimatePack || value == null || value.Length < 2)
+                return false;
+            int age = nowMs - value[0];
+            return age >= 0 && age < PickupRingsFreshMs;
+        }
+
+        private const int PickupRingsFreshMs = 1000;
+
         /// <summary>Which of the configured spot lists belongs to this map (its scene name), or -1 for none.</summary>
         public static int SpotSetIndex(System.Collections.Generic.IReadOnlyList<string> sceneNames, string scene)
         {

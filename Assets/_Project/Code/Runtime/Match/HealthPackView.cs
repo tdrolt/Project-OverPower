@@ -27,6 +27,8 @@ namespace Overpower.Match
         private Transform cross;
         private Transform lean;
         private Renderer[] crossRenderers;
+        private Renderer[] outlineRenderers;
+        private Material outlineMaterial;
         private MeshRenderer edgeRenderer;
         private Mesh padMesh;
         private Mesh edgeMesh;
@@ -36,6 +38,7 @@ namespace Overpower.Match
 
         public bool ShownReady { get; private set; }
         public Renderer[] CrossRenderers => crossRenderers;
+        public Renderer[] OutlineRenderers => outlineRenderers;
         public Renderer EdgeRenderer => edgeRenderer;
         public Transform Cross => cross;
 
@@ -85,18 +88,37 @@ namespace Overpower.Match
             var leanObject = new GameObject("Lean");
             leanObject.transform.SetParent(crossObject.transform, false);
             view.lean = leanObject.transform;
-            float length = config.CrossSizeMetres, arm = length / 3f;
+            float length = config.CrossSizeMetres, arm = length / 3f, edge = config.ShapeOutlineMetres;
+            // The black edge: each part again, grown by the edge's thickness and drawn from the inside only (front faces culled), so
+            // it shows as a rim round the part and never over it.
+            view.outlineMaterial = new Material(solid.shader) { name = "Pack Shape Edge", hideFlags = HideFlags.HideAndDontSave };
+            view.outlineMaterial.SetFloat("_Cull", 1f);
             if (ultimate)
             {
                 view.shapeMesh = IcosahedronMesh.Create(length / 2f); // as tall as the cross
-                view.crossRenderers = new Renderer[] { AddMesh(leanObject.transform, "Icosahedron", view.shapeMesh, solid) };
+                MeshRenderer body = AddMesh(leanObject.transform, "Icosahedron", view.shapeMesh, solid);
+                MeshRenderer rim = AddMesh(body.transform, "Icosahedron edge", view.shapeMesh, view.outlineMaterial);
+                rim.transform.localScale = Vector3.one * (HealthPackLook.OutlineSize(Vector3.one * length, edge).x / length);
+                view.crossRenderers = new Renderer[] { body };
+                view.outlineRenderers = new Renderer[] { rim };
             }
             else
+            {
+                var horizontal = new Vector3(length, arm, arm);
+                var vertical = new Vector3(arm, length, arm);
                 view.crossRenderers = new Renderer[]
                 {
-                    MakeBox(leanObject.transform, "Horizontal bar", new Vector3(length, arm, arm), solid),
-                    MakeBox(leanObject.transform, "Vertical bar", new Vector3(arm, length, arm), solid),
+                    MakeBox(leanObject.transform, "Horizontal bar", horizontal, solid),
+                    MakeBox(leanObject.transform, "Vertical bar", vertical, solid),
                 };
+                view.outlineRenderers = new Renderer[]
+                {
+                    MakeBox(leanObject.transform, "Horizontal bar edge", HealthPackLook.OutlineSize(horizontal, edge), view.outlineMaterial),
+                    MakeBox(leanObject.transform, "Vertical bar edge", HealthPackLook.OutlineSize(vertical, edge), view.outlineMaterial),
+                };
+            }
+            foreach (Renderer rim in view.outlineRenderers)
+                VisualTint.SetMeshColor(rim, view.block, config.ShapeOutlineColour);
             view.Animate(0f);
             view.Paint(true);
             return view;
@@ -161,6 +183,12 @@ namespace Overpower.Match
             Free(ref padMesh);
             Free(ref edgeMesh);
             Free(ref shapeMesh);
+            if (outlineMaterial != null)
+            {
+                if (Application.isPlaying) Destroy(outlineMaterial);
+                else DestroyImmediate(outlineMaterial);
+                outlineMaterial = null;
+            }
         }
 
         private static void Free(ref Mesh mesh)

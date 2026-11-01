@@ -410,6 +410,10 @@ namespace Overpower.Match
                 pack.hasOutstanding = false;
                 pack.pending = null;
 
+                if (HealthPackRules.ShowsPickupRings(pack.ultimate, value, PhotonNetwork.ServerTimestamp))
+                    PickupRingsView.Play(PlayerLookup.GetPhotonViewFor(value[1]), config, config.UltimatePackColour,
+                                         theme != null && theme.arenaLook != null ? theme.arenaLook.fxAlpha : null);
+
                 if (localHealth == null)
                     continue;
                 if (!HealthPackRules.EchoIsMyFreshTake(value, PhotonNetwork.LocalPlayer.ActorNumber, nextRequestId,
