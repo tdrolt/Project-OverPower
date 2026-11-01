@@ -87,6 +87,7 @@ namespace Overpower.Data
         [Header("Moving in a fight")]
         [Tooltip("It strafes left and right while it fights and switches side after a random time between these two, in seconds.")]
         [SerializeField, Min(0.1f)] private float strafeSwitchMinSeconds = 1.5f;
+        [Tooltip("The longest it strafes one way before switching, in seconds (see the line above).")]
         [SerializeField, Min(0.1f)] private float strafeSwitchMaxSeconds = 2.5f;
 
         [Header("Heat")]
@@ -116,6 +117,7 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float flameMetres = 5f;
         [Tooltip("Zip to close in on a target between these two distances, in metres...")]
         [SerializeField, Min(0f)] private float zipMinMetres = 8f;
+        [Tooltip("The furthest target it zips toward, in metres.")]
         [SerializeField, Min(0f)] private float zipMaxMetres = 16f;
         [Tooltip("...and only above this much health.")]
         [SerializeField, Range(0f, 1f)] private float zipMinHealth = 0.5f;

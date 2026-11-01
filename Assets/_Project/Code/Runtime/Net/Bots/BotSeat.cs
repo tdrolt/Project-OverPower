@@ -34,7 +34,7 @@ namespace Overpower.Net
         private void Awake()
         {
             PhotonView view = GetComponent<PhotonView>();
-            if (view == null || !TryReadActor(view.InstantiationData, out int actor)) return;
+            if (!TryReadActor(view != null ? view.InstantiationData : null, out int actor)) return;
             BotPlayer bot = BotRoster.Ensure(actor);
             if (bot == null)
             {

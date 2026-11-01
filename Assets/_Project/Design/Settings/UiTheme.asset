@@ -144,7 +144,7 @@ MonoBehaviour:
   loadoutArmorPathHeight: 64
   loadoutArmorPathTextWidth: 340
   loadoutArmorPathIconSize: 48
-  loadoutArmorHeadingText: "Armor — two upgrade paths"
+  loadoutArmorHeadingText: "Armor \u2014 two upgrade paths"
   loadoutArmorStepSize: 20
   loadoutArmorStepSpacing: 90
   loadoutArmorStepLineWidth: 4
@@ -567,7 +567,8 @@ MonoBehaviour:
   leaveMatchRejoinNoteText: You can rejoin from the list while the match is running.
   leaveMatchYesText: YES, LEAVE
   leaveMatchStayText: STAY
-  matchDataNoticeText: Match data, including your player name, is collected to help improve the game.
+  matchDataNoticeText: Match data, including your player name, is collected to help
+    improve the game.
   quitYesText: Yes
   quitNoText: No
   matchLogSavedText: 'Your match log is saved.
@@ -860,6 +861,9 @@ MonoBehaviour:
   lobbyRoomEmptySeatText: Empty seat
   lobbyRoomYouSuffix: ' (you)'
   lobbyRoomHostSuffix: " \xB7 host"
+  lobbyRoomBotSuffix: ' <color=#8F9399>BOT</color>'
+  lobbyRoomAddBotText: + Add bot
+  lobbyRoomFillBotsText: Fill with bots
   lobbyRoomSpectatorsText: Spectators
   lobbyRoomNoRoleFormat: No role ({0})
   lobbyRoomNoRoleNote: At the start they fill the emptiest team, then the spectator

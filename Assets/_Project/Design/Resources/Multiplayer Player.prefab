@@ -2914,6 +2914,7 @@ GameObject:
   - component: {fileID: 8987111587285106385}
   - component: {fileID: 2598302905374254828}
   - component: {fileID: 2381349880885733557}
+  - component: {fileID: 4230351615809481897}
   m_Layer: 0
   m_Name: Multiplayer Player
   m_TagString: Player
@@ -3523,6 +3524,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
+--- !u!114 &4230351615809481897
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536872752076754183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5117596bf7005024d97e690ecae8b4e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &2741422025056904628
 GameObject:
   m_ObjectHideFlags: 0

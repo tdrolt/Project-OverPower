@@ -750,6 +750,7 @@ MonoBehaviour:
   lobbyConfig: {fileID: 11400000, guid: 8b0e874f150976448a033eed017ab4d9, type: 2}
   visionConfig: {fileID: 11400000, guid: 8f976973125e6cc408a4086d6ba10c5d, type: 2}
   dominionConfig: {fileID: 11400000, guid: e1b8099001138b04bb5a91332acba4fa, type: 2}
+  botConfig: {fileID: 11400000, guid: 7cdced68986f7eb40a2313481e9a28c8, type: 2}
 --- !u!114 &7108746357274768874
 MonoBehaviour:
   m_ObjectHideFlags: 0

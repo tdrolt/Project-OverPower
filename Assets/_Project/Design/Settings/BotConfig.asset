@@ -1,0 +1,137 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e5ee79951af009747b676b63e82cc60d, type: 3}
+  m_Name: BotConfig
+  m_EditorClassIdentifier: 
+  names:
+  - Mira
+  - Jonas
+  - Sanne
+  - Bram
+  - Noor
+  - Lucas
+  - Fenna
+  - Daan
+  - Tess
+  - Milan
+  - Lotte
+  - Ruben
+  - Isa
+  - Sem
+  - Jade
+  - Thijs
+  - Evi
+  - Luuk
+  - Roos
+  - Finn
+  - Yara
+  - Stijn
+  - Lina
+  - Joris
+  - Nina
+  - Koen
+  - Maud
+  - Olaf
+  - Vera
+  - Timo
+  - pixelfox
+  - NightOwl
+  - Kestrel
+  - mossy
+  - Tidebreaker
+  - Juno
+  - Quinn
+  - Rikkert
+  - Ilse
+  - Wouter
+  builds:
+  - name: Shotgun
+    familyWeapon: {fileID: 11400000, guid: 27983484f42c6eb409acf1c5d0d8e823, type: 2}
+    upgradeWeapon: {fileID: 11400000, guid: 92f073324e7eb0243ba8c161975de076, type: 2}
+    attachment: {fileID: 11400000, guid: 7c65659eb5d202342a562aad8f2d141d, type: 2}
+    movement: {fileID: 11400000, guid: eb7e5df75e9512c48bed6766e4e6d997, type: 2}
+    ultimate: {fileID: 11400000, guid: d8d5ee1b6edd5044dae466f49e2d9c1d, type: 2}
+    absorbUpgrades: 2
+    rechargeUpgrades: 0
+    fightRangeMin: 3
+    fightRangeMax: 6
+  - name: Burst
+    familyWeapon: {fileID: 11400000, guid: b52e9c7b32723bf4a8dcd0d813187443, type: 2}
+    upgradeWeapon: {fileID: 11400000, guid: baf657da301a45544a319d0c63d818aa, type: 2}
+    attachment: {fileID: 11400000, guid: b816fdb581ae1c7478158614e4501c67, type: 2}
+    movement: {fileID: 11400000, guid: 6fe3d4b091b7faf47b861df9dbb7fb82, type: 2}
+    ultimate: {fileID: 11400000, guid: b29e4ff381e327c45997b558263bb6b1, type: 2}
+    absorbUpgrades: 1
+    rechargeUpgrades: 1
+    fightRangeMin: 8
+    fightRangeMax: 14
+  - name: Laser
+    familyWeapon: {fileID: 11400000, guid: 8fa3cfc5d5169494cb5251a678cca581, type: 2}
+    upgradeWeapon: {fileID: 11400000, guid: c43b3d099d51da145806adeaa5733630, type: 2}
+    attachment: {fileID: 11400000, guid: f691ddec9713d8a45aabc56f07dd9dfb, type: 2}
+    movement: {fileID: 11400000, guid: 4641354ad41ac4846aa078660734338a, type: 2}
+    ultimate: {fileID: 11400000, guid: f06398ca97ce34d4fa89271c58865d1b, type: 2}
+    absorbUpgrades: 0
+    rechargeUpgrades: 2
+    fightRangeMin: 14
+    fightRangeMax: 20
+  reactionSeconds: 0.5
+  memorySeconds: 3
+  targetSwitchMetres: 3
+  thinkSeconds: 0.1
+  aimErrorStartMetres: 1.5
+  aimErrorMinMetres: 0.5
+  aimSettleSeconds: 2
+  aimWobbleSeconds: 0.3
+  turnDegreesPerSecond: 360
+  leadFraction: 0.5
+  strafeSwitchMinSeconds: 1.5
+  strafeSwitchMaxSeconds: 2.5
+  stopFiringHeat: 0.8
+  finishTargetHealth: 0.25
+  ventSuccessChance: 0.5
+  retreatHealth: 0.35
+  returnHealth: 0.7
+  corneredMetres: 5
+  healthPackHealth: 0.5
+  healthPackMetres: 25
+  ultimatePackMetres: 12
+  flameMetres: 5
+  zipMinMetres: 8
+  zipMaxMetres: 16
+  zipMinHealth: 0.5
+  fenceMetres: 5
+  fenceTwoEnemiesMetres: 8
+  coverHealth: 0.6
+  coverMinMetres: 6
+  sprintQuietSeconds: 3
+  sprintMaxHeat: 0.5
+  healZoneHealth: 0.5
+  healZoneTeammateMetres: 5
+  scopeMinMetres: 15
+  blinkHealth: 0.35
+  blinkEnemyMetres: 10
+  raybeamMetres: 20
+  raybeamSeenSeconds: 1
+  tierThreeBonusMetres: 10
+  bountyBonusMetres: 10
+  humanTeammateMetres: 20
+  pushCapitalTeammates: 2
+  pushCapitalMetres: 20
+  centreBeforeScanSeconds: 15
+  centreBeforePayoutSeconds: 10
+  circleMarginMetres: 2
+  agentRadius: 0.75
+  agentHeight: 2.6
+  agentClimb: 0.4
+  repathSeconds: 0.5
+  stuckSeconds: 1

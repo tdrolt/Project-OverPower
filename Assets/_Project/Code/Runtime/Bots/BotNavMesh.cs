@@ -48,7 +48,12 @@ namespace Overpower.Bots
             {
                 var collider = sources[i].component as Collider;
                 Rigidbody body = collider != null ? collider.attachedRigidbody : null;
-                if (collider == null || !BotPathRules.IsWalkSource(collider.isTrigger, body != null && !body.isKinematic))
+                if (collider == null)
+                {
+                    sources.RemoveAt(i);
+                    continue;
+                }
+                if (!BotPathRules.IsWalkSource(collider.isTrigger, body != null && !body.isKinematic))
                 {
                     sources.RemoveAt(i);
                     continue;
