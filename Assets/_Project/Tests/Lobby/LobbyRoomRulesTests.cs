@@ -33,12 +33,12 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void OnlyTheHostsClickOnABotSeatRemovesTheBot()
+        public void OnlyTheHostSeesTheXThatTakesABotOut()
         {
-            Assert.IsTrue(LobbyRoomRules.ClickRemovesBot(true, 1001));
-            Assert.IsFalse(LobbyRoomRules.ClickRemovesBot(false, 1001), "a guest's click asks for the seat as before");
-            Assert.IsFalse(LobbyRoomRules.ClickRemovesBot(true, 3), "a human's seat is never emptied by the host's click");
-            Assert.IsFalse(LobbyRoomRules.ClickRemovesBot(true, 0), "an empty seat");
+            Assert.IsTrue(LobbyRoomRules.ShowsRemoveBot(true, 1001));
+            Assert.IsFalse(LobbyRoomRules.ShowsRemoveBot(false, 1001), "a guest never takes a bot out");
+            Assert.IsFalse(LobbyRoomRules.ShowsRemoveBot(true, 3), "a human's seat has no x");
+            Assert.IsFalse(LobbyRoomRules.ShowsRemoveBot(true, 0), "an empty seat has no x");
         }
 
         [Test]

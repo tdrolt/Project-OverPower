@@ -53,18 +53,20 @@ namespace Overpower.Data
         [Tooltip("The names bots get, picked at random. Never one already in the lobby. Keep them like real players' names: never a build's name.")]
         [SerializeField] private string[] names =
         {
-            "Mira", "Jonas", "Sanne", "Bram", "Noor", "Lucas", "Fenna", "Daan", "Tess", "Milan", "Lotte", "Ruben", "Isa", "Sem",
-            "Jade", "Thijs", "Evi", "Luuk", "Roos", "Finn", "Yara", "Stijn", "Lina", "Joris", "Nina", "Koen", "Maud", "Olaf",
-            "Vera", "Timo", "pixelfox", "NightOwl", "Kestrel", "mossy", "Tidebreaker", "Juno", "Quinn", "Rikkert", "Ilse", "Wouter",
+            "Albert", "Allen", "Bert", "Bob", "Cecil", "Clarence", "Elliot", "Elmer", "Ernie", "Eugene", "Fergus", "Ferris", "Frank", "Fred",
+            "George", "Graham", "Harvey", "Irwin", "Larry", "Lester", "Marvin", "Neil", "Niles", "Oliver", "Ryan", "Ted", "Toby", "Ulric",
+            "Ulysses", "Uri", "Vinny", "Wade", "Waldo", "Wally", "Walt", "Wesley", "Xavier", "Yogi", "Yuri", "Zach",
         };
         [Tooltip("The three builds, in this order: Shotgun, Burst, Laser. A bot draws one at random when it is added.")]
         [SerializeField] private Build[] builds = new Build[3];
 
         [Header("Seeing and reacting")]
-        [Tooltip("How long a bot waits after an enemy appears before it shoots, in seconds. 0.5 = an easy, human-like delay.")]
-        [SerializeField, Min(0f)] private float reactionSeconds = 0.5f;
-        [Tooltip("How long a bot remembers where it last saw an enemy, in seconds; it goes to look there in that time.")]
+        [Tooltip("How long a bot waits after an enemy appears before it shoots, in seconds. 1 = an easy delay for people who never played.")]
+        [SerializeField, Min(0f)] private float reactionSeconds = 1f;
+        [Tooltip("How long a bot remembers where it last saw an enemy, in seconds; it goes to look there in that time (only near the zone it is going for).")]
         [SerializeField, Min(0f)] private float memorySeconds = 3f;
+        [Tooltip("It keeps its target this many seconds after the target slips out of sight, toward where it was last seen, before it lets go. Stops it turning round each time someone steps behind a wall.")]
+        [SerializeField, Min(0f)] private float targetLostSeconds = 1f;
         [Tooltip("A bot keeps its target unless another enemy is this many metres closer.")]
         [SerializeField, Min(0f)] private float targetSwitchMetres = 3f;
         [Tooltip("How often a bot re-decides what to do, in seconds. Smaller = sharper, larger = slower to change its mind.")]
@@ -72,9 +74,9 @@ namespace Overpower.Data
 
         [Header("Aim")]
         [Tooltip("How far its shots miss at first, in metres to the side of the target.")]
-        [SerializeField, Min(0f)] private float aimErrorStartMetres = 1.5f;
+        [SerializeField, Min(0f)] private float aimErrorStartMetres = 2.2f;
         [Tooltip("How far its shots still miss once settled, in metres.")]
-        [SerializeField, Min(0f)] private float aimErrorMinMetres = 0.5f;
+        [SerializeField, Min(0f)] private float aimErrorMinMetres = 0.9f;
         [Tooltip("How many seconds of shooting the same target it takes to settle from the first error to the settled one.")]
         [SerializeField, Min(0.01f)] private float aimSettleSeconds = 2f;
         [Tooltip("How often the miss changes direction, in seconds (a new random offset each time).")]
@@ -84,11 +86,51 @@ namespace Overpower.Data
         [Tooltip("How much it leads a moving target with a slow shot: 0 = aims at where the target is, 1 = exactly where it will be.")]
         [SerializeField, Range(0f, 1f)] private float leadFraction = 0.5f;
 
+        [Header("Objective first")]
+        [Tooltip("On its way to a zone it turns to fight an enemy only within the furthest it likes to fight (its build's range) plus this many metres. Further away it keeps walking and only shoots enemies that come into its weapon's range.")]
+        [SerializeField, Min(0f)] private float engageExtraMetres = 3f;
+        [Tooltip("An enemy within this many metres of the zone it is going for (or holding) is always fought: it defends its zone. Also how near enemies must be to a zone to count as defending it.")]
+        [SerializeField, Min(0f)] private float objectiveGuardMetres = 12f;
+        [Tooltip("An enemy that hit it in the last this-many seconds is always fought back, wherever it was going.")]
+        [SerializeField, Min(0f)] private float hitMemorySeconds = 3f;
+        [Tooltip("Once it picks where to go (a zone, a fight, a pack, a teammate) it keeps that at least this many seconds, unless a fight starts or ends, it backs off or regroups, or a zone of its team is being taken. Stops it turning back and forth.")]
+        [SerializeField, Min(0f)] private float goalHoldSeconds = 1.5f;
+
         [Header("Moving in a fight")]
         [Tooltip("It strafes left and right while it fights and switches side after a random time between these two, in seconds.")]
         [SerializeField, Min(0.1f)] private float strafeSwitchMinSeconds = 1.5f;
         [Tooltip("The longest it strafes one way before switching, in seconds (see the line above).")]
         [SerializeField, Min(0.1f)] private float strafeSwitchMaxSeconds = 2.5f;
+        [Tooltip("Each time it would switch strafing side, the chance it stands still instead until the next switch (0.3 = 30%).")]
+        [SerializeField, Range(0f, 1f)] private float fightStandStillChance = 0.3f;
+        [Tooltip("Once it starts backing off (or walking in) to keep its range, it keeps going until it is this many metres inside its range. Stops it stepping back and forth at the edge.")]
+        [SerializeField, Min(0f)] private float rangeDeadBandMetres = 1f;
+
+        [Header("Standing still now and then")]
+        [Tooltip("With no enemy to fight (walking to a zone or holding one) it thinks about standing still once every random time between this...")]
+        [SerializeField, Min(0.5f)] private float idlePauseEveryMinSeconds = 6f;
+        [Tooltip("...and this many seconds.")]
+        [SerializeField, Min(0.5f)] private float idlePauseEveryMaxSeconds = 12f;
+        [Tooltip("Each time, the chance it does stand still (0.25 = 25%). Never while its capital or a zone of its team is being taken.")]
+        [SerializeField, Range(0f, 1f)] private float idlePauseChance = 0.25f;
+        [Tooltip("How long it stands still: a random time between this...")]
+        [SerializeField, Min(0f)] private float pauseMinSeconds = 1f;
+        [Tooltip("...and this many seconds.")]
+        [SerializeField, Min(0f)] private float pauseMaxSeconds = 2f;
+
+        [Header("Team play")]
+        [Tooltip("It counts the enemies it just saw and its own team (itself included) within this many metres of it...")]
+        [SerializeField, Min(0f)] private float outnumberedRadiusMetres = 15f;
+        [Tooltip("...and when the enemies are at least its team plus this many it falls back to the nearest teammate (or home) to regroup, shooting only what comes into range, until it is no longer outnumbered.")]
+        [SerializeField, Min(1)] private int outnumberedMargin = 1;
+        [Tooltip("When it picks a zone, each enemy known near that zone makes it count this many metres further, so it pushes zones nobody defends.")]
+        [SerializeField, Min(0f)] private float enemyNearZonePenaltyMetres = 10f;
+        [Tooltip("How long an enemy it saw (or the centre scan showed its team) still counts as near that spot when it weighs the zones, in seconds.")]
+        [SerializeField, Min(0f)] private float zoneIntelSeconds = 8f;
+        [Tooltip("With no enemy of its own it joins the fight of a teammate within this many metres of it...")]
+        [SerializeField, Min(0f)] private float helpTeammateMetres = 12f;
+        [Tooltip("...where the teammate's fight is an enemy within this many metres of that teammate.")]
+        [SerializeField, Min(0f)] private float teammateFightMetres = 15f;
 
         [Header("Heat")]
         [Tooltip("It stops pulling the trigger at this much heat (0.8 = 80% of the bar)...")]
@@ -117,10 +159,14 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float flameMetres = 5f;
         [Tooltip("Zip to close in on a target between these two distances, in metres...")]
         [SerializeField, Min(0f)] private float zipMinMetres = 8f;
-        [Tooltip("The furthest target it zips toward, in metres.")]
+        [Tooltip("The furthest target it zips toward, in metres. Also how far behind it a wall may be for an escape Zip.")]
         [SerializeField, Min(0f)] private float zipMaxMetres = 16f;
         [Tooltip("...and only above this much health.")]
         [SerializeField, Range(0f, 1f)] private float zipMinHealth = 0.5f;
+        [Tooltip("Zip away to escape when below this much health...")]
+        [SerializeField, Range(0f, 1f)] private float zipEscapeHealth = 0.35f;
+        [Tooltip("...with an enemy within this many metres, straight away from the nearest enemy, when a wall behind it gives the bolt something to pull it to.")]
+        [SerializeField, Min(0f)] private float zipEscapeEnemyMetres = 10f;
         [Tooltip("Fence when an enemy is within this many metres...")]
         [SerializeField, Min(0f)] private float fenceMetres = 5f;
         [Tooltip("...or two enemies are within this many metres.")]
@@ -143,6 +189,12 @@ namespace Overpower.Data
         [Header("Abilities - Laser bot")]
         [Tooltip("It holds Scope while its target is further than this many metres.")]
         [SerializeField, Min(0f)] private float scopeMinMetres = 15f;
+        [Tooltip("On its way to a zone, with no enemy in sight, it stops once between this...")]
+        [SerializeField, Min(0f)] private float scoutMinMetres = 15f;
+        [Tooltip("...and this many metres from the zone, faces it and looks ahead through its Scope before it walks in.")]
+        [SerializeField, Min(0f)] private float scoutMaxMetres = 30f;
+        [Tooltip("How long it stops to look ahead, in seconds.")]
+        [SerializeField, Min(0f)] private float scoutSeconds = 1.5f;
         [Tooltip("Blink away when below this much health...")]
         [SerializeField, Range(0f, 1f)] private float blinkHealth = 0.35f;
         [Tooltip("...with an enemy within this many metres.")]
@@ -163,6 +215,8 @@ namespace Overpower.Data
         [SerializeField, Min(1)] private int pushCapitalTeammates = 2;
         [Tooltip("How near the enemy capital they must be, in metres.")]
         [SerializeField, Min(0f)] private float pushCapitalMetres = 20f;
+        [Tooltip("It turns back to defend a zone of its team that an enemy is taking within this many metres (its capital it always defends).")]
+        [SerializeField, Min(0f)] private float defendZoneMetres = 25f;
         [Tooltip("After the shrink it goes to the centre when the scan is this many seconds away.")]
         [SerializeField, Min(0f)] private float centreBeforeScanSeconds = 15f;
 
@@ -173,16 +227,20 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float circleMarginMetres = 2f;
 
         [Header("Navigation")]
-        [Tooltip("How wide a bot thinks it is when it plans a route, in metres (the body is 0.7 wide each side; a little more keeps it off walls).")]
-        [SerializeField, Min(0.1f)] private float agentRadius = 0.75f;
+        [Tooltip("How wide a bot thinks it is when it plans a route, in metres (the body is 0.7 wide each side; more keeps it off walls).")]
+        [SerializeField, Min(0.1f)] private float agentRadius = 1f;
         [Tooltip("How tall a bot thinks it is when it plans a route, in metres.")]
         [SerializeField, Min(0.5f)] private float agentHeight = 2.6f;
         [Tooltip("The highest step a route may climb, in metres.")]
         [SerializeField, Min(0f)] private float agentClimb = 0.4f;
+        [Tooltip("How near it must come to a bend in its route before it heads for the next one, in metres. A little more than its step keeps it from circling a bend.")]
+        [SerializeField, Min(0.1f)] private float cornerReachMetres = 0.8f;
         [Tooltip("How often it plans its route again while walking, in seconds.")]
         [SerializeField, Min(0.1f)] private float repathSeconds = 0.5f;
-        [Tooltip("If it moved less than half a metre in this many seconds while walking, it plans a new way round.")]
+        [Tooltip("If it moved less than half a metre in this many seconds while walking, it steps aside and plans a new way round...")]
         [SerializeField, Min(0.2f)] private float stuckSeconds = 1f;
+        [Tooltip("...but never within this many metres of where it is going (there it just stops).")]
+        [SerializeField, Min(0f)] private float noSidestepNearGoalMetres = 1.5f;
 
         public string[] Names => names;
         public Build[] Builds => builds;
@@ -190,6 +248,7 @@ namespace Overpower.Data
 
         public float ReactionSeconds => reactionSeconds;
         public float MemorySeconds => memorySeconds;
+        public float TargetLostSeconds => targetLostSeconds;
         public float TargetSwitchMetres => targetSwitchMetres;
         public float ThinkSeconds => thinkSeconds;
 
@@ -200,8 +259,28 @@ namespace Overpower.Data
         public float TurnDegreesPerSecond => turnDegreesPerSecond;
         public float LeadFraction => leadFraction;
 
+        public float EngageExtraMetres => engageExtraMetres;
+        public float ObjectiveGuardMetres => objectiveGuardMetres;
+        public float HitMemorySeconds => hitMemorySeconds;
+        public float GoalHoldSeconds => goalHoldSeconds;
+
         public float StrafeSwitchMinSeconds => strafeSwitchMinSeconds;
         public float StrafeSwitchMaxSeconds => strafeSwitchMaxSeconds;
+        public float FightStandStillChance => fightStandStillChance;
+        public float RangeDeadBandMetres => rangeDeadBandMetres;
+
+        public float IdlePauseEveryMinSeconds => idlePauseEveryMinSeconds;
+        public float IdlePauseEveryMaxSeconds => idlePauseEveryMaxSeconds;
+        public float IdlePauseChance => idlePauseChance;
+        public float PauseMinSeconds => pauseMinSeconds;
+        public float PauseMaxSeconds => pauseMaxSeconds;
+
+        public float OutnumberedRadiusMetres => outnumberedRadiusMetres;
+        public int OutnumberedMargin => outnumberedMargin;
+        public float EnemyNearZonePenaltyMetres => enemyNearZonePenaltyMetres;
+        public float ZoneIntelSeconds => zoneIntelSeconds;
+        public float HelpTeammateMetres => helpTeammateMetres;
+        public float TeammateFightMetres => teammateFightMetres;
 
         public float StopFiringHeat => stopFiringHeat;
         public float FinishTargetHealth => finishTargetHealth;
@@ -218,6 +297,8 @@ namespace Overpower.Data
         public float ZipMinMetres => zipMinMetres;
         public float ZipMaxMetres => zipMaxMetres;
         public float ZipMinHealth => zipMinHealth;
+        public float ZipEscapeHealth => zipEscapeHealth;
+        public float ZipEscapeEnemyMetres => zipEscapeEnemyMetres;
         public float FenceMetres => fenceMetres;
         public float FenceTwoEnemiesMetres => fenceTwoEnemiesMetres;
 
@@ -229,6 +310,9 @@ namespace Overpower.Data
         public float HealZoneTeammateMetres => healZoneTeammateMetres;
 
         public float ScopeMinMetres => scopeMinMetres;
+        public float ScoutMinMetres => scoutMinMetres;
+        public float ScoutMaxMetres => scoutMaxMetres;
+        public float ScoutSeconds => scoutSeconds;
         public float BlinkHealth => blinkHealth;
         public float BlinkEnemyMetres => blinkEnemyMetres;
         public float RaybeamMetres => raybeamMetres;
@@ -239,6 +323,7 @@ namespace Overpower.Data
         public float HumanTeammateMetres => humanTeammateMetres;
         public int PushCapitalTeammates => pushCapitalTeammates;
         public float PushCapitalMetres => pushCapitalMetres;
+        public float DefendZoneMetres => defendZoneMetres;
         public float CentreBeforeScanSeconds => centreBeforeScanSeconds;
 
         public float CentreBeforePayoutSeconds => centreBeforePayoutSeconds;
@@ -247,7 +332,9 @@ namespace Overpower.Data
         public float AgentRadius => agentRadius;
         public float AgentHeight => agentHeight;
         public float AgentClimb => agentClimb;
+        public float CornerReachMetres => cornerReachMetres;
         public float RepathSeconds => repathSeconds;
         public float StuckSeconds => stuckSeconds;
+        public float NoSidestepNearGoalMetres => noSidestepNearGoalMetres;
     }
 }

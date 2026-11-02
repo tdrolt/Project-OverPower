@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Overpower.Bots
 {
     public enum RangeMove { Approach, Hold, BackOff }
-    public enum BotStance { Fight, Retreat }
+    public enum BotStance { Fight, Retreat, Regroup }
     public enum ShopStepKind { Weapon, Attachment, Movement, Ultimate, Absorb, Recharge }
 
     /// <summary>One zone as a Conquest bot weighs it.</summary>
@@ -22,6 +22,10 @@ namespace Overpower.Bots
         /// <summary>For an enemy capital: how many of the bot's team (itself included) are near it.</summary>
         public int TeammatesNear;
         public bool IsCentre;
+        /// <summary>A zone of its team (not the capital) that an enemy stands in or just left.</summary>
+        public bool OursUnderAttack;
+        /// <summary>Enemies its team saw near the zone lately (or the centre scan showed).</summary>
+        public int EnemiesNear;
     }
 
     /// <summary>One zone as a Dominion bot weighs it.</summary>
@@ -34,6 +38,8 @@ namespace Overpower.Bots
         public bool BeingTakenFromUs;
         public bool IsCentre;
         public bool Capturable;
+        /// <summary>Enemies its team saw near the zone lately.</summary>
+        public int EnemiesNear;
     }
 
     /// <summary>A build as shop steps: catalogue ids and how many of each armour upgrade.</summary>

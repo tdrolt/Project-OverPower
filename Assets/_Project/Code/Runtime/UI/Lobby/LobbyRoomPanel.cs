@@ -33,6 +33,7 @@ namespace Overpower.UI
             public LobbyButton Button;
             public Image Dash;
             public TextMeshProUGUI Label;
+            public LobbyButton Remove;
             public SeatState State = (SeatState)(-1);
             public string Text;
             public float TextSize;
@@ -45,6 +46,10 @@ namespace Overpower.UI
         /// <summary>How tall a line of the display font (Oswald) is, in text sizes. A text box shorter than that drops its line altogether (the
         /// ellipsis overflow cuts what does not fit), so every heading box is made this tall.</summary>
         private const float DisplayLine = 1.5f;
+
+        /// <summary>The x on a bot's seat is a square this share of the seat's height, inset from the seat's right end by the same margin
+        /// as from its top and bottom.</summary>
+        private const float RemoveBotShareOfSeat = 0.6f;
 
         private LobbyUiKit kit;
         private UiTheme theme;
@@ -147,6 +152,14 @@ namespace Overpower.UI
         {
             if (!seatViews.TryGetValue(seatKey, out SeatView view) || !view.Button.Button.interactable) return false;
             view.Button.Press();
+            return true;
+        }
+
+        /// <summary>Presses the x on a bot's seat (what the host's click does). False when that seat shows no x.</summary>
+        public bool PressRemoveBot(string seatKey)
+        {
+            if (!seatViews.TryGetValue(seatKey, out SeatView view) || view.Remove == null || !view.Remove.Root.activeSelf) return false;
+            view.Remove.Press();
             return true;
         }
 
@@ -356,8 +369,25 @@ namespace Overpower.UI
             labelRect.offsetMax = new Vector2(-theme.lobbyRoomSeatPadding, 0f);
 
             var view = new SeatView { Key = key, Spectator = spectator, Button = button, Dash = dashImage, Label = (TextMeshProUGUI)button.Label, TextSize = textSize };
+            if (!spectator) view.Remove = BuildRemoveBot(button, key, height, textSize);
             seatViews[key] = view;
             seatOrder.Add(key);
+        }
+
+        /// <summary>The host's small x at the right end of a bot's seat: a button of its own on top of the seat's, so a click on it never asks
+        /// for the seat. Hidden until Redraw shows it; the room to its left is free for another small button.</summary>
+        private LobbyButton BuildRemoveBot(LobbyButton seat, string key, float seatHeight, float textSize)
+        {
+            float size = seatHeight * RemoveBotShareOfSeat;
+            LobbyButton remove = kit.MakeButton(seat.Root.transform, "Remove bot", theme.lobbyRoomRemoveBotText, kit.Bold, textSize, theme.lobbyOffWhiteColor,
+                theme.lobbyRoomSideFill, theme.lobbyCornerRadius, theme.lobbyBorderColor, theme.lobbyBorderWidth);
+            RectTransform rect = remove.Rect;
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(1f, 0.5f);
+            rect.sizeDelta = new Vector2(size, size);
+            rect.anchoredPosition = new Vector2(-(seatHeight - size) * 0.5f, 0f);
+            remove.Button.onClick.AddListener(() => OnRemoveBotClicked(key));
+            remove.Root.SetActive(false);
+            return remove;
         }
 
         private void BuildNoRole(Transform parent)
@@ -393,14 +423,15 @@ namespace Overpower.UI
             fillBotsButton.Button.onClick.AddListener(() => AddBots(null));
         }
 
-        private void OnSeatClicked(string key)
+        private void OnSeatClicked(string key) => roomManager.Seats.TryTake(key);
+
+        private void OnRemoveBotClicked(string key)
         {
             LobbySeats seats = roomManager.Seats;
             int holder = seats.Seats.TryGetValue(key, out int actor) ? actor : 0;
-            if (LobbyRoomRules.ClickRemovesBot(PhotonNetwork.IsMasterClient, holder))
+            // The seat may have changed hands since the x was drawn.
+            if (LobbyRoomRules.ShowsRemoveBot(PhotonNetwork.IsMasterClient, holder))
                 seats.RemoveBot(holder);
-            else
-                seats.TryTake(key);
         }
 
         /// <summary>Add bot (one, on team) or Fill with bots (team null). Names never repeat a build's name or a weapon's.</summary>
@@ -520,6 +551,7 @@ namespace Overpower.UI
                 {
                     ApplySeat(view, SeatState.Empty, theme.lobbyRoomEmptySeatText);
                 }
+                ShowRemoveBot(view, LobbyRoomRules.ShowsRemoveBot(iAmHost, actor));
             }
 
             IReadOnlyList<int> noRole = seats.NoRoleActors;
@@ -573,6 +605,15 @@ namespace Overpower.UI
         {
             if (room == null) return "";
             return room.CustomProperties.TryGetValue(LobbyKeys.Name, out object raw) && raw is string name && name.Length > 0 ? name : room.Name;
+        }
+
+        /// <summary>Shows or hides a seat's x, and keeps the name clear of it.</summary>
+        private void ShowRemoveBot(SeatView view, bool show)
+        {
+            if (view.Remove == null || view.Remove.Root.activeSelf == show) return;
+            view.Remove.Root.SetActive(show);
+            float room = show ? view.Remove.Rect.sizeDelta.x + theme.lobbyRoomSeatPadding : 0f;
+            ((RectTransform)view.Label.transform).offsetMax = new Vector2(-(theme.lobbyRoomSeatPadding + room), 0f);
         }
 
         private void ApplySeat(SeatView view, SeatState state, string text)

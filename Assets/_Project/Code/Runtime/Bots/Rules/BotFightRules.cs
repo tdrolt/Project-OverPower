@@ -66,8 +66,14 @@ namespace Overpower.Bots
     /// <summary>Where a bot stands in a fight: inside its build's range, strafing from side to side.</summary>
     public static class BotRangeRules
     {
-        public static RangeMove Decide(float distance, float min, float max) =>
-            distance < min ? RangeMove.BackOff : distance > max ? RangeMove.Approach : RangeMove.Hold;
+        /// <summary>Outside [min, max] it backs off or walks in; once moving it keeps on until deadBand metres inside the range, so it
+        /// does not step back and forth at the edge.</summary>
+        public static RangeMove Decide(float distance, float min, float max, RangeMove previous, float deadBand)
+        {
+            if (distance < min || (previous == RangeMove.BackOff && distance < min + deadBand)) return RangeMove.BackOff;
+            if (distance > max || (previous == RangeMove.Approach && distance > max - deadBand)) return RangeMove.Approach;
+            return RangeMove.Hold;
+        }
 
         /// <summary>The strafe side (+1 right, -1 left) after secondsOnThisSide: it switches once switchAfter has passed.</summary>
         public static int StrafeSide(int side, float secondsOnThisSide, float switchAfter) =>
@@ -112,7 +118,7 @@ namespace Overpower.Bots
     }
 
     /// <summary>Each build's rule for its attachment, movement ability and ultimate (BotConfig holds the numbers).</summary>
-    public static class BotAbilityRules
+    public static partial class BotAbilityRules
     {
         public static bool Flame(bool hasTarget, float distance, float angleToTarget, float flameMetres, float halfConeDegrees) =>
             hasTarget && distance <= flameMetres && angleToTarget <= halfConeDegrees;

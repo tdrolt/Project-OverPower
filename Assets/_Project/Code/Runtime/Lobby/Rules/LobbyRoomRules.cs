@@ -23,8 +23,9 @@ namespace Overpower.Lobby
             return bot ? text + botSuffix : text;
         }
 
-        /// <summary>The host's click on a bot's seat takes the bot out; anyone else's click (or the host's on a human's seat) asks for the seat.</summary>
-        public static bool ClickRemovesBot(bool iAmHost, int holderActor) => iAmHost && Overpower.Net.BotRosterRules.IsBotActor(holderActor);
+        /// <summary>Whether a seat shows the small x that takes its bot out: to the host only, on a bot's seat only. A click on the rest of
+        /// the seat asks for it, as on any seat.</summary>
+        public static bool ShowsRemoveBot(bool iAmHost, int holderActor) => iAmHost && Overpower.Net.BotRosterRules.IsBotActor(holderActor);
 
         /// <summary>The name of a team from a list of team names (index = team number); a team with no name reads "Team 3" (number + 1).</summary>
         public static string TeamName(string[] names, int team)

@@ -70,7 +70,17 @@ namespace Overpower.Tests
         [TestCase(20f, RangeMove.Approach)]
         public void ItKeepsItsBuildsRange(float distance, RangeMove expected)
         {
-            Assert.AreEqual(expected, BotRangeRules.Decide(distance, 8f, 14f));
+            Assert.AreEqual(expected, BotRangeRules.Decide(distance, 8f, 14f, RangeMove.Hold, 1f));
+        }
+
+        [Test]
+        public void OnceItMovesInOrOutItKeepsGoingUntilWellInsideItsRange()
+        {
+            Assert.AreEqual(RangeMove.BackOff, BotRangeRules.Decide(5.8f, 5f, 11f, RangeMove.BackOff, 1.5f), "still inside the dead band");
+            Assert.AreEqual(RangeMove.Hold, BotRangeRules.Decide(5.8f, 5f, 11f, RangeMove.Hold, 1.5f), "holding: no step back just inside the edge");
+            Assert.AreEqual(RangeMove.Hold, BotRangeRules.Decide(6.7f, 5f, 11f, RangeMove.BackOff, 1.5f), "far enough in");
+            Assert.AreEqual(RangeMove.Approach, BotRangeRules.Decide(10.2f, 5f, 11f, RangeMove.Approach, 1.5f));
+            Assert.AreEqual(RangeMove.Hold, BotRangeRules.Decide(9.3f, 5f, 11f, RangeMove.Approach, 1.5f));
         }
 
         [Test]

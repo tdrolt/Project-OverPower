@@ -31,7 +31,7 @@ namespace Overpower.Bots
             if (!hasSettings)
             {
                 settings = NavMesh.CreateSettings();
-                settings.agentRadius = config != null ? config.AgentRadius : 0.75f;
+                settings.agentRadius = config != null ? config.AgentRadius : 1f;
                 settings.agentHeight = config != null ? config.AgentHeight : 2.6f;
                 settings.agentClimb = config != null ? config.AgentClimb : 0.4f;
                 settings.agentSlope = 30f;

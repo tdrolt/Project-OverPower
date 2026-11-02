@@ -5,6 +5,7 @@ using Overpower.Data;
 using Overpower.Lobby;
 using Overpower.Net;
 using Overpower.UI;
+using Overpower.Vision;
 using UnityEditor;
 using UnityEngine;
 
@@ -21,8 +22,20 @@ namespace Overpower.Tests
             t.GetMethod(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
 
         [Test]
-        public void TheHostsClickOnABotSeatAsksTheRule() =>
-            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(LobbyRoomPanel), "OnSeatClicked", M(typeof(LobbyRoomRules), nameof(LobbyRoomRules.ClickRemovesBot))));
+        public void TheXOnABotsSeatShowsByTheRuleAndItsClickTakesTheBotOut()
+        {
+            MethodInfo rule = M(typeof(LobbyRoomRules), nameof(LobbyRoomRules.ShowsRemoveBot));
+            Assert.IsTrue(IlWiring.Uses(typeof(LobbyRoomPanel), "Redraw", rule));
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(LobbyRoomPanel), "OnRemoveBotClicked", rule));
+            Assert.IsTrue(IlWiring.Uses(typeof(LobbyRoomPanel), "OnRemoveBotClicked", M(typeof(LobbySeats), nameof(LobbySeats.RemoveBot))));
+        }
+
+        [Test]
+        public void AClickOnASeatAsksForItEvenOnABotsSeat()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(LobbyRoomPanel), "OnSeatClicked", M(typeof(LobbySeats), nameof(LobbySeats.TryTake))));
+            Assert.IsFalse(IlWiring.Uses(typeof(LobbyRoomPanel), "OnSeatClicked", M(typeof(LobbySeats), nameof(LobbySeats.RemoveBot))), "only the x takes a bot out");
+        }
 
         [Test]
         public void TheSeatsWriteBotsThroughTheirRules()
@@ -77,10 +90,35 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheBrainPutsItsZoneFirstAndKeepsACalmPaceThroughTheRules()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ChooseGoal", M(typeof(BotFocusRules), nameof(BotFocusRules.ShouldEngage))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "RecentMemory", M(typeof(BotFocusRules), nameof(BotFocusRules.ChaseMemory))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "InSpawnOffLimits", M(typeof(BotSpawnRules), nameof(BotSpawnRules.OffLimits))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "PickTarget", M(typeof(BotBrain), "LeftAlone")), "an enemy in its own spawn is no target");
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ChooseGoal", M(typeof(BotPaceRules), nameof(BotPaceRules.KeepGoal))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "PauseNowAndThen", M(typeof(BotPaceRules), nameof(BotPaceRules.Pause))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "FightPoint", M(typeof(BotPaceRules), nameof(BotPaceRules.Pause))), "a strafe may stand still");
+        }
+
+        [Test]
+        public void TheBrainPlaysWithItsTeamThroughTheRules()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "Think", M(typeof(BotTeamRules), nameof(BotTeamRules.Outnumbered))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "Think", M(typeof(BotTeamRules), nameof(BotTeamRules.Stance))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "TeammateFights", M(typeof(BotTeamRules), nameof(BotTeamRules.FightingNearTeammate))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "PickTarget", M(typeof(BotBrain), "TeammatesFightTarget")), "no target of its own: it joins a teammate's fight");
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ReadScan", M(typeof(BotTeamRules), nameof(BotTeamRules.ScanShowsUs))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ReadScan", M(typeof(BotTeamRules), nameof(BotTeamRules.ScanSweptFrom))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ReadScan", M(typeof(CentreScanRules), nameof(CentreScanRules.FrontSwept))));
+        }
+
+        [Test]
         public void EachBuildsAbilitiesAreUsedByItsRules()
         {
-            foreach (string rule in new[] { "Flame", "Zip", "Fence", "Cover", "Sprint", "HealZone", "Scope", "Blink", "Raybeam" })
+            foreach (string rule in new[] { "Flame", "Zip", "ZipEscape", "Fence", "Cover", "Sprint", "HealZone", "Scope", "Blink", "Raybeam" })
                 Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ChooseAbilities", M(typeof(BotAbilityRules), rule)), rule);
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ScoutAhead", M(typeof(BotAbilityRules), nameof(BotAbilityRules.Scout))));
         }
 
         [Test]

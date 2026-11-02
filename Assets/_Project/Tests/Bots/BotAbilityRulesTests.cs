@@ -29,6 +29,15 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheShotgunBotZipsAwayWhenLowWithAnEnemyCloseAndAWallBehindIt()
+        {
+            Assert.IsTrue(BotAbilityRules.ZipEscape(0.2f, 0.3f, 6f, 9f, true));
+            Assert.IsFalse(BotAbilityRules.ZipEscape(0.4f, 0.3f, 6f, 9f, true), "healthy enough to stay");
+            Assert.IsFalse(BotAbilityRules.ZipEscape(0.2f, 0.3f, 12f, 9f, true), "nobody close");
+            Assert.IsFalse(BotAbilityRules.ZipEscape(0.2f, 0.3f, 6f, 9f, false), "nothing behind it for the bolt to bite");
+        }
+
+        [Test]
         public void TheShotgunBotDropsItsFenceOnACloseEnemyOrTwoNearOnes()
         {
             Assert.IsTrue(BotAbilityRules.Fence(1, 1));
@@ -69,6 +78,17 @@ namespace Overpower.Tests
             Assert.IsTrue(BotAbilityRules.Scope(true, 18f, 15f));
             Assert.IsFalse(BotAbilityRules.Scope(true, 12f, 15f));
             Assert.IsFalse(BotAbilityRules.Scope(false, 18f, 15f));
+        }
+
+        [Test]
+        public void TheLaserBotScoutsOncePerZoneFromAFairDistanceWithNothingInSight()
+        {
+            Assert.IsTrue(BotAbilityRules.Scout(true, false, 22f, 12f, 28f, false));
+            Assert.IsFalse(BotAbilityRules.Scout(true, true, 22f, 12f, 28f, false), "it already looked ahead at this zone");
+            Assert.IsFalse(BotAbilityRules.Scout(true, false, 8f, 12f, 28f, false), "too close: it walks in");
+            Assert.IsFalse(BotAbilityRules.Scout(true, false, 35f, 12f, 28f, false), "too far to see the zone");
+            Assert.IsFalse(BotAbilityRules.Scout(true, false, 22f, 12f, 28f, true), "an enemy in sight: it deals with that first");
+            Assert.IsFalse(BotAbilityRules.Scout(false, false, 22f, 12f, 28f, false), "no Scope bought yet");
         }
 
         [Test]

@@ -5,8 +5,9 @@ namespace Overpower.Bots
 {
     /// <summary>
     /// Where a Conquest bot goes when no fight holds it: its threatened capital; the centre just before a scan after the shrink; an enemy
-    /// capital it may take with enough of its team near; else the closest zone its team may capture, a Tier III or bounty zone counted
-    /// closer. "from" is the bot, or the human teammate it sticks with.
+    /// capital it may take with enough of its team near; a zone of its team being taken close by; else the closest zone its team may
+    /// capture, a Tier III or bounty zone counted closer and a zone with enemies known near it counted further (it pushes where nobody
+    /// defends). "from" is the bot, or the human teammate it sticks with.
     /// </summary>
     public static class ConquestGoalRules
     {
@@ -15,6 +16,8 @@ namespace Overpower.Bots
             public float TierThreeBonusMetres;
             public float BountyBonusMetres;
             public int PushCapitalTeammates;
+            public float EnemyNearPenaltyMetres;
+            public float DefendZoneMetres;
         }
 
         public static int Choose(IReadOnlyList<ConquestZone> zones, Vector3 from, bool centreUrgent, Settings settings)
@@ -37,13 +40,24 @@ namespace Overpower.Bots
             }
             if (push >= 0) return push;
 
+            int defend = -1;
+            float defendDistance = float.MaxValue;
+            for (int i = 0; i < zones.Count; i++)
+            {
+                ConquestZone z = zones[i];
+                if (!z.OursUnderAttack) continue;
+                float d = Flat(from, z.Centre);
+                if (d <= settings.DefendZoneMetres && d < defendDistance) { defendDistance = d; defend = z.Id; }
+            }
+            if (defend >= 0) return defend;
+
             int best = -1;
             float bestScore = float.MaxValue;
             for (int i = 0; i < zones.Count; i++)
             {
                 ConquestZone z = zones[i];
                 if (!z.MayCapture || z.IsEnemyCapital || z.IsOwnCapital) continue;
-                float score = Flat(from, z.Centre);
+                float score = Flat(from, z.Centre) + settings.EnemyNearPenaltyMetres * z.EnemiesNear;
                 if (z.Tier >= 3) score -= settings.TierThreeBonusMetres;
                 if (z.Bounty) score -= settings.BountyBonusMetres;
                 if (score < bestScore) { bestScore = score; best = z.Id; }
@@ -56,11 +70,12 @@ namespace Overpower.Bots
 
     /// <summary>
     /// Where a Dominion bot goes, for 2v2 and 3v3v3 alike: the centre just before its payout (when the mode has one); a zone of its team
-    /// being taken; the best-paying zone it does not hold, closest first; when it holds them all, its best-paying zone.
+    /// being taken; the best-paying zone it does not hold, closest first, each enemy known near a zone counting enemyNearPenaltyMetres
+    /// further (of equally paying zones it takes the undefended one); when it holds them all, its best-paying zone.
     /// </summary>
     public static class DominionGoalRules
     {
-        public static int Choose(IReadOnlyList<DominionZone> zones, Vector3 from, bool centreSoon)
+        public static int Choose(IReadOnlyList<DominionZone> zones, Vector3 from, bool centreSoon, float enemyNearPenaltyMetres)
         {
             if (centreSoon)
                 for (int i = 0; i < zones.Count; i++)
@@ -69,10 +84,10 @@ namespace Overpower.Bots
             int defend = Closest(zones, from, z => z.Ours && z.BeingTakenFromUs);
             if (defend >= 0) return defend;
 
-            int take = BestPaying(zones, from, z => z.Capturable && !z.Ours && !z.IsCentre);
+            int take = BestPaying(zones, from, enemyNearPenaltyMetres, z => z.Capturable && !z.Ours && !z.IsCentre);
             if (take >= 0) return take;
 
-            return BestPaying(zones, from, z => z.Ours && !z.IsCentre);
+            return BestPaying(zones, from, 0f, z => z.Ours && !z.IsCentre);
         }
 
         public static bool InsideCircle(Vector2 position, Vector2 centre, float radius, float margin) =>
@@ -91,7 +106,7 @@ namespace Overpower.Bots
             return best;
         }
 
-        private static int BestPaying(IReadOnlyList<DominionZone> zones, Vector3 from, System.Func<DominionZone, bool> wanted)
+        private static int BestPaying(IReadOnlyList<DominionZone> zones, Vector3 from, float enemyNearPenaltyMetres, System.Func<DominionZone, bool> wanted)
         {
             int best = -1;
             float bestPoints = float.MinValue, bestDistance = float.MaxValue;
@@ -99,7 +114,7 @@ namespace Overpower.Bots
             {
                 DominionZone z = zones[i];
                 if (!wanted(z)) continue;
-                float d = Flat(from, z.Centre);
+                float d = Flat(from, z.Centre) + enemyNearPenaltyMetres * z.EnemiesNear;
                 if (z.PointsPerSecond > bestPoints + 1e-4f || (Mathf.Abs(z.PointsPerSecond - bestPoints) <= 1e-4f && d < bestDistance))
                 {
                     bestPoints = z.PointsPerSecond;

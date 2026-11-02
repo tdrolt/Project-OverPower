@@ -13,46 +13,46 @@ MonoBehaviour:
   m_Name: BotConfig
   m_EditorClassIdentifier: 
   names:
-  - Mira
-  - Jonas
-  - Sanne
-  - Bram
-  - Noor
-  - Lucas
-  - Fenna
-  - Daan
-  - Tess
-  - Milan
-  - Lotte
-  - Ruben
-  - Isa
-  - Sem
-  - Jade
-  - Thijs
-  - Evi
-  - Luuk
-  - Roos
-  - Finn
-  - Yara
-  - Stijn
-  - Lina
-  - Joris
-  - Nina
-  - Koen
-  - Maud
-  - Olaf
-  - Vera
-  - Timo
-  - pixelfox
-  - NightOwl
-  - Kestrel
-  - mossy
-  - Tidebreaker
-  - Juno
-  - Quinn
-  - Rikkert
-  - Ilse
-  - Wouter
+  - Albert
+  - Allen
+  - Bert
+  - Bob
+  - Cecil
+  - Clarence
+  - Elliot
+  - Elmer
+  - Ernie
+  - Eugene
+  - Fergus
+  - Ferris
+  - Frank
+  - Fred
+  - George
+  - Graham
+  - Harvey
+  - Irwin
+  - Larry
+  - Lester
+  - Marvin
+  - Neil
+  - Niles
+  - Oliver
+  - Ryan
+  - Ted
+  - Toby
+  - Ulric
+  - Ulysses
+  - Uri
+  - Vinny
+  - Wade
+  - Waldo
+  - Wally
+  - Walt
+  - Wesley
+  - Xavier
+  - Yogi
+  - Yuri
+  - Zach
   builds:
   - name: Shotgun
     familyWeapon: {fileID: 11400000, guid: 27983484f42c6eb409acf1c5d0d8e823, type: 2}
@@ -84,18 +84,36 @@ MonoBehaviour:
     rechargeUpgrades: 2
     fightRangeMin: 14
     fightRangeMax: 20
-  reactionSeconds: 0.5
+  reactionSeconds: 1
   memorySeconds: 3
+  targetLostSeconds: 1
   targetSwitchMetres: 3
   thinkSeconds: 0.1
-  aimErrorStartMetres: 1.5
-  aimErrorMinMetres: 0.5
+  aimErrorStartMetres: 2.2
+  aimErrorMinMetres: 0.9
   aimSettleSeconds: 2
   aimWobbleSeconds: 0.3
   turnDegreesPerSecond: 360
   leadFraction: 0.5
+  engageExtraMetres: 3
+  objectiveGuardMetres: 12
+  hitMemorySeconds: 3
+  goalHoldSeconds: 1.5
   strafeSwitchMinSeconds: 1.5
   strafeSwitchMaxSeconds: 2.5
+  fightStandStillChance: 0.3
+  rangeDeadBandMetres: 1
+  idlePauseEveryMinSeconds: 6
+  idlePauseEveryMaxSeconds: 12
+  idlePauseChance: 0.25
+  pauseMinSeconds: 1
+  pauseMaxSeconds: 2
+  outnumberedRadiusMetres: 15
+  outnumberedMargin: 1
+  enemyNearZonePenaltyMetres: 10
+  zoneIntelSeconds: 8
+  helpTeammateMetres: 12
+  teammateFightMetres: 15
   stopFiringHeat: 0.8
   finishTargetHealth: 0.25
   ventSuccessChance: 0.5
@@ -109,6 +127,8 @@ MonoBehaviour:
   zipMinMetres: 8
   zipMaxMetres: 16
   zipMinHealth: 0.5
+  zipEscapeHealth: 0.35
+  zipEscapeEnemyMetres: 10
   fenceMetres: 5
   fenceTwoEnemiesMetres: 8
   coverHealth: 0.6
@@ -118,6 +138,9 @@ MonoBehaviour:
   healZoneHealth: 0.5
   healZoneTeammateMetres: 5
   scopeMinMetres: 15
+  scoutMinMetres: 15
+  scoutMaxMetres: 30
+  scoutSeconds: 1.5
   blinkHealth: 0.35
   blinkEnemyMetres: 10
   raybeamMetres: 20
@@ -127,11 +150,14 @@ MonoBehaviour:
   humanTeammateMetres: 20
   pushCapitalTeammates: 2
   pushCapitalMetres: 20
+  defendZoneMetres: 25
   centreBeforeScanSeconds: 15
   centreBeforePayoutSeconds: 10
   circleMarginMetres: 2
-  agentRadius: 0.75
+  agentRadius: 1
   agentHeight: 2.6
   agentClimb: 0.4
+  cornerReachMetres: 0.8
   repathSeconds: 0.5
   stuckSeconds: 1
+  noSidestepNearGoalMetres: 1.5
