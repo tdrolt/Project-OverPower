@@ -145,6 +145,7 @@ MonoBehaviour:
   blinkEnemyMetres: 10
   raybeamMetres: 20
   raybeamSeenSeconds: 1
+  pressRetrySeconds: 1.5
   tierThreeBonusMetres: 10
   bountyBonusMetres: 10
   humanTeammateMetres: 20

@@ -203,6 +203,8 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float raybeamMetres = 20f;
         [Tooltip("...and has been in sight this many seconds.")]
         [SerializeField, Min(0f)] private float raybeamSeenSeconds = 1f;
+        [Tooltip("When an ability refuses a press (a blocked spot for Cover, nowhere to land a Blink), how long the bot waits before it tries that key again, in seconds.")]
+        [SerializeField, Min(0f)] private float pressRetrySeconds = 1.5f;
 
         [Header("Conquest")]
         [Tooltip("A Tier III zone counts as this many metres closer when it picks a zone to capture.")]
@@ -317,6 +319,7 @@ namespace Overpower.Data
         public float BlinkEnemyMetres => blinkEnemyMetres;
         public float RaybeamMetres => raybeamMetres;
         public float RaybeamSeenSeconds => raybeamSeenSeconds;
+        public float PressRetrySeconds => pressRetrySeconds;
 
         public float TierThreeBonusMetres => tierThreeBonusMetres;
         public float BountyBonusMetres => bountyBonusMetres;

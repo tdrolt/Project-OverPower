@@ -1019,7 +1019,13 @@ namespace Overpower.Bots
         }
 
         private bool Ready(AbilitySlot slot, int wantedId) =>
-            wantedId != 0 && abilities.EquippedId(slot) == wantedId && abilities.BlockFor(slot) == CastBlock.None && !abilities.CasterLocked && pending.Slot == PressSlot.None;
+            wantedId != 0 && abilities.EquippedId(slot) == wantedId && abilities.BlockFor(slot) == CastBlock.None && !abilities.CasterLocked && pending.Slot == PressSlot.None
+            && BotPressRules.MayPressAgain(Time.time - lastPressAt[(int)ToPress(slot)], cfg.PressRetrySeconds);
+
+        private readonly float[] lastPressAt = { -99f, -99f, -99f, -99f };
+
+        private static PressSlot ToPress(AbilitySlot slot) =>
+            slot == AbilitySlot.Attachment ? PressSlot.Attachment : slot == AbilitySlot.Mobility ? PressSlot.Mobility : PressSlot.Ultimate;
 
         private bool UltimateReady(int ultimateId) =>
             ultimate != null && ultimate.IsFull && Ready(AbilitySlot.Ultimate, ultimateId);
@@ -1103,6 +1109,7 @@ namespace Overpower.Bots
             pending.Stage++;
             if (pending.Stage == 2)
             {
+                lastPressAt[(int)pending.Slot] = Time.time;
                 if (pending.Slot == PressSlot.Attachment) tally.Attachment++;
                 else if (pending.Slot == PressSlot.Mobility) tally.Movement++;
                 else tally.Ultimate++;

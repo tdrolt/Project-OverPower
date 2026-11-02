@@ -114,6 +114,10 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ARefusedPressIsRetriedOnlyAfterTheWait() =>
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "Ready", M(typeof(BotPressRules), nameof(BotPressRules.MayPressAgain))));
+
+        [Test]
         public void EachBuildsAbilitiesAreUsedByItsRules()
         {
             foreach (string rule in new[] { "Flame", "Zip", "ZipEscape", "Fence", "Cover", "Sprint", "HealZone", "Scope", "Blink", "Raybeam" })
