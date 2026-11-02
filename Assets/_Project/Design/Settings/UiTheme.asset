@@ -244,10 +244,11 @@ MonoBehaviour:
   laserBeamWidth: 0.14
   laserBeamEmission: 1.6
   laserBeamLingerSeconds: 0.18
-  goldTextColor: {r: 1, g: 0.82, b: 0.2, a: 1}
+  goldTextColor: {r: 0.1216, g: 0.5412, b: 0.2353, a: 1}
   goldShopGap: 8
   goldIncomeSizePercent: 75
-  bountyToastColor: {r: 1, g: 0.82, b: 0.2, a: 1}
+  bountyToastColor: {r: 0.1216, g: 0.5412, b: 0.2353, a: 1}
+  toastColor: {r: 1, g: 0.82, b: 0.2, a: 1}
   bountyToastDurationSeconds: 3
   capitalUnderAttackRespawnNote: Your capital is under attack - you will respawn
     at your Tier 2 zone
@@ -297,9 +298,9 @@ MonoBehaviour:
   bountyLabelGoldFormat: BOUNTY {0} CREDITS
   bountyPopFormat: +{0}
   bountyPopGoldFormat: +{0} CREDITS
-  bountyLabelColour: {r: 1, g: 0.85, b: 0.1, a: 1}
-  bountyLabelFontSize: 30
-  bountyPopFontSize: 44
+  bountyLabelColour: {r: 0.1216, g: 0.5412, b: 0.2353, a: 1}
+  bountyLabelFontSize: 19.5
+  bountyPopFontSize: 28.6
   bountyLabelAnchorHeight: 1.5
   bountyLabelLift: 56
   bountyPopRise: 110
@@ -862,6 +863,7 @@ MonoBehaviour:
   lobbyRoomYouSuffix: ' (you)'
   lobbyRoomHostSuffix: " \xB7 host"
   lobbyRoomBotSuffix: ' <color=#8F9399>BOT</color>'
+  lobbyRoomRemoveBotText: "\xD7"
   lobbyRoomAddBotText: + Add bot
   lobbyRoomFillBotsText: Fill with bots
   lobbyRoomSpectatorsText: Spectators

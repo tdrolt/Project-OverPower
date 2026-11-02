@@ -17,8 +17,8 @@ MonoBehaviour:
   description: Hold to charge up to five shots.
   parent: {fileID: 11400000, guid: b52e9c7b32723bf4a8dcd0d813187443, type: 2}
   icon: {fileID: 21300000, guid: 8b6dd78732e33db4fb4476d8a40396d3, type: 3}
-  goldCost: 1280
-  damage: 10
+  goldCost: 1664
+  damage: 7
   fireInterval: 0.38
   projectilesPerShot: 3
   simultaneous: 0

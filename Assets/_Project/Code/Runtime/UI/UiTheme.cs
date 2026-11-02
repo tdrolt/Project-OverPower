@@ -663,10 +663,11 @@ namespace Overpower.UI
         [Range(30f, 100f)] public float goldIncomeSizePercent = 75f;
 
         [Header("Bounty toast")]
-        [Tooltip("Text colour of the transient \"Bounty +900\" toast shown when a capture pays your team a bounty - " +
-                 "the same warm amber family as Gold Text Colour, so a bounty reads as an emphatic version of the " +
-                 "same gold reward rather than an unrelated alert colour.")]
+        [Tooltip("Text colour of the transient \"Bounty +900\" toast shown when a capture pays your team a bounty: the credits' colour " +
+                 "(Gold Text Colour), so a bounty reads as more of the same reward.")]
         public Color bountyToastColor = new Color(1f, 0.82f, 0.2f, 1f);
+        [Tooltip("Text colour of every other toast in the same place (match live, two teams left, respawned at Tier 2, shop closed, bug marked).")]
+        public Color toastColor = new Color(1f, 0.82f, 0.2f, 1f);
         [Tooltip("Seconds the bounty toast stays on screen before it hides itself again.")]
         public float bountyToastDurationSeconds = 3f;
 
@@ -2036,7 +2037,9 @@ namespace Overpower.UI
         public string lobbyRoomHostSuffix = " \u00b7 host";
         [Tooltip("Written after a bot's name on its seat, in the lobby only: in a match a bot's name stands alone, like a player's.")]
         public string lobbyRoomBotSuffix = " <color=#8F9399>BOT</color>";
-        [Tooltip("The host's button under each team: puts one bot in that team's first empty seat. The host's click on a bot's seat takes the bot out.")]
+        [Tooltip("The host's small button at the right end of a bot's seat: it takes the bot out of the lobby. A click on the rest of the seat asks for it, as on any seat.")]
+        public string lobbyRoomRemoveBotText = "\u00d7";
+        [Tooltip("The host's button under each team: puts one bot in that team's first empty seat.")]
         public string lobbyRoomAddBotText = "+ Add bot";
         [Tooltip("The host's button in the side box: a bot in every empty team seat.")]
         public string lobbyRoomFillBotsText = "Fill with bots";

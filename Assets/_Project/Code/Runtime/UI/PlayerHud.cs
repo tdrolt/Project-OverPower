@@ -367,13 +367,17 @@ namespace Overpower.UI
         /// <summary>GoldWallet.BountyReceived handler: shows "Bounty +900" through the shared toast label. The text is set
         /// once, on the trigger frame; UpdateToast only toggles the active flag, so a bounty allocates one string.</summary>
         private void HandleBountyReceived(int amount) =>
-            ShowToast($"Bounty +{amount.ToString(CultureInfo.InvariantCulture)}");
+            ShowToast($"Bounty +{amount.ToString(CultureInfo.InvariantCulture)}", theme.bountyToastColor);
 
         /// <summary>Shows <paramref name="text"/> in the HUD's one transient toast label for bountyToastDurationSeconds
         /// (UiTheme; the name predates the toast serving other callers), unscaled. There is only ONE label: calling this
         /// while a toast shows replaces its text and restarts the duration, it does not queue.</summary>
-        public void ShowToast(string text)
+        public void ShowToast(string text) => ShowToast(text, theme.toastColor);
+
+        /// <summary>As ShowToast(text), in a colour of its own (the bounty's is the credits' colour).</summary>
+        public void ShowToast(string text, Color colour)
         {
+            toastText.color = colour;
             toastText.text = text;
             toastGo.SetActive(true);
             toastHideAtTime = Time.unscaledTime + theme.bountyToastDurationSeconds;
@@ -1093,7 +1097,7 @@ namespace Overpower.UI
             textRt.anchorMax = Vector2.one;
             textRt.offsetMin = Vector2.zero;
             textRt.offsetMax = Vector2.zero;
-            text.color = theme.bountyToastColor;
+            text.color = theme.toastColor;
             text.alignment = TextAlignmentOptions.Center;
 
             go.SetActive(false); // ShowToast turns this on; UpdateToast turns it off again.
