@@ -98,13 +98,16 @@ namespace Overpower.Net
             foreach (int actor in toAdd)
                 Create(room, actor);
 
-            Dictionary<int, Hashtable> full = BotRosterRules.SplitByBot(all);
+            // The whole room is split only on a join or when a bot is announced; an update re-reads just the keys it changed (bots write
+            // their properties often, and the room table grows with every bot).
+            Dictionary<int, Hashtable> full = changed == null ? BotRosterRules.SplitByBot(all) : null;
             Dictionary<int, Hashtable> delta = changed == null ? full : BotRosterRules.SplitByBot(changed);
             foreach (int actor in roster)
             {
                 if (!(room.GetPlayer(actor) is BotPlayer bot)) continue;
                 if (announced.Add(actor))
                 {
+                    if (full == null) full = BotRosterRules.SplitByBot(all);
                     full.TryGetValue(actor, out Hashtable everything);
                     bot.Mirror(everything);
                     Debug.Log($"[BOTS] {bot.NickName} ({actor}, build {bot.Build}) is in the room");

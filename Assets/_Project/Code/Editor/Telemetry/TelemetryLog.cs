@@ -41,6 +41,13 @@ namespace Overpower.EditorTools.Telemetry
         public readonly string Commit;
         public readonly int Schema;
         public readonly JObject Tuning;
+        /// <summary>A seat the host played (its file is written by the host); BotBuild is its build number, -1 for a person.</summary>
+        public bool Bot { get; private set; }
+        public int BotBuild { get; private set; } = -1;
+        /// <summary>The mode, map and seats per team the session line names ("" / 0 in a log from before they were written).</summary>
+        public string Mode { get; private set; } = "";
+        public string Map { get; private set; } = "";
+        public int TeamSize { get; private set; }
 
         public TelemetrySession(string file, int actor, string nick, int team, bool isMaster, string matchId, string commit, int schema, JObject tuning, bool spectator = false)
         {
@@ -54,6 +61,17 @@ namespace Overpower.EditorTools.Telemetry
             Commit = commit;
             Schema = schema;
             Tuning = tuning;
+        }
+
+        /// <summary>The session line's newer fields, read separately so the constructor every test builds a session with stays as it was.</summary>
+        public TelemetrySession With(bool bot, int botBuild, string mode, string map, int teamSize)
+        {
+            Bot = bot;
+            BotBuild = botBuild;
+            Mode = mode ?? "";
+            Map = map ?? "";
+            TeamSize = teamSize;
+            return this;
         }
     }
 
@@ -104,6 +122,8 @@ namespace Overpower.EditorTools.Telemetry
             TelemetryKeys.Adopt,
             // Console/bug/chat lines: TelemetryAggregator.BuildBugsAndConsole is the only reader.
             TelemetryKeys.Console, TelemetryKeys.Bug, TelemetryKeys.Chat,
+            // ModeReportBuilder reads these.
+            TelemetryKeys.Points, TelemetryKeys.Shield, TelemetryKeys.Shrink, TelemetryKeys.Scan,
         };
 
         public static TelemetryLog Load(string folder)
@@ -130,7 +150,7 @@ namespace Overpower.EditorTools.Telemetry
                 unknownByFile[name] = 0;
 
                 string[] lines;
-                try { lines = File.ReadAllLines(path); }
+                try { lines = ReadAllLinesShared(path); }
                 catch
                 {
                     unreadable++; // counted, not silently dropped.
@@ -244,6 +264,20 @@ namespace Overpower.EditorTools.Telemetry
             return log;
         }
 
+        /// <summary>File.ReadAllLines, but the file may still be open in a running game (the game keeps its log open for the match).</summary>
+        private static string[] ReadAllLinesShared(string path)
+        {
+            var lines = new List<string>();
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var reader = new StreamReader(stream, System.Text.Encoding.UTF8, true))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                    lines.Add(line);
+            }
+            return lines.ToArray();
+        }
+
         private static TelemetrySession ParseSession(string file, JObject data)
         {
             int actor = data[TelemetryKeys.Actor]?.ToObject<int?>() ?? -1;
@@ -255,7 +289,13 @@ namespace Overpower.EditorTools.Telemetry
             int schema = data[TelemetryKeys.Schema]?.ToObject<int?>() ?? 0;
             JObject tuning = data[TelemetryKeys.Tuning] as JObject;
             bool spectator = data[TelemetryKeys.Spectator]?.ToObject<bool?>() ?? false;
-            return new TelemetrySession(file, actor, nick, team, master, matchId, commit, schema, tuning, spectator);
+            bool bot = data[TelemetryKeys.Bot]?.ToObject<bool?>() ?? false;
+            int botBuild = data[TelemetryKeys.BotBuild]?.ToObject<int?>() ?? -1;
+            string mode = data[TelemetryKeys.Mode]?.ToString() ?? "";
+            string map = data[TelemetryKeys.Map]?.ToString() ?? "";
+            int teamSize = data[TelemetryKeys.TeamSize]?.ToObject<int?>() ?? 0;
+            return new TelemetrySession(file, actor, nick, team, master, matchId, commit, schema, tuning, spectator)
+                .With(bot, botBuild, mode, map, teamSize);
         }
     }
 }

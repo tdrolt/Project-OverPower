@@ -343,6 +343,9 @@ namespace Overpower.Match
             // in the master's own live write, not in StartCountdown. Never logged twice: GoLive runs once
             // (liveWritten/IsLive guard at the top).
             MatchTelemetry.Instance?.LogPhase((int)phase, teams);
+            // A two-team Conquest start plays with the third corner closed from go-live.
+            if (phase == MatchPhase.TwoTeams && !DominionMode.IsActive())
+                LogShrink(buildings, PhaseTwoCutRules.CutTeam(true, teams, System.Array.Empty<int>()));
             Debug.Log($"[MATCH] live: teams [{string.Join(",", teams)}], {phase}");
         }
 

@@ -594,7 +594,10 @@ namespace Overpower.Match
             // phaseTwoStarts is true (the ThreeTeams -> TwoTeams edge can only be crossed by a fresh elimination -
             // MatchPhaseRules.PhaseFor), but this stays defensive rather than assuming that ordering.
             if (phaseTwoStarts && newlyEliminated.Count > 0)
+            {
                 NeutraliseForPhaseTwo(buildings, newlyEliminated[0]);
+                LogShrink(buildings, newlyEliminated[0]);
+            }
             if (result.Phase == MatchPhase.Over)
                 CloseFinishedRoom();
 
@@ -626,6 +629,14 @@ namespace Overpower.Match
                 buildings.SetNeutralWithoutBountyHistory(zone);
                 buildings.ResetCaptureOf(zone, TerritoryMap.Neutral);
             }
+        }
+
+        /// <summary>The match log's map shrink: which corner closed and the zones it took out of play.</summary>
+        private void LogShrink(BuildingManager buildings, int cutTeam)
+        {
+            if (MatchTelemetry.Instance == null || buildings == null || buildings.Map == null || cutTeam < 0)
+                return;
+            MatchTelemetry.Instance.LogShrink(cutTeam, PhaseTwoCutRules.CutZones(buildings.Map, cutTeam, BaseTierOf).ToArray());
         }
 
         /// A decided match's room must not keep taking new players - RoomManager.JoinRandomRoom would

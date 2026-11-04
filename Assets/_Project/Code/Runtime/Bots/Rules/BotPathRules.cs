@@ -3,8 +3,10 @@ using UnityEngine;
 namespace Overpower.Bots
 {
     /// <summary>Following a planned route with the player's own movement: corner by corner, flat, re-planned on a timer, when the goal
-    /// moves or when the body is stuck against something the map does not know (a Cover wall, another body).</summary>
-    public static class BotPathRules
+    /// moves or when the body is stuck against something the map does not know (a Cover wall, another body). Routes come from two walkable
+    /// maps, a tight one as wide as the body and a wide one with a margin off walls: which to walk, and how to take a tight route's bends
+    /// (slower, through the middle of the gap).</summary>
+    public static partial class BotPathRules
     {
         /// <summary>The first corner after the start not yet within reachMetres (flat); -1 when the last one is reached.</summary>
         public static int NextCorner(Vector3[] corners, Vector3 position, float reachMetres)

@@ -130,6 +130,97 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(BotNavMesh), nameof(BotNavMesh.Build), M(typeof(BotPathRules), nameof(BotPathRules.IsWalkSource))));
 
         [Test]
+        public void TheBrainFinishesTeamsThroughTheRules()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ReadLastStands", M(typeof(BotHuntRules), nameof(BotHuntRules.LastStand))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "IsHunted", M(typeof(BotHuntRules), nameof(BotHuntRules.Hunted))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "Think", M(typeof(BotBrain), "ReadLastStands")));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "PickTarget", M(typeof(BotBrain), "IsHunted")), "a team in its last stand is a target at any distance");
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ChooseGoal", M(typeof(BotBrain), "IsHunted")), "...and is chased");
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ConquestGoal", M(typeof(BotPushRules), nameof(BotPushRules.Exposed))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ConquestGoal", M(typeof(BotPushRules), nameof(BotPushRules.PushAnyway))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ConquestGoal", M(typeof(BotPushRules), nameof(BotPushRules.Forced))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ConquestGoal", M(typeof(BotPushRules), nameof(BotPushRules.KeepTaking))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ConquestGoal", M(typeof(BotBrain), "CaptureDone")));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "CaptureDone", M(typeof(BotPushRules), nameof(BotPushRules.CaptureDone01))));
+        }
+
+        [Test]
+        public void TheBrainSpreadsOutThroughTheRulesInBothModes()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ConquestGoal", M(typeof(BotSpreadRules), nameof(BotSpreadRules.Spreading))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ConquestGoal", M(typeof(BotSpreadRules), nameof(BotSpreadRules.PushedBack))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "DominionGoal", M(typeof(BotSpreadRules), nameof(BotSpreadRules.Spreading))));
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(BotBrain), "HoldWhileSpreading", M(typeof(BotSpreadRules), nameof(BotSpreadRules.HoldZone))));
+            foreach (string mode in new[] { "ConquestGoal", "DominionGoal" })
+            {
+                Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), mode, M(typeof(BotBrain), "HoldWhileSpreading")), mode);
+                Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), mode, M(typeof(BotBrain), "CountTeammatesHeading")), mode);
+            }
+        }
+
+        [Test]
+        public void TheLaserBotSupportsAPartnerThroughTheRules()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ChoosePartner", M(typeof(BotSupportRules), nameof(BotSupportRules.PickPartner))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "SupportPoint", M(typeof(BotSupportRules), nameof(BotSupportRules.FollowPoint))));
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(BotBrain), "WaitingToWalkOut", M(typeof(BotSupportRules), nameof(BotSupportRules.WaitForTeammate))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ChooseGoal", M(typeof(BotBrain), "WaitingToWalkOut")));
+            foreach (string mode in new[] { "ConquestGoal", "DominionGoal" })
+            {
+                Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), mode, M(typeof(BotBrain), "ChoosePartner")), mode);
+                Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), mode, M(typeof(BotBrain), "SupportPoint")), mode);
+            }
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(BotBrain), "ScoutAhead", M(typeof(BotAbilityRules), nameof(BotAbilityRules.ScoutDue))));
+        }
+
+        [Test]
+        public void AHurtBotUsesATeammatesHealZoneThroughTheRule()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "TryHealZone", M(typeof(BotHealZoneRules), nameof(BotHealZoneRules.WalkIn))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "TryHealZone", M(typeof(BotDirector), nameof(BotDirector.HealZones))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ChooseGoal", M(typeof(BotBrain), "TryHealZone")));
+        }
+
+        [Test]
+        public void SpawnsAreShotBackIntoAndKeptOutOfThroughTheRules()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "LeftAlone", M(typeof(BotSpawnRules), nameof(BotSpawnRules.LeaveAlone))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "OffLimits", M(typeof(BotSpawnRules), nameof(BotSpawnRules.KeepOut))));
+        }
+
+        [Test]
+        public void RoutesComeFromTwoMapsAndTightBendsAreTakenThroughTheRules()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(BotNavMesh), nameof(BotNavMesh.TryRoute), M(typeof(BotPathRules), nameof(BotPathRules.TakeWide))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotNavMesh), nameof(BotNavMesh.TryRoute), M(typeof(BotPathRules), nameof(BotPathRules.RouteMetres))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotNavMesh), nameof(BotNavMesh.Centred), M(typeof(BotPathRules), nameof(BotPathRules.GapMiddle))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotNavMesh), nameof(BotNavMesh.Centred), M(typeof(BotPathRules), nameof(BotPathRules.Across))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "Steer", M(typeof(BotNavMesh), nameof(BotNavMesh.TryRoute))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "Steer", M(typeof(BotPathRules), nameof(BotPathRules.CornerSpeed))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "Steer", M(typeof(BotBrain), "CentreBends")));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "CentreBends", M(typeof(BotNavMesh), nameof(BotNavMesh.Centred))));
+        }
+
+        [Test]
+        public void EachBotThinksShopsAndReadsTheMatchOnItsOwnBeat()
+        {
+            MethodInfo roll = typeof(UnityEngine.Random).GetProperty(nameof(UnityEngine.Random.value)).GetGetMethod();
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(BotBrain), "Init", roll), "a random phase per bot");
+            foreach (string field in new[] { "nextThinkAt", "nextShopAt", "nextLastStandReadAt" })
+                Assert.IsTrue(IlWiring.Stores(typeof(BotBrain), "Init", typeof(BotBrain).GetField(field, BindingFlags.Instance | BindingFlags.NonPublic)), field);
+        }
+
+        [Test]
+        public void TheBotsBuysAndPicksGoIntoItsMatchLog()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "Logged",
+                M(typeof(Overpower.Telemetry.PlayerTelemetry), nameof(Overpower.Telemetry.PlayerTelemetry.HandlePurchased))));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ShopConquest", M(typeof(BotBrain), "Logged")));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ShopDominion", M(typeof(BotBrain), "Logged")));
+        }
+
+        [Test]
         public void ThePlayerPrefabCarriesTheBotSeat()
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Design/Resources/Multiplayer Player.prefab");

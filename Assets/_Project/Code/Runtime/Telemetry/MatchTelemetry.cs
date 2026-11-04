@@ -72,6 +72,7 @@ namespace Overpower.Telemetry
         private TelemetryWriter writer = new TelemetryWriter();
         private readonly PendingLineBuffer pending = new PendingLineBuffer(MaxPendingLines);
         private readonly LocalJoinLine localJoin = new LocalJoinLine(); // whether this player's own join line is queued behind the file
+        private readonly WarmupAnchorLine warmupAnchor = new WarmupAnchorLine();
 
         // Spectators this master has already noted with a marker (cleared when the room is left).
         private readonly HashSet<int> spectatorsNoted = new HashSet<int>();
@@ -183,7 +184,7 @@ namespace Overpower.Telemetry
 
             flushTimer = 0f;
             writer.Flush();
-            FlushBotLogs();
+            FlushBotLogs(false);
         }
 
         private void OnApplicationQuit()
@@ -222,6 +223,9 @@ namespace Overpower.Telemetry
             string roomName = PhotonNetwork.CurrentRoom.Name; int me = PhotonNetwork.LocalPlayer.ActorNumber;
             if (localJoin.OnJoinedRoom(TelemetryWrittenMemory.Process, roomName, me, writer.IsOpen))
                 LogJoinOrLeave(TelemetryKeys.Join, PhotonNetwork.LocalPlayer);
+            // The same scene: the warm-up anchor queued in the lobby's scene died with it, and without one the report counts the warm-up as match time.
+            if (warmupAnchor.LogsOnArrival(TelemetryWrittenMemory.Process, roomName, PhotonNetwork.IsMasterClient, LobbyStageNow))
+                LogWarmupAnchor();
             // A scene that loads inside the room finds its bots already there: no enter callback comes for them.
             foreach (Player player in PhotonNetwork.CurrentRoom.Players.Values)
                 NoteBot(player);
@@ -240,6 +244,7 @@ namespace Overpower.Telemetry
             matchStartMs = 0;
             pending.Clear();
             localJoin.Reset();
+            warmupAnchor.Reset();
             spectatorsNoted.Clear();
             botsNoted.Clear();
             TelemetryWrittenMemory.Process.ForgetAll(); // leaving the room: the next one (or this one again) is a new beginning
@@ -506,7 +511,7 @@ namespace Overpower.Telemetry
             // Log); matchId/matchStartMs may still be unset (Now reads -1, the sentinel `join` already uses). Phase 0 marks a NEW-STYLE
             // log for PhaseTimeline.From; MatchDirector.GoLive logs phase 1 or 2 for real, so this anchor is never a live moment or a
             // transition.
-            LogPhase(0, System.Array.Empty<int>());
+            LogWarmupAnchor();
 
             // Wait for mId to actually show up (see TryClaimMatchIdentity on why the return value above is not the signal).
             float waitedForEcho = 0f;
@@ -571,6 +576,7 @@ namespace Overpower.Telemetry
                 writer.Write(waiting);
             pending.Clear();
             localJoin.OnFileOpened(TelemetryWrittenMemory.Process, PhotonNetwork.CurrentRoom.Name, actor); // marks the join written only if this player's join was queued
+            warmupAnchor.OnFileOpened(TelemetryWrittenMemory.Process, PhotonNetwork.CurrentRoom.Name);
 
             writer.Flush(); // Immediate, so the file and its header exist as soon as a client joins, not just after the first flush interval.
         }
@@ -630,15 +636,21 @@ namespace Overpower.Telemetry
         /// <summary>The display name of the room's game mode ("Conquest 3v3v3"), or "" when the room has none / the catalogue does not know it.</summary>
         private string ModeNameOfRoom()
         {
+            GameModeDefinition mode = ModeOfRoom();
+            return mode != null ? mode.DisplayName : "";
+        }
+
+        /// <summary>The room's game mode, or null when the room has none / the catalogue does not know it.</summary>
+        private GameModeDefinition ModeOfRoom()
+        {
             if (PhotonNetwork.CurrentRoom == null || !PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(LobbyKeys.Mode, out object raw) || !(raw is int modeId))
-                return "";
+                return null;
             if (modeCatalogue == null)
             {
                 RoomManager manager = FindFirstObjectByType<RoomManager>();
                 modeCatalogue = manager != null ? manager.ModeCatalogue : null;
             }
-            GameModeDefinition mode = modeCatalogue != null ? modeCatalogue.ById(modeId) : null;
-            return mode != null ? mode.DisplayName : "";
+            return modeCatalogue != null ? modeCatalogue.ById(modeId) : null;
         }
 
         /// <summary>The one line that says how many of the earliest pending lines were dropped (PendingLineBuffer).</summary>
@@ -670,10 +682,17 @@ namespace Overpower.Telemetry
                 line.Bool(TelemetryKeys.Bot, true);
                 line.Int(TelemetryKeys.BotBuild, bot.Build);
             }
+            GameModeDefinition mode = ModeOfRoom();
+            line.String(TelemetryKeys.Mode, mode != null ? mode.DisplayName : "");
+            line.Int(TelemetryKeys.ModeId, mode != null ? mode.Id : -1);
+            line.String(TelemetryKeys.Map, UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+            line.Int(TelemetryKeys.TeamSize, mode != null ? mode.SeatsPerTeam : 0);
+            line.Ints(TelemetryKeys.ModeTeams, mode != null && mode.Teams != null ? mode.Teams : Array.Empty<int>());
             line.String(TelemetryKeys.Commit, ReadCommitHash());
             line.String(TelemetryKeys.UnityVersion, Application.unityVersion);
             line.String(TelemetryKeys.Platform, Application.platform.ToString());
-            line.Raw(TelemetryKeys.Tuning, TuningSnapshot.Json(territoryConfig, gameplayConfig, armorConfig, config, weapons, abilities));
+            DominionConfig dominion = mode != null && mode.Family == GameModeFamily.Dominion ? Overpower.Dominion.DominionMode.Config() : null;
+            line.Raw(TelemetryKeys.Tuning, TuningSnapshot.Json(territoryConfig, gameplayConfig, armorConfig, config, weapons, abilities, dominion));
             target.Write(line.End());
         }
 
@@ -722,10 +741,14 @@ namespace Overpower.Telemetry
                 log.Pending.Add(text);
         }
 
-        private void FlushBotLogs()
+        /// <summary>release: also let go of each file, for a reader that opens them right after (see TelemetryWriter.Release).</summary>
+        private void FlushBotLogs(bool release)
         {
             foreach (BotLog log in botLogs.Values)
-                log.Writer.Flush();
+            {
+                if (release) log.Writer.Release();
+                else log.Writer.Flush();
+            }
         }
 
         private void CloseBotLogs()
@@ -900,12 +923,83 @@ namespace Overpower.Telemetry
             Log(line);
         }
 
-        /// <summary>Flushes whatever is buffered to disk now, regardless of FlushIntervalSeconds' timer (MatchLogZip calls it before
-        /// reading the folder). No-op if the writer never opened or is disabled.</summary>
+        /// <summary>Flushes whatever is buffered to disk now, regardless of FlushIntervalSeconds' timer, and lets go of the files (MatchLogZip
+        /// calls it before reading the folder; the next flush opens them again). No-op if the writer never opened or is disabled.</summary>
         public void FlushNow()
         {
-            writer.Flush();
-            FlushBotLogs();
+            writer.Release();
+            FlushBotLogs(true);
+        }
+
+        // ---------------------------------------------------------------- warm-up / Dominion points / respawn shield / shrink / centre scan
+
+        /// <summary>The `phase` 0 warm-up anchor (see LogPhase), with its written-or-queued bookkeeping (WarmupAnchorLine).</summary>
+        private void LogWarmupAnchor()
+        {
+            if (!PhotonNetwork.IsMasterClient || PhotonNetwork.CurrentRoom == null) return;
+            LogPhase(0, Array.Empty<int>());
+            warmupAnchor.OnLogged(TelemetryWrittenMemory.Process, PhotonNetwork.CurrentRoom.Name, writer.IsOpen);
+        }
+
+        /// <summary>DominionDirector, master only: every team's points as the room holds them now (the report's points race).</summary>
+        public void LogTeamPoints(int round, int stage, int[] points)
+        {
+            if (!PhotonNetwork.IsMasterClient) return;
+
+            line.Begin(TelemetryKeys.Points, Now);
+            line.Int(TelemetryKeys.Round, round);
+            line.Int(TelemetryKeys.Stage, stage);
+            line.Ints(TelemetryKeys.TeamPoints, points ?? Array.Empty<int>());
+            Log(line);
+        }
+
+        /// <summary>RespawnShield, on the client that plays the body: its shield went up for this long.</summary>
+        public void LogShieldUp(PhotonView body, float seconds)
+        {
+            line.Begin(TelemetryKeys.Shield, Now);
+            line.String(TelemetryKeys.State, "up");
+            line.Float(TelemetryKeys.Duration, seconds);
+            LogForBody(body);
+        }
+
+        /// <summary>RespawnShield: the shield went down (ShieldLogState's reasons), having stopped <paramref name="blocked"/> hits and effects.</summary>
+        public void LogShieldDown(PhotonView body, string reason, int blocked)
+        {
+            line.Begin(TelemetryKeys.Shield, Now);
+            line.String(TelemetryKeys.State, "down");
+            line.String(TelemetryKeys.Reason, reason ?? "");
+            line.Int(TelemetryKeys.Blocked, blocked);
+            LogForBody(body);
+        }
+
+        /// <summary>A bot's body is the bot's file's; any other body this client plays is this client's own.</summary>
+        private void LogForBody(PhotonView body)
+        {
+            if (BodyRole.IsBot(body))
+                LogBot(body.OwnerActorNr, line);
+            else
+                Log(line);
+        }
+
+        /// <summary>MatchDirector, master only: a corner closed and these zones left play.</summary>
+        public void LogShrink(int cutTeam, int[] zones)
+        {
+            if (!PhotonNetwork.IsMasterClient) return;
+
+            line.Begin(TelemetryKeys.Shrink, Now);
+            line.Int(TelemetryKeys.Team, cutTeam);
+            line.Ints(TelemetryKeys.Zones, zones ?? Array.Empty<int>());
+            Log(line);
+        }
+
+        /// <summary>CentreScan, every client: one finished wave (ScanWaveLog), its start on the server clock turned into match seconds.</summary>
+        public void LogScan(int waveStartServerMs, int holderTeam, int caught)
+        {
+            line.Begin(TelemetryKeys.Scan, Now);
+            line.Float(TelemetryKeys.WaveStartT, (float)MatchClock.Seconds(waveStartServerMs, matchStartMs));
+            line.Int(TelemetryKeys.Team, holderTeam);
+            line.Int(TelemetryKeys.Caught, caught);
+            Log(line);
         }
     }
 }

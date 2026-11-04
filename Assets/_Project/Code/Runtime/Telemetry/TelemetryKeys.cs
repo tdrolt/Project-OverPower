@@ -71,6 +71,16 @@ namespace Overpower.Telemetry
         /// <summary>The sender's own public chat text, logged right before PhotonChat.SubmitPublicChatOnClick publishes it - never
         /// the receive callback's copy.</summary>
         public const string Chat = "chat";
+        /// <summary>Dominion, master only: every team's points (TeamPoints) each time the room's points change, for the report's points race.</summary>
+        public const string Points = "points";
+        /// <summary>The respawn shield of the body whose file this is: State "up" with Duration, or "down" with Reason and Blocked.</summary>
+        public const string Shield = "shield";
+        /// <summary>Conquest, master only: a corner closed (Team = the corner's team, Zones = the zones taken out of play), at the first
+        /// knockout or at go-live of a two-team start.</summary>
+        public const string Shrink = "shrink";
+        /// <summary>One centre-scan wave, logged by every client when the front leaves the arena: WaveStartT, Team = the holder (-1 nobody),
+        /// Caught = enemies this client's team spotted (-1 when the wave was not this client's team's).</summary>
+        public const string Scan = "scan";
 
         // ---------------------------------------------------------------- session (line 1)
         public const string Schema = "schema";
@@ -83,6 +93,16 @@ namespace Overpower.Telemetry
         public const string Bot = "bot";
         /// <summary>Which of the three builds a bot plays (BotPlayer.Build), on its session and join lines.</summary>
         public const string BotBuild = "bbuild";
+        /// <summary>The room's game mode as the lobby names it ("Dominion 2v2"); "" when unknown. With ModeId, Map, TeamSize and ModeTeams it
+        /// tells the report which mode and map it reads, whatever the folder is called.</summary>
+        public const string Mode = "mode";
+        public const string ModeId = "modeId";
+        /// <summary>The scene the match is played on.</summary>
+        public const string Map = "map";
+        /// <summary>The mode's seats per team (2 in a 2v2), not the territory's Players Per Team.</summary>
+        public const string TeamSize = "teamSize";
+        /// <summary>The team ids the mode plays with.</summary>
+        public const string ModeTeams = "teams";
         public const string Commit = "commit";
         public const string UnityVersion = "uv";
         public const string Platform = "plat";
@@ -218,6 +238,18 @@ namespace Overpower.Telemetry
 
         // ---------------------------------------------------------------- marker
         public const string Note = "note";
+
+        // ---------------------------------------------------------------- Dominion points / respawn shield / centre scan
+        public const string Round = "round";
+        /// <summary>`points`' Dominion stage, as the DominionStage number.</summary>
+        public const string Stage = "stage";
+        /// <summary>`points`' points of every team slot, indexed by team id.</summary>
+        public const string TeamPoints = "pts";
+        /// <summary>`shield` "down": how many hits and enemy effects the shield stopped while it was up.</summary>
+        public const string Blocked = "blocked";
+        /// <summary>`scan`: the match seconds the wave started.</summary>
+        public const string WaveStartT = "startT";
+        public const string Caught = "caught";
 
         // ---------------------------------------------------------------- respawn
         /// <summary>`respawn`'s own field: true only on the ONE respawn line ResetForMatchStart can produce - a player dead the instant

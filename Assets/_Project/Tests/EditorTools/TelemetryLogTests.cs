@@ -48,6 +48,48 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void AFileTheGameStillHasOpenIsRead()
+        {
+            string temp = NewTempFolder();
+            string path = Path.Combine(temp, "1.jsonl");
+            // The game keeps its log open for the whole match, writing and sharing it.
+            using (var writing = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+            {
+                byte[] bytes = System.Text.Encoding.UTF8.GetBytes(Session(1) + "\n");
+                writing.Write(bytes, 0, bytes.Length);
+                writing.Flush();
+
+                TelemetryLog log = TelemetryLog.Load(temp);
+                Assert.AreEqual(0, log.UnreadableFileCount);
+                Assert.AreEqual(1, log.Sessions.Count);
+            }
+
+            Directory.Delete(temp, true);
+        }
+
+        [Test]
+        public void TheSessionLineSaysModeMapTeamSizeAndBot()
+        {
+            string temp = NewTempFolder();
+            File.WriteAllText(Path.Combine(temp, "1001_Rex.jsonl"),
+                "{\"e\":\"session\",\"t\":0,\"schema\":1,\"m\":\"M\",\"a\":1001,\"nick\":\"Rex\",\"tm\":1,\"master\":false,\"bot\":true,\"bbuild\":1," +
+                "\"mode\":\"Dominion 3v3v3\",\"map\":\"Game Scene\",\"teamSize\":3}\n");
+            TelemetrySession session = TelemetryLog.Load(temp).Sessions[0];
+            Assert.IsTrue(session.Bot);
+            Assert.AreEqual(1, session.BotBuild);
+            Assert.AreEqual("Dominion 3v3v3", session.Mode);
+            Assert.AreEqual("Game Scene", session.Map);
+            Assert.AreEqual(3, session.TeamSize);
+
+            File.WriteAllText(Path.Combine(temp, "1001_Rex.jsonl"), Session(1001));
+            TelemetrySession old = TelemetryLog.Load(temp).Sessions[0];
+            Assert.IsFalse(old.Bot);
+            Assert.AreEqual(-1, old.BotBuild);
+            Assert.AreEqual("", old.Mode, "a log from before the mode was written");
+            Directory.Delete(temp, true);
+        }
+
+        [Test]
         public void AnUnreadableFileIsCountedNotThrown()
         {
             string temp = NewTempFolder();

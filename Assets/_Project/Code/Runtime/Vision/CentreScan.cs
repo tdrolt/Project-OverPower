@@ -49,6 +49,7 @@ namespace Overpower.Vision
         private readonly List<Vector2> zonePositions = new List<Vector2>();
         private readonly List<int> zoneTiers = new List<int>();
 
+        private readonly Overpower.Telemetry.ScanWaveLog waveLog = new Overpower.Telemetry.ScanWaveLog();
         private int dotsTeam = -1; // the team the dots in the pool belong to (a spectator can switch the watched team)
         private int centreZone = -1;
         private Vector3 centrePosition;
@@ -142,6 +143,7 @@ namespace Overpower.Vision
             // A spectator (no body, so no sight) watches no team: nothing is caught or refreshed for them, the wave and the countdown still show.
             int friendly = sight != null ? sight.FriendlyTeamId : -1;
             SeenByMyTeam = Frame.Active && CentreScanDisplayRules.SeesScan(friendly, Frame.HolderTeam);
+            LogWaveIfFinished(director != null && director.IsLive);
             if (dotPool.Dots.Count > 0 && dotsTeam != friendly)
                 dotPool.Clear();
             if (SeenByMyTeam)
@@ -187,8 +189,18 @@ namespace Overpower.Vision
                 Vector3 position = view.transform.position;
                 float distance = Vector2.Distance(centre, new Vector2(position.x, position.z));
                 if (CentreScanRules.FrontSwept(Frame.PrevRadius, Frame.Radius, distance))
+                {
                     dotPool.Add(position, Time.time, nowMs, player.ActorNumber);
+                    waveLog.Caught();
+                }
             }
+        }
+
+        /// <summary>The match log's line for a live wave once it is over (Overpower.Telemetry.ScanWaveLog decides when).</summary>
+        private void LogWaveIfFinished(bool live)
+        {
+            if (waveLog.Step(Frame.Active && live, Frame.ScanStartMs, Frame.HolderTeam, Frame.Travelling, SeenByMyTeam, out Overpower.Telemetry.ScanWaveLog.Wave wave))
+                Overpower.Telemetry.MatchTelemetry.Instance?.LogScan(wave.StartMs, wave.Holder, wave.Caught);
         }
 
         // The ticked tiers' zones the front passed this frame take the live state in ZoneKnowledge (only visible with the zone
@@ -249,6 +261,7 @@ namespace Overpower.Vision
             Frame = default;
             HolderTeam = -1;
             SeenByMyTeam = false;
+            LogWaveIfFinished(false);
             CountdownSeconds = -1;
             dotPool.Clear();
             SetScanned(refreshed, false);

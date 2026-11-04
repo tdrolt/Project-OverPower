@@ -72,12 +72,14 @@ namespace Overpower.EditorTools.Telemetry
             // ...so load + aggregate BEFORE cleaning anything: a folder that fails to parse keeps whatever report it already had.
             TelemetryLog log;
             ReportSet reportSet;
+            ModeReport modeReport;
             try
             {
                 log = TelemetryLog.Load(sourceFolder);
                 // One log, three scopes (whole match, Phase 1, Phase 2 when the match had one; see ReportSet), so the CSV folders and
                 // the HTML tabs always match.
                 reportSet = TelemetryAggregator.BuildSet(log);
+                modeReport = BuildModeReport(log, reportSet);
             }
             catch (Exception ex)
             {
@@ -91,11 +93,13 @@ namespace Overpower.EditorTools.Telemetry
             CleanStaleReportOutputs(outputFolder);
 
             Directory.CreateDirectory(outputFolder);
-            CsvReportWriter.Write(reportSet, outputFolder);
+            ReportMap map = ReportModes.MapOf(modeReport.Mode);
+            CsvReportWriter.Write(reportSet, outputFolder, map);
+            CsvReportWriter.WriteModeExtras(modeReport, outputFolder);
 
             BalanceTargetsData targets = LoadBalanceTargetsData();
-            ArenaReportRender.Result arena = ArenaReportRender.Render();
-            string htmlPath = HtmlReportWriter.Write(reportSet, log, targets, arena, outputFolder);
+            ArenaReportRender.Result arena = ArenaReportRender.Render(map);
+            string htmlPath = HtmlReportWriter.Write(reportSet, log, targets, arena, outputFolder, modeReport);
 
             Debug.Log($"[TelemetryMenu] Built report from '{sourceFolder}' into '{outputFolder}': {htmlPath}");
             // A hand-built "file://" + path leaves spaces and other reserved characters unescaped (persistentDataPath contains one on
@@ -104,13 +108,19 @@ namespace Overpower.EditorTools.Telemetry
             return htmlPath;
         }
 
-        // The exact 12 CSV file names written flat inside csv/ before the per-scope folders existed; a report built with an old
-        // binary could still have left them lying around.
+        // Every CSV file name a report writes: flat inside csv/ (an old binary's layout, which can still be lying around) or inside a scope folder.
         private static readonly string[] KnownFlatCsvFileNames =
         {
             "gold_timeline.csv", "economy_by_minute.csv", "zone_income.csv", "ownership.csv",
             "captures.csv", "purchases.csv", "shop_blocked.csv", "hits.csv", "weapons.csv",
             "abilities.csv", "players.csv", "deaths.csv", "log_coverage.csv",
+            "bugs.csv", "console.csv", "roster.csv", "rounds.csv", "points.csv", "shields.csv", "builds.csv", "scan.csv",
+        };
+
+        // The scope folders a report writes: the whole match, the two phases, and Dominion's rounds and sudden death.
+        private static readonly string[] KnownScopeFolderNames =
+        {
+            "whole_match", "phase1_3teams", "phase2_2teams", "round_1", "round_2", "round_3", "round_4", "round_5", "sudden_death",
         };
 
         private static void CleanStaleReportOutputs(string outputFolder)
@@ -126,7 +136,7 @@ namespace Overpower.EditorTools.Telemetry
 
             // Delete only the known file names inside each scope folder, and remove the scope folder ONLY if that leaves it empty:
             // a recursive delete destroyed anything else a user had saved there (their own spreadsheet, say).
-            foreach (string scopeFolderName in new[] { "whole_match", "phase1_3teams", "phase2_2teams" })
+            foreach (string scopeFolderName in KnownScopeFolderNames)
             {
                 string scopePath = Path.Combine(csvFolder, scopeFolderName);
                 if (!Directory.Exists(scopePath)) continue;
@@ -144,6 +154,22 @@ namespace Overpower.EditorTools.Telemetry
             {
                 string path = Path.Combine(folder, fileName);
                 if (File.Exists(path)) File.Delete(path);
+            }
+        }
+
+        /// <summary>The mode decides the tabs, the sections and the map; a Dominion round or sudden death is a scope of its own. A mode report
+        /// that fails to build costs its own sections, not the report: the page falls back to the plain whole-match report.</summary>
+        private static ModeReport BuildModeReport(TelemetryLog log, ReportSet reportSet)
+        {
+            ReportMode mode = ModeReportBuilder.ModeOf(log);
+            try
+            {
+                return ModeReportBuilder.Build(log, mode, reportSet);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[TelemetryMenu] The {ReportModes.DisplayName(mode)} sections could not be built ({ex.Message}) - the report shows the plain whole match.");
+                return ModeReportBuilder.Build(null, mode, reportSet);
             }
         }
 

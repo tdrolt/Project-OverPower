@@ -37,6 +37,30 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void EachMapsPictureIsItsOwnWhicheverSceneIsOpen()
+        {
+            ArenaReportRender.Result lane = ArenaReportRender.Render(ReportMap.Lane);
+            ArenaReportRender.Result triangle = ArenaReportRender.Render(ReportMap.Triangle);
+            Assert.IsTrue(lane.Available, lane.Note);
+            Assert.IsTrue(triangle.Available, triangle.Note);
+            Assert.AreNotEqual(lane.Base64Png, triangle.Base64Png);
+            Assert.AreEqual("the lane", lane.MapName);
+        }
+
+        [Test]
+        public void TheLaneIsFramedToItselfNotToTheTriangleArena()
+        {
+            ArenaReportRender.Result lane = ArenaReportRender.Render(ReportMap.Lane);
+            Assert.AreEqual(lane.ImageWidthMetres, lane.FrameWidthMetres, 0.01f, "the lane's picture is already framed to the lane");
+            Assert.Less(lane.FrameWidthMetres, 144f);
+            Assert.Less(lane.PixelsUp, lane.PixelsAcross, "the lane is long and narrow");
+            ArenaReportRender.Result triangle = ArenaReportRender.Render(ReportMap.Triangle);
+            Assert.AreEqual(144f, triangle.FrameWidthMetres, 0.01f);
+            Assert.AreEqual(-7f, triangle.FrameMinX, 0.01f);
+            Assert.AreEqual(triangle.PixelsAcross, triangle.PixelsUp);
+        }
+
+        [Test]
         public void WorldToPixelMatchesAHandComputedInteriorPoint()
         {
             // The same point used to manually verify the fixture's one death lands inside the

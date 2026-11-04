@@ -17,10 +17,23 @@ namespace Overpower.Telemetry
         /// MatchTelemetry still produces a parseable session line.</summary>
         public static string Json(TerritoryConfig territoryConfig, GameplayConfig gameplayConfig,
                                    ArmorConfig armorConfig, TelemetryConfig telemetryConfig,
-                                   WeaponCatalogue weapons, AbilityCatalogue abilities)
+                                   WeaponCatalogue weapons, AbilityCatalogue abilities) =>
+            Json(territoryConfig, gameplayConfig, armorConfig, telemetryConfig, weapons, abilities, null);
+
+        /// <summary>As above, plus a "dominion" object (DominionConfig: rounds, points, bounty, centre, overtime, respawn, shield, sudden-death
+        /// circle and what each round's shop opens) when <paramref name="dominionConfig"/> is given; a Conquest match passes null and gets none.</summary>
+        public static string Json(TerritoryConfig territoryConfig, GameplayConfig gameplayConfig,
+                                   ArmorConfig armorConfig, TelemetryConfig telemetryConfig,
+                                   WeaponCatalogue weapons, AbilityCatalogue abilities, DominionConfig dominionConfig)
         {
             var sb = new StringBuilder(4096);
             sb.Append('{');
+
+            if (dominionConfig != null)
+            {
+                AppendRawField(sb, "dominion", JsonUtility.ToJson(dominionConfig));
+                sb.Append(',');
+            }
 
             AppendRawField(sb, "territory", territoryConfig != null ? JsonUtility.ToJson(territoryConfig) : "null");
             sb.Append(',');

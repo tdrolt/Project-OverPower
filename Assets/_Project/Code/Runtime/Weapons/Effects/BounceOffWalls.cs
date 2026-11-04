@@ -1,4 +1,5 @@
 using UnityEngine;
+using Overpower.Abilities;
 using Overpower.Combat;
 
 namespace Overpower.Weapons
@@ -7,7 +8,8 @@ namespace Overpower.Weapons
     /// Turns a projectile into one that bounces off walls instead of stopping on them - the "Bounce" leaf of the burst path. Every bounce adds
     /// damage, so landing a shot after it has ricocheted round a corner is worth more than a straight hit.
     /// BOUNCES ARE GEOMETRY ONLY. Hitting a player still ends the shot like an unmodified projectile (see OnHit): letting a shot ricochet off a
-    /// body would make standing behind a teammate a way to redirect fire instead of block it.
+    /// body would make standing behind a teammate a way to redirect fire instead of block it. The one thing that is not level geometry yet still
+    /// bounces is the shooter's OWN Cover wall (BounceRules.BouncesOffCover); anyone else's wall, a teammate's included, stops the shot as before.
     /// The damage bonus is ADDITIVE, not multiplicative, on the designer's explicit instruction: three bounces must land at +60% (1.6x), not +20%
     /// compounded three times (1.73x). Setting ProjectileContext's multiplier directly from the bounce count - never reading it back and
     /// re-multiplying - is what keeps that true.
@@ -48,15 +50,23 @@ namespace Overpower.Weapons
 
         /// <summary>
         /// A player ends the shot exactly like a projectile with no behaviours at all - only a
-        /// wall (victim == null) bounces. Damage for THIS hit was already dealt by the motor
-        /// before OnHit runs, at whatever multiplier the earlier bounces left set, so a player hit
-        /// needs no extra work here.
+        /// wall (victim == null) or the shooter's own Cover wall bounces. Damage for THIS hit was
+        /// already dealt by the motor before OnHit runs, at whatever multiplier the earlier bounces
+        /// left set, so a player hit needs no extra work here, and the owner's own wall takes none
+        /// (CoverWall.ApplyDamage).
         /// </summary>
         public ProjectileHitResponse OnHit(ProjectileMotor motor, ProjectileContext shot,
                                             RaycastHit hit, IDamageable victim)
         {
             if (victim != null)
-                return ProjectileHitResponse.Despawn;
+            {
+                CoverWall cover = victim as CoverWall;
+                if (cover == null)
+                    return ProjectileHitResponse.Despawn;
+
+                if (!BounceRules.BouncesOffCover(shot.ShooterActorNumber, cover.OwnerActor))
+                    return ProjectileHitResponse.Despawn;
+            }
 
             if (bounces >= maxBounces)
                 return ProjectileHitResponse.Despawn;

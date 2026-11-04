@@ -114,6 +114,9 @@ MonoBehaviour:
   zoneIntelSeconds: 8
   helpTeammateMetres: 12
   teammateFightMetres: 15
+  spreadMetres: 20
+  spreadStartSeconds: 20
+  spreadHoldSeconds: 3
   stopFiringHeat: 0.8
   finishTargetHealth: 0.25
   ventSuccessChance: 0.5
@@ -123,6 +126,8 @@ MonoBehaviour:
   healthPackHealth: 0.5
   healthPackMetres: 25
   ultimatePackMetres: 12
+  useHealZoneHealth: 0.6
+  useHealZoneMetres: 15
   flameMetres: 5
   zipMinMetres: 8
   zipMaxMetres: 16
@@ -138,9 +143,13 @@ MonoBehaviour:
   healZoneHealth: 0.5
   healZoneTeammateMetres: 5
   scopeMinMetres: 15
-  scoutMinMetres: 15
+  scoutMinMetres: 20
   scoutMaxMetres: 30
   scoutSeconds: 1.5
+  scoutEverySeconds: 30
+  supportMinMetres: 14
+  supportMaxMetres: 20
+  walkOutWaitSeconds: 5
   blinkHealth: 0.35
   blinkEnemyMetres: 10
   raybeamMetres: 20
@@ -151,11 +160,20 @@ MonoBehaviour:
   humanTeammateMetres: 20
   pushCapitalTeammates: 2
   pushCapitalMetres: 20
+  exposedMaxDefenders: 1
+  exposedPushMetres: 40
+  forcePushMetres: 15
+  tradeCaptureDone: 0.5
+  huntIntelSeconds: 8
   defendZoneMetres: 25
   centreBeforeScanSeconds: 15
   centreBeforePayoutSeconds: 10
   circleMarginMetres: 2
-  agentRadius: 1
+  wideRouteMarginMetres: 0.6
+  wideRouteMaxRatio: 2
+  narrowCornerSlowMetres: 1.5
+  narrowCornerSpeed: 0.6
+  gapSearchMetres: 3
   agentHeight: 2.6
   agentClimb: 0.4
   cornerReachMetres: 0.8

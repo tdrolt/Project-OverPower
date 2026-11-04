@@ -15,6 +15,8 @@ namespace Overpower.Abilities
     /// ask FriendlyFire.IsSelfOrTeammate against THIS OBJECT'S ActorNumber/TeamId, both -1 (never a real shooter or team),
     /// so every check reads "not friendly" and the shot acts as if it hit a plain wall. ApplyDamage then decides via
     /// OwnerTeam whether the stop costs HP: identity for "do you stop here", OwnerTeam for "does it cost HP".
+    /// The one shot that does not stop is the owner's own Burst - Bounce round: BounceOffWalls reads OwnerActor and ricochets it off this wall like
+    /// off level geometry (BounceRules.BouncesOffCover), still at no HP cost.
     /// The through-walls laser (IgnoreWalls leaf) never asks Physics about the Building layer, so BeamResolver never sees
     /// this collider and it passes through on purpose; the base laser is blocked like a bullet and damages the cover.
     /// HP IS OWNER-AUTHORITATIVE, NOT SYNCED (like PlayerHealth): every client's local projectile calls ApplyDamage on its

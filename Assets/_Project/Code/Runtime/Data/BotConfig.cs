@@ -131,6 +131,12 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float helpTeammateMetres = 12f;
         [Tooltip("...where the teammate's fight is an enemy within this many metres of that teammate.")]
         [SerializeField, Min(0f)] private float teammateFightMetres = 15f;
+        [Tooltip("Spreading out: at the start, and when its team is pushed back to its Tier II zones with nobody to defend against, each other bot of its team already heading for a zone makes that zone count this many metres further, so they do not all walk to the same zone.")]
+        [SerializeField, Min(0f)] private float spreadMetres = 20f;
+        [Tooltip("How long 'the start' lasts for spreading out, in seconds after the match goes live (Conquest) or after each round starts (Dominion).")]
+        [SerializeField, Min(0f)] private float spreadStartSeconds = 20f;
+        [Tooltip("While spreading out it keeps the zone it picked at least this many seconds, so two bots do not keep swapping zones.")]
+        [SerializeField, Min(0f)] private float spreadHoldSeconds = 3f;
 
         [Header("Heat")]
         [Tooltip("It stops pulling the trigger at this much heat (0.8 = 80% of the bar)...")]
@@ -153,6 +159,10 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float healthPackMetres = 25f;
         [Tooltip("It goes for an ultimate pack when its meter is not full, if one is up within this many metres.")]
         [SerializeField, Min(0f)] private float ultimatePackMetres = 12f;
+        [Tooltip("Below this much health (0.6 = 60%) it walks into a teammate's Heal Zone...")]
+        [SerializeField, Range(0f, 1f)] private float useHealZoneHealth = 0.6f;
+        [Tooltip("...if one is within this many metres, and stays in it while the zone lasts (still shooting what it can).")]
+        [SerializeField, Min(0f)] private float useHealZoneMetres = 15f;
 
         [Header("Abilities - Shotgun bot")]
         [Tooltip("Flame when its target is within this many metres in front of it.")]
@@ -190,11 +200,19 @@ namespace Overpower.Data
         [Tooltip("It holds Scope while its target is further than this many metres.")]
         [SerializeField, Min(0f)] private float scopeMinMetres = 15f;
         [Tooltip("On its way to a zone, with no enemy in sight, it stops once between this...")]
-        [SerializeField, Min(0f)] private float scoutMinMetres = 15f;
+        [SerializeField, Min(0f)] private float scoutMinMetres = 20f;
         [Tooltip("...and this many metres from the zone, faces it and looks ahead through its Scope before it walks in.")]
         [SerializeField, Min(0f)] private float scoutMaxMetres = 30f;
         [Tooltip("How long it stops to look ahead, in seconds.")]
         [SerializeField, Min(0f)] private float scoutSeconds = 1.5f;
+        [Tooltip("It stops to look ahead at most once in this many seconds.")]
+        [SerializeField, Min(0f)] private float scoutEverySeconds = 30f;
+        [Tooltip("The Laser bot plays supporting fire: it pairs up with the nearest teammate (a human first) and follows it at least this many metres behind...")]
+        [SerializeField, Min(0f)] private float supportMinMetres = 14f;
+        [Tooltip("...and at most this many metres behind.")]
+        [SerializeField, Min(0f)] private float supportMaxMetres = 20f;
+        [Tooltip("After it respawns, the Laser bot waits up to this many seconds for a teammate who comes back within that time, then walks out with them.")]
+        [SerializeField, Min(0f)] private float walkOutWaitSeconds = 5f;
         [Tooltip("Blink away when below this much health...")]
         [SerializeField, Range(0f, 1f)] private float blinkHealth = 0.35f;
         [Tooltip("...with an enemy within this many metres.")]
@@ -217,6 +235,16 @@ namespace Overpower.Data
         [SerializeField, Min(1)] private int pushCapitalTeammates = 2;
         [Tooltip("How near the enemy capital they must be, in metres.")]
         [SerializeField, Min(0f)] private float pushCapitalMetres = 20f;
+        [Tooltip("An enemy capital its team may take, with at most this many enemies known near it, is exposed...")]
+        [SerializeField, Min(0)] private int exposedMaxDefenders = 1;
+        [Tooltip("...and is pushed once the number of its team above is within this many metres of it (further than for a defended capital).")]
+        [SerializeField, Min(0f)] private float exposedPushMetres = 40f;
+        [Tooltip("A bot this many metres or closer to a Tier II zone next to an enemy capital, which its team holds or is taking, goes on to that capital by itself when no enemy is known near the capital.")]
+        [SerializeField, Min(0f)] private float forcePushMetres = 15f;
+        [Tooltip("Trading capitals: while its own capital is being taken, a bot taking another team's capital or Tier II keeps going once its capture is at least this far along (0.5 = half; draining the owner's hold is the first half). Otherwise it goes back to defend.")]
+        [SerializeField, Range(0f, 1f)] private float tradeCaptureDone = 0.5f;
+        [Tooltip("A team with no capital left (its last stand) is hunted: its players are targets at any distance, wherever its team saw them (or the scan showed them) in the last this-many seconds.")]
+        [SerializeField, Min(0f)] private float huntIntelSeconds = 8f;
         [Tooltip("It turns back to defend a zone of its team that an enemy is taking within this many metres (its capital it always defends).")]
         [SerializeField, Min(0f)] private float defendZoneMetres = 25f;
         [Tooltip("After the shrink it goes to the centre when the scan is this many seconds away.")]
@@ -229,8 +257,16 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float circleMarginMetres = 2f;
 
         [Header("Navigation")]
-        [Tooltip("How wide a bot thinks it is when it plans a route, in metres (the body is 0.7 wide each side; more keeps it off walls).")]
-        [SerializeField, Min(0.1f)] private float agentRadius = 1f;
+        [Tooltip("Bots plan on two walkable maps: a tight one exactly as wide as the body (it fits every gap a player fits) and a wide one that keeps this many metres more off walls.")]
+        [SerializeField, Min(0f)] private float wideRouteMarginMetres = 0.6f;
+        [Tooltip("It takes the wide route when that is at most this many times as long as the tight route (2 = twice as long); else the tight one.")]
+        [SerializeField, Min(1f)] private float wideRouteMaxRatio = 2f;
+        [Tooltip("On a tight route it slows down within this many metres of a bend...")]
+        [SerializeField, Min(0f)] private float narrowCornerSlowMetres = 1.5f;
+        [Tooltip("...to this share of its speed (0.6 = 60%).")]
+        [SerializeField, Range(0.1f, 1f)] private float narrowCornerSpeed = 0.6f;
+        [Tooltip("On a tight route it goes through the middle of the gap at each bend, looking this many metres to each side for the gap's edges. 0 = it walks the bend as planned.")]
+        [SerializeField, Min(0f)] private float gapSearchMetres = 3f;
         [Tooltip("How tall a bot thinks it is when it plans a route, in metres.")]
         [SerializeField, Min(0.5f)] private float agentHeight = 2.6f;
         [Tooltip("The highest step a route may climb, in metres.")]
@@ -283,6 +319,9 @@ namespace Overpower.Data
         public float ZoneIntelSeconds => zoneIntelSeconds;
         public float HelpTeammateMetres => helpTeammateMetres;
         public float TeammateFightMetres => teammateFightMetres;
+        public float SpreadMetres => spreadMetres;
+        public float SpreadStartSeconds => spreadStartSeconds;
+        public float SpreadHoldSeconds => spreadHoldSeconds;
 
         public float StopFiringHeat => stopFiringHeat;
         public float FinishTargetHealth => finishTargetHealth;
@@ -294,6 +333,8 @@ namespace Overpower.Data
         public float HealthPackHealth => healthPackHealth;
         public float HealthPackMetres => healthPackMetres;
         public float UltimatePackMetres => ultimatePackMetres;
+        public float UseHealZoneHealth => useHealZoneHealth;
+        public float UseHealZoneMetres => useHealZoneMetres;
 
         public float FlameMetres => flameMetres;
         public float ZipMinMetres => zipMinMetres;
@@ -315,6 +356,10 @@ namespace Overpower.Data
         public float ScoutMinMetres => scoutMinMetres;
         public float ScoutMaxMetres => scoutMaxMetres;
         public float ScoutSeconds => scoutSeconds;
+        public float ScoutEverySeconds => scoutEverySeconds;
+        public float SupportMinMetres => supportMinMetres;
+        public float SupportMaxMetres => supportMaxMetres;
+        public float WalkOutWaitSeconds => walkOutWaitSeconds;
         public float BlinkHealth => blinkHealth;
         public float BlinkEnemyMetres => blinkEnemyMetres;
         public float RaybeamMetres => raybeamMetres;
@@ -326,13 +371,22 @@ namespace Overpower.Data
         public float HumanTeammateMetres => humanTeammateMetres;
         public int PushCapitalTeammates => pushCapitalTeammates;
         public float PushCapitalMetres => pushCapitalMetres;
+        public int ExposedMaxDefenders => exposedMaxDefenders;
+        public float ExposedPushMetres => exposedPushMetres;
+        public float ForcePushMetres => forcePushMetres;
+        public float TradeCaptureDone => tradeCaptureDone;
+        public float HuntIntelSeconds => huntIntelSeconds;
         public float DefendZoneMetres => defendZoneMetres;
         public float CentreBeforeScanSeconds => centreBeforeScanSeconds;
 
         public float CentreBeforePayoutSeconds => centreBeforePayoutSeconds;
         public float CircleMarginMetres => circleMarginMetres;
 
-        public float AgentRadius => agentRadius;
+        public float WideRouteMarginMetres => wideRouteMarginMetres;
+        public float WideRouteMaxRatio => wideRouteMaxRatio;
+        public float NarrowCornerSlowMetres => narrowCornerSlowMetres;
+        public float NarrowCornerSpeed => narrowCornerSpeed;
+        public float GapSearchMetres => gapSearchMetres;
         public float AgentHeight => agentHeight;
         public float AgentClimb => agentClimb;
         public float CornerReachMetres => cornerReachMetres;

@@ -26,6 +26,12 @@ namespace Overpower.Bots
         public bool OursUnderAttack;
         /// <summary>Enemies its team saw near the zone lately (or the centre scan showed).</summary>
         public int EnemiesNear;
+        /// <summary>For an enemy capital: pushed without enough of its team near it (BotPushRules: exposed, or straight on from a Tier II).</summary>
+        public bool PushAnyway;
+        /// <summary>A zone the bot is taking and finishes even while its own capital is being taken (BotPushRules.KeepTaking).</summary>
+        public bool KeepTaking;
+        /// <summary>Other bots of its team heading for this zone.</summary>
+        public int TeammatesHeading;
     }
 
     /// <summary>One zone as a Dominion bot weighs it.</summary>
@@ -40,6 +46,8 @@ namespace Overpower.Bots
         public bool Capturable;
         /// <summary>Enemies its team saw near the zone lately.</summary>
         public int EnemiesNear;
+        /// <summary>Other bots of its team heading for this zone.</summary>
+        public int TeammatesHeading;
     }
 
     /// <summary>A build as shop steps: catalogue ids and how many of each armour upgrade.</summary>

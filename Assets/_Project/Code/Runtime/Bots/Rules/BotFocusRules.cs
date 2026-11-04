@@ -15,9 +15,9 @@ namespace Overpower.Bots
             !hasObjective || spotToObjectiveMetres <= guardMetres;
     }
 
-    /// <summary>No spawn camping: an enemy inside its own spawn is no target and a bot never walks into an enemy spawn, unless it is the
-    /// enemy capital the bot is pushing with its team.</summary>
-    public static class BotSpawnRules
+    /// <summary>No spawn camping: an enemy inside its own spawn is no target unless it shoots the bot, and in Dominion a bot never walks
+    /// into an enemy spawn. A capital the bot is pushing with its team does not count as a spawn.</summary>
+    public static partial class BotSpawnRules
     {
         public static bool OffLimits(bool insideEnemySpawn, bool pushingThatCapital) => insideEnemySpawn && !pushingThatCapital;
     }

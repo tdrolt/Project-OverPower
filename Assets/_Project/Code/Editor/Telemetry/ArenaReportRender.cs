@@ -1,39 +1,43 @@
 using System;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.SceneManagement;
+using Overpower.Data;
 
 namespace Overpower.EditorTools.Telemetry
 {
-    /// <summary>A top-down PNG of the arena for the report's death/position heatmaps, plus the world-to-pixel mapping the HTML
-    /// needs to place dots on it. A HideAndDontSave orthographic camera renders once and is destroyed immediately after, so
-    /// Game Scene is never dirtied by building a report.
-    ///
-    /// Framed on x -7..137, z -7..137 (144m square: the arena including its capital pockets) at 1024 px, i.e. 1024/144 px per
-    /// metre.</summary>
+    /// <summary>The top-down picture under the report's death and position maps, and where it sits in the world. It is the map's own saved
+    /// minimap picture (its MinimapConfig: the image, its world centre and size), so a report draws the right map whichever scene is open, or
+    /// none. The page shows the patch ReportMaps.FrameFor picks out of it.</summary>
     public static class ArenaReportRender
     {
         private const float MinX = -7f;
         private const float MinZ = -7f;
         private const float SpanMetres = 144f; // 137 - (-7)
         private const int PixelSize = 1024;
-        private const string GameScenePath = "Assets/_Project/Scenes/Game Scene.unity";
 
         public sealed class Result
         {
-            /// <summary>True if the render happened - false means Game Scene wasn't open, and every
-            /// other field is meaningless (Note explains why for the report header).</summary>
+            /// <summary>False when the map has no saved picture; Note then says why for the page.</summary>
             public bool Available;
             public string Note;
+            public string MapName;
             public string Base64Png;
-            public float MinX;
-            public float MinZ;
-            public float MetresPerPixel;
-            public int PixelSize;
+            /// <summary>The world patch the whole saved picture covers.</summary>
+            public float ImageMinX;
+            public float ImageMinZ;
+            public float ImageWidthMetres;
+            public float ImageDepthMetres;
+            /// <summary>The world patch the page shows, and the page's picture size for it.</summary>
+            public float FrameMinX;
+            public float FrameMinZ;
+            public float FrameWidthMetres;
+            public float FrameDepthMetres;
+            public int PixelsAcross;
+            public int PixelsUp;
         }
 
-        /// <summary>The same world-to-pixel mapping the HTML's own toPixel() JS implements (HtmlReportWriter), as a pure function so
-        /// it - including the Y-FLIP (image up is +Z) - can be unit tested without Game Scene open or a real render.</summary>
+        /// <summary>The triangle arena's world-to-pixel mapping on its 1024 px frame (x and z -7 to 137), with the Y-FLIP (image up is +Z).</summary>
         public static (float Px, float Py) WorldToPixel(float x, float z)
         {
             float metresPerPixel = SpanMetres / PixelSize;
@@ -42,86 +46,53 @@ namespace Overpower.EditorTools.Telemetry
             return (px, py);
         }
 
-        /// <summary>Renders the arena if (and only if) a scene named "Game Scene" is currently open -
-        /// checked across every LOADED scene, not just the active one, so the report still gets its
-        /// heatmaps if Game Scene is merely not the active scene in a multi-scene setup.</summary>
-        public static Result Render()
-        {
-            if (!IsGameSceneOpen())
-            {
-                return new Result
-                {
-                    Available = false,
-                    Note = "Game Scene isn't open - death/position heatmaps omitted. Open " +
-                           GameScenePath + " and rebuild the report to include them.",
-                };
-            }
+        /// <summary>The triangle arena's picture.</summary>
+        public static Result Render() => Render(ReportMap.Triangle);
 
-            // Captured before the try so `finally` can always restore it, even if ReadPixels/Apply/EncodeToPNG throws while rt is
-            // still the active RenderTexture.
-            RenderTexture prevActive = RenderTexture.active;
-            GameObject go = null;
-            RenderTexture rt = null;
-            Texture2D tex = null;
+        /// <summary>The map's saved picture; never null, and never throws (a report without a map is still a report).</summary>
+        public static Result Render(ReportMap map)
+        {
+            string mapName = "";
             try
             {
-                go = EditorUtility.CreateGameObjectWithHideFlags("ArenaReportRenderCam", HideFlags.HideAndDontSave, typeof(Camera));
-                var cam = go.GetComponent<Camera>();
-                cam.orthographic = true;
-                cam.orthographicSize = SpanMetres / 2f;
-                float centre = MinX + SpanMetres / 2f; // same value for X and Z: the frame is square
-                cam.transform.SetPositionAndRotation(new Vector3(centre, 150f, centre), Quaternion.Euler(90f, 0f, 0f));
-                cam.nearClipPlane = 1f;
-                cam.farClipPlane = 400f;
-                cam.clearFlags = CameraClearFlags.SolidColor;
-                cam.backgroundColor = Color.black;
+                mapName = ReportMaps.Name(map);
+                string configPath = ReportMaps.MinimapConfigPath(map);
+                var config = AssetDatabase.LoadAssetAtPath<MinimapConfig>(configPath);
+                if (config == null || config.ArenaImage == null)
+                    return Unavailable(mapName, "No saved picture of " + mapName + " (" + configPath + ") - the map is left out.");
 
-                rt = new RenderTexture(PixelSize, PixelSize, 24);
-                cam.targetTexture = rt;
-                cam.Render();
+                string assetPath = AssetDatabase.GetAssetPath(config.ArenaImage);
+                string fullPath = Path.Combine(Directory.GetParent(Application.dataPath).FullName, assetPath);
+                if (!File.Exists(fullPath))
+                    return Unavailable(mapName, "The saved picture of " + mapName + " is missing (" + assetPath + ") - the map is left out.");
 
-                RenderTexture.active = rt;
-                tex = new Texture2D(PixelSize, PixelSize, TextureFormat.RGB24, false);
-                tex.ReadPixels(new Rect(0, 0, PixelSize, PixelSize), 0, 0);
-                tex.Apply();
-
-                byte[] png = ImageConversion.EncodeToPNG(tex);
+                var picture = new MapFrame(config.WorldCentre.x - config.WorldSizeMetres / 2f, config.WorldCentre.y - config.WorldDepthMetres / 2f,
+                                           config.WorldSizeMetres, config.WorldDepthMetres);
+                MapFrame frame = ReportMaps.FrameFor(map, picture);
                 return new Result
                 {
                     Available = true,
                     Note = "",
-                    Base64Png = Convert.ToBase64String(png),
-                    MinX = MinX,
-                    MinZ = MinZ,
-                    MetresPerPixel = SpanMetres / PixelSize,
-                    PixelSize = PixelSize,
+                    MapName = mapName,
+                    Base64Png = Convert.ToBase64String(File.ReadAllBytes(fullPath)),
+                    ImageMinX = picture.MinX,
+                    ImageMinZ = picture.MinZ,
+                    ImageWidthMetres = picture.Width,
+                    ImageDepthMetres = picture.Depth,
+                    FrameMinX = frame.MinX,
+                    FrameMinZ = frame.MinZ,
+                    FrameWidthMetres = frame.Width,
+                    FrameDepthMetres = frame.Depth,
+                    PixelsAcross = PixelSize,
+                    PixelsUp = ReportMaps.PixelsUp(frame, PixelSize),
                 };
             }
-            finally
+            catch (Exception e)
             {
-                // Restore before destroying rt: once destroyed, RenderTexture.active must not still reference it.
-                RenderTexture.active = prevActive;
-                if (rt != null)
-                {
-                    // cam.targetTexture must be cleared before the RenderTexture is released, else the
-                    // camera (already about to be destroyed too) is left pointing at a freed texture.
-                    var cam = go != null ? go.GetComponent<Camera>() : null;
-                    if (cam != null) cam.targetTexture = null;
-                    UnityEngine.Object.DestroyImmediate(rt);
-                }
-                if (tex != null) UnityEngine.Object.DestroyImmediate(tex);
-                if (go != null) UnityEngine.Object.DestroyImmediate(go);
+                return Unavailable(mapName, "The map picture could not be read (" + e.Message + ") - the map is left out.");
             }
         }
 
-        private static bool IsGameSceneOpen()
-        {
-            for (int i = 0; i < SceneManager.sceneCount; i++)
-            {
-                Scene scene = SceneManager.GetSceneAt(i);
-                if (scene.isLoaded && scene.path == GameScenePath) return true;
-            }
-            return false;
-        }
+        private static Result Unavailable(string mapName, string note) => new Result { Available = false, MapName = mapName, Note = note };
     }
 }

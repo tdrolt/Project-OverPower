@@ -7,6 +7,7 @@ using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Match;
 using Overpower.Net;
+using Overpower.Telemetry;
 using Overpower.UI;
 using Overpower.Vision;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
@@ -45,6 +46,7 @@ namespace Overpower.Dominion
         private int stampSeen;            // every client: the dBlk value already popped
         private bool stampPrimed;         // the first read only takes the value in: a joiner never pops an old stamp
         private CombatFeed feed;          // this body's own actor's feed, kept to leave the same one
+        private readonly ShieldLogState shieldLog = new ShieldLogState(); // owner: the match log's story of the current shield
 
         private void Awake()
         {
@@ -57,7 +59,7 @@ namespace Overpower.Dominion
             spawnWatch = new ShieldSpawnWatch(
                 () => RespawnShieldRules.WatchArmed(IsUp, shieldClearSent),
                 () => SpawnHealArea.InOwnSpawn(health != null ? health.TeamId : -1, BodyPosition()),
-                () => { ClearShield(); Debug.Log("[DOMINION] respawn shield ended: this player left their spawn"); });
+                () => { LogShieldDown(ShieldLogState.LeftSpawnReason); ClearShield(); Debug.Log("[DOMINION] respawn shield ended: this player left their spawn"); });
         }
 
         private void OnEnable()
@@ -129,6 +131,7 @@ namespace Overpower.Dominion
             if (!alive)
             {
                 diedBefore = true;
+                LogShieldDown(ShieldLogState.DiedReason);
                 ClearShield();
                 return;
             }
@@ -157,6 +160,15 @@ namespace Overpower.Dominion
             shieldClearSent = false; // a new shield is up again at once and may drop again when it leaves the spawn
             PlayerProps.Set(photonView.Owner, new Hashtable { { RespawnShieldRules.StartKey, now }, { RespawnShieldRules.ShieldKey, end } });
             Debug.Log($"[DOMINION] respawn shield up for {config.ShieldSeconds:0.#} s (ends {end})");
+            shieldLog.Started();
+            Overpower.Telemetry.MatchTelemetry.Instance?.LogShieldUp(photonView, config.ShieldSeconds);
+        }
+
+        /// <summary>The match log's "shield down" line, written once for a shield the log saw go up.</summary>
+        private void LogShieldDown(string reason)
+        {
+            if (shieldLog.Ended(out int blocked))
+                Overpower.Telemetry.MatchTelemetry.Instance?.LogShieldDown(photonView, reason, blocked);
         }
 
         /// <summary>Owner: drop the shield (writes 0, only when something is set). Called on death, on a hit, on leaving the spawn and at a fresh start.</summary>
@@ -178,6 +190,7 @@ namespace Overpower.Dominion
         public void ClearForFreshStart()
         {
             diedBefore = false;
+            LogShieldDown(ShieldLogState.FreshStartReason);
             ClearShield();
         }
 
@@ -185,6 +198,7 @@ namespace Overpower.Dominion
         {
             // The feed is this body's own actor's, so only what this body did arrives here, however many bodies this client simulates.
             if (!photonView.IsMine || !RespawnShieldRules.EndsOnEnemyAffected(IsUp, victimShielded, fromBeforeRespawn)) return;
+            LogShieldDown(ShieldLogState.AttackedReason);
             ClearShield();
             Debug.Log("[DOMINION] respawn shield ended: this player hit an enemy");
         }
@@ -235,7 +249,12 @@ namespace Overpower.Dominion
         /// <summary>Called by PlayerHealth.ApplyDamage on the victim's own client before anything changes: true = stop the hit here. A stopped hit
         /// stamps dBlk when one is due; the combat clock and the credit message are never reached, so the attacker earns neither charge nor an
         /// early end to its own shield.</summary>
-        public bool BlocksHit(RespawnShieldRules.Origin origin) => photonView.IsMine && judge != null && judge.JudgeHit(origin);
+        public bool BlocksHit(RespawnShieldRules.Origin origin)
+        {
+            bool blocked = photonView.IsMine && judge != null && judge.JudgeHit(origin);
+            if (blocked && origin == RespawnShieldRules.Origin.Enemy) shieldLog.Blocked(); // a player's own shot it stops is no enemy's hit
+            return blocked;
+        }
 
         /// <summary>A24: called by PlayerStatusEffects.Apply and PlayerDisplacement.Displace on this player's own client before an enemy's stun,
         /// slow, burn, vulnerability or push lands. True = stop it (and BLOCKED is stamped like for a stopped hit). Own and teammate effects land.</summary>
@@ -244,7 +263,9 @@ namespace Overpower.Dominion
             if (!photonView.IsMine || judge == null) return false;
             bool itself = sourceActor == photonView.OwnerActorNr;
             bool sameTeam = !itself && Teams.AreSameTeam(PhotonNetwork.CurrentRoom?.GetPlayer(sourceActor), photonView.Owner);
-            return judge.JudgeEffect(RespawnShieldRules.OriginOf(itself, sameTeam));
+            bool stopped = judge.JudgeEffect(RespawnShieldRules.OriginOf(itself, sameTeam));
+            if (stopped) shieldLog.Blocked();
+            return stopped;
         }
 
         // ---------------------------------------------------------------- every client: bubble and BLOCKED
@@ -254,6 +275,10 @@ namespace Overpower.Dominion
             if (photonView == null || photonView.Owner == null) return;
 
             if (photonView.IsMine && (lifecycle == null || lifecycle.IsAlive)) spawnWatch.Tick();
+            if (photonView.IsMine && PhotonNetwork.ServerTimestamp != 0)
+            {
+                if (shieldLog.RanOut(IsUp, shieldClearSent)) LogShieldDown(ShieldLogState.RanOutReason);
+            }
 
             bool wanted = IsUp && (lifecycle == null || lifecycle.IsAlive);
             if (wanted && bubble == null) BuildBubble();

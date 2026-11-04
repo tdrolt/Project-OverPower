@@ -62,6 +62,7 @@ namespace Overpower.Telemetry
         private int botActor;
 
         private float sampleTimer;
+        private float SampleIntervalSeconds => config != null ? config.SampleIntervalSeconds : 5f;
 
         // Polled state transitions (Update), never events of their own (design doc, "Changes from the spec").
         private bool wasSilenced;
@@ -183,6 +184,9 @@ namespace Overpower.Telemetry
         private void Start()
         {
             aliveSinceTime = Time.time;
+            // The host plays every bot: without a head start each, all of them sample and flush in the same frame.
+            if (botActor != 0)
+                sampleTimer = TelemetryWriteRules.FirstSampleHeadStart(botActor, SampleIntervalSeconds);
 
             if (playerHealth != null)
             {
@@ -301,9 +305,8 @@ namespace Overpower.Telemetry
             AccumulateZoneIncome();
             PollHeal();
 
-            float interval = config != null ? config.SampleIntervalSeconds : 5f;
             sampleTimer += Time.unscaledDeltaTime;
-            if (sampleTimer < interval)
+            if (sampleTimer < SampleIntervalSeconds)
                 return;
 
             sampleTimer = 0f;

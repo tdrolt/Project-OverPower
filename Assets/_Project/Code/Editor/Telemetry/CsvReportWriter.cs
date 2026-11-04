@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -21,40 +22,94 @@ namespace Overpower.EditorTools.Telemetry
         /// WriteTables.</summary>
         public static void Write(ReportTables tables, string folder)
         {
-            WriteTables(tables, Path.Combine(folder, "csv"));
+            WriteTables(tables, Path.Combine(folder, "csv"), ArenaNames.ZoneName);
         }
 
         /// <summary>One folder per scope - csv/whole_match/, csv/phase1_3teams/ and, if the match ever had one, csv/phase2_2teams/ -
         /// each with the same 12 files as the overload above (see WriteTables), plus extra files in whole_match only (log_coverage.csv:
         /// which players' logs are in this report, a whole-match fact; see LogCoverageRow).</summary>
-        public static void Write(ReportSet reportSet, string folder)
+        public static void Write(ReportSet reportSet, string folder) => Write(reportSet, folder, ArenaNames.ZoneName);
+
+        /// <summary>As above, with the zone names of the map the match was played on.</summary>
+        public static void Write(ReportSet reportSet, string folder, ReportMap map) => Write(reportSet, folder, zone => ReportMaps.ZoneName(map, zone));
+
+        private static void Write(ReportSet reportSet, string folder, Func<int, string> zoneName)
         {
             if (reportSet == null) return;
 
             string csvRoot = Path.Combine(folder, "csv");
 
             string wholeMatchFolder = Path.Combine(csvRoot, "whole_match");
-            WriteTables(reportSet.WholeMatch, wholeMatchFolder);
+            WriteTables(reportSet.WholeMatch, wholeMatchFolder, zoneName);
             WriteLogCoverage(reportSet.WholeMatch?.Header?.LogCoverage, wholeMatchFolder);
             // bugs.csv and console.csv, whole_match only: computed once, written only from the whole-match table, like log_coverage.csv.
             WriteBugs(reportSet.WholeMatch?.Header?.Bugs, wholeMatchFolder);
             WriteConsole(reportSet.WholeMatch?.Header?.ConsoleByPlayer, wholeMatchFolder);
 
-            WriteTables(reportSet.Phase1, Path.Combine(csvRoot, "phase1_3teams"));
+            WriteTables(reportSet.Phase1, Path.Combine(csvRoot, "phase1_3teams"), zoneName);
 
             if (reportSet.Phase2 != null)
-                WriteTables(reportSet.Phase2, Path.Combine(csvRoot, "phase2_2teams"));
+                WriteTables(reportSet.Phase2, Path.Combine(csvRoot, "phase2_2teams"), zoneName);
         }
 
-        private static void WriteTables(ReportTables tables, string csvFolder)
+        /// <summary>The scope folder of one of the mode report's tabs ("round-2" writes into csv/round_2).</summary>
+        public static string ScopeFolderName(string tabKey) => (tabKey ?? "").Replace('-', '_');
+
+        /// <summary>The mode's own files, into csv/whole_match (roster.csv for every mode; rounds, points, shields and builds for Dominion; scan for
+        /// Conquest), and the 12 tables of each round and sudden-death tab into a folder of its own.</summary>
+        public static void WriteModeExtras(ModeReport report, string folder)
+        {
+            if (report == null) return;
+            string csvRoot = Path.Combine(folder, "csv");
+            string wholeMatchFolder = Path.Combine(csvRoot, "whole_match");
+            Directory.CreateDirectory(wholeMatchFolder);
+            ReportMap map = ReportModes.MapOf(report.Mode);
+            Func<int, string> zoneName = zone => ReportMaps.ZoneName(map, zone);
+
+            WriteCsv(Path.Combine(wholeMatchFolder, "roster.csv"),
+                new[] { "actor", "name", "team", "teamName", "bot", "build" },
+                report.Roster.Select(r => new[] { N(r.Actor), r.Nick, N(r.Team), ArenaNames.TeamName(r.Team), N(r.Bot), r.Build }));
+
+            foreach (KeyValuePair<string, ReportTables> scope in report.Scopes)
+                WriteTables(scope.Value, Path.Combine(csvRoot, ScopeFolderName(scope.Key)), zoneName);
+
+            DominionData d = report.DominionReport;
+            if (d != null)
+            {
+                int[] teams = report.Teams;
+                WriteCsv(Path.Combine(wholeMatchFolder, "rounds.csv"),
+                    new[] { "round", "winners", "outcome" }.Concat(teams.Select(t => "points" + ArenaNames.TeamName(t))).Concat(new[] { "margin", "start", "end", "seconds", "overtimeSeconds" }).ToArray(),
+                    d.Rounds.Select(r => new[] { N(r.Number), string.Join(";", r.Winners.Select(ArenaNames.TeamName)), r.Outcome }
+                        .Concat(teams.Select(t => r.Points.TryGetValue(t, out int p) ? N(p) : ""))
+                        .Concat(new[] { N(r.Margin), r.StartT.HasValue ? N(r.StartT.Value) : "", r.EndT.HasValue ? N(r.EndT.Value) : "", N(r.LengthSeconds), N(r.OvertimeSeconds) })
+                        .ToArray()));
+                WriteCsv(Path.Combine(wholeMatchFolder, "points.csv"),
+                    new[] { "round", "secondsIntoRound", "team", "teamName", "points" },
+                    d.Races.SelectMany(race => race.Series.SelectMany(s => s.Points.Select(p => new[] { N(race.Round), N(p[0]), N(s.Team), ArenaNames.TeamName(s.Team), N(p[1]) }))));
+                WriteCsv(Path.Combine(wholeMatchFolder, "shields.csv"),
+                    new[] { "t", "actor", "team", "reason", "blocked" },
+                    d.Shields.Select(s => new[] { N(s.T), N(s.Actor), N(s.Team), s.Reason, N(s.Blocked) }));
+                WriteCsv(Path.Combine(wholeMatchFolder, "builds.csv"),
+                    new[] { "round", "actor", "team", "weapon", "attachment", "mobility", "ultimate", "absorbLevel", "rechargeLevel" },
+                    d.Builds.Select(b => new[] { N(b.Round), N(b.Actor), N(b.Team), N(b.Weapon), N(b.Attachment), N(b.Mobility), N(b.Ultimate), N(b.Absorb), N(b.Recharge) }));
+            }
+
+            ConquestData c = report.ConquestReport;
+            if (c != null)
+                WriteCsv(Path.Combine(wholeMatchFolder, "scan.csv"),
+                    new[] { "startT", "holder", "holderName", "caught" },
+                    c.ScanWaves.Select(w => new[] { N(w.StartT), N(w.Holder), w.Holder >= 0 ? ArenaNames.TeamName(w.Holder) : "", N(w.Caught) }));
+        }
+
+        private static void WriteTables(ReportTables tables, string csvFolder, Func<int, string> zoneName)
         {
             Directory.CreateDirectory(csvFolder);
 
             WriteGoldTimeline(tables, csvFolder);
             WriteEconomyByMinute(tables, csvFolder);
-            WriteZoneIncome(tables, csvFolder);
-            WriteOwnership(tables, csvFolder);
-            WriteCaptures(tables, csvFolder);
+            WriteZoneIncome(tables, csvFolder, zoneName);
+            WriteOwnership(tables, csvFolder, zoneName);
+            WriteCaptures(tables, csvFolder, zoneName);
             WritePurchases(tables, csvFolder);
             WriteShopBlocked(tables, csvFolder);
             WriteHits(tables, csvFolder);
@@ -142,20 +197,20 @@ namespace Overpower.EditorTools.Telemetry
 
         // A name column right next to the id it names (id kept, never removed), from the same pure ArenaNames mapping the HTML
         // report uses, so a CSV opened on its own reads the same way as the page.
-        private static void WriteZoneIncome(ReportTables t, string folder) => WriteCsv(
+        private static void WriteZoneIncome(ReportTables t, string folder, Func<int, string> zoneName) => WriteCsv(
             Path.Combine(folder, "zone_income.csv"),
             new[] { "zone", "zoneName", "team", "teamName", "tier", "secondsHeld", "goldGenerated" },
-            t.ZoneIncome.Select(r => new[] { N(r.Zone), ArenaNames.ZoneName(r.Zone), N(r.Team), ArenaNames.TeamName(r.Team), N(r.Tier), N(r.SecondsHeld), N(r.GoldGenerated) }));
+            t.ZoneIncome.Select(r => new[] { N(r.Zone), zoneName(r.Zone), N(r.Team), ArenaNames.TeamName(r.Team), N(r.Tier), N(r.SecondsHeld), N(r.GoldGenerated) }));
 
-        private static void WriteOwnership(ReportTables t, string folder) => WriteCsv(
+        private static void WriteOwnership(ReportTables t, string folder, Func<int, string> zoneName) => WriteCsv(
             Path.Combine(folder, "ownership.csv"),
             new[] { "zone", "zoneName", "tier", "team", "teamName", "from", "to", "duration", "howEnded", "phase" },
-            t.Ownership.Select(r => new[] { N(r.Zone), ArenaNames.ZoneName(r.Zone), N(r.Tier), N(r.Team), ArenaNames.TeamName(r.Team), N(r.From), N(r.To), N(r.Duration), r.HowEnded, N(r.Phase) }));
+            t.Ownership.Select(r => new[] { N(r.Zone), zoneName(r.Zone), N(r.Tier), N(r.Team), ArenaNames.TeamName(r.Team), N(r.From), N(r.To), N(r.Duration), r.HowEnded, N(r.Phase) }));
 
-        private static void WriteCaptures(ReportTables t, string folder) => WriteCsv(
+        private static void WriteCaptures(ReportTables t, string folder, Func<int, string> zoneName) => WriteCsv(
             Path.Combine(folder, "captures.csv"),
             new[] { "zone", "zoneName", "tier", "team", "teamName", "start", "end", "outcome", "duration", "players", "phase" },
-            t.Captures.Select(r => new[] { N(r.Zone), ArenaNames.ZoneName(r.Zone), N(r.Tier), N(r.Team), ArenaNames.TeamName(r.Team), N(r.Start), N(r.End), r.Outcome, N(r.Duration), N(r.Players), N(r.Phase) }));
+            t.Captures.Select(r => new[] { N(r.Zone), zoneName(r.Zone), N(r.Tier), N(r.Team), ArenaNames.TeamName(r.Team), N(r.Start), N(r.End), r.Outcome, N(r.Duration), N(r.Players), N(r.Phase) }));
 
         private static void WritePurchases(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "purchases.csv"),

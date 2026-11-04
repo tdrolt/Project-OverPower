@@ -11,12 +11,18 @@ using UnityEngine;
 namespace Overpower.Bots
 {
     /// <summary>
-    /// The host's side of the bots: once the room's scene is up and the room has bots, it builds the walkable map (BotNavMesh) and gives
-    /// every bot body this client controls a BotBrain and a scoreboard publisher. It rebuilds the map when the arena changes shape (the
-    /// shrink). On any other client, and on a host with no bots, it does nothing. Added by RoomManager.
+    /// The host's side of the bots: once the room's scene is up and the room has bots, it builds the walkable maps (BotNavMesh) and gives
+    /// every bot body this client controls a BotBrain and a scoreboard publisher. It rebuilds the maps when the arena changes shape (the
+    /// shrink). It also keeps what every brain shares: the list of brains and the Heal Zones standing now. On any other client, and on a
+    /// host with no bots, it does nothing. Added by RoomManager.
     /// </summary>
     public sealed class BotDirector : MonoBehaviour
     {
+        // The body's half width when the player prefab cannot be read: what the capsule measures.
+        private const float FallbackBodyRadius = 0.7f;
+        // The Heal Zones are looked up at most this often, for every bot at once.
+        private const float HealZoneLookupSeconds = 0.5f;
+
         private RoomManager roomManager;
         private BotConfig config;
         private GameplayConfig gameplay;
@@ -24,6 +30,9 @@ namespace Overpower.Bots
 
         private readonly BotNavMesh navMesh = new BotNavMesh();
         private readonly List<PhotonView> bodies = new List<PhotonView>();
+        private readonly List<BotBrain> brains = new List<BotBrain>();
+        private readonly List<AoeZone> healZones = new List<AoeZone>();
+        private float healZonesReadAt = -99f;
         private int builtForCut = int.MinValue;
         private float rebuildAt = -1f;
         private float nextCheckAt;
@@ -32,6 +41,8 @@ namespace Overpower.Bots
         public BotConfig Config => config;
         public GameplayConfig Gameplay => gameplay;
         public RoomManager Room => roomManager;
+        /// <summary>Every bot brain on this host (a destroyed body's brain leaves the list).</summary>
+        public IReadOnlyList<BotBrain> Brains => brains;
 
         public static BotDirector Instance { get; private set; }
 
@@ -52,6 +63,20 @@ namespace Overpower.Bots
 
         private void OnDestroy() => navMesh.Dispose();
 
+        /// <summary>The Heal Zones standing now (a destroyed one reads as null until the next look).</summary>
+        public IReadOnlyList<AoeZone> HealZones()
+        {
+            if (Time.time - healZonesReadAt >= HealZoneLookupSeconds)
+            {
+                healZonesReadAt = Time.time;
+                healZones.Clear();
+                healZones.AddRange(FindObjectsByType<AoeZone>(FindObjectsSortMode.None));
+            }
+            return healZones;
+        }
+
+        public void Forget(BotBrain brain) => brains.Remove(brain);
+
         private void Update()
         {
             navMesh.Tick();
@@ -71,7 +96,7 @@ namespace Overpower.Bots
             {
                 rebuildAt = -1f;
                 ConfigureSight();
-                navMesh.Build(config);
+                navMesh.Build(config, BodyRadius());
             }
 
             foreach (Player player in PhotonNetwork.CurrentRoom.Players.Values)
@@ -81,7 +106,9 @@ namespace Overpower.Bots
                 if (body == null || !body.IsMine || body.GetComponent<BotBrain>() != null) continue;
                 body.GetComponent<PlayerInputRouter>()?.BeginBotDrive();
                 if (gameplay != null) ScoreboardPublisher.Create(body.gameObject, gameplay);
-                body.gameObject.AddComponent<BotBrain>().Init(this, bot);
+                BotBrain brain = body.gameObject.AddComponent<BotBrain>();
+                brain.Init(this, bot);
+                brains.Add(brain);
                 Debug.Log($"[BOTS] {bot.NickName} ({bot.ActorNumber}) is playing build {bot.Build}");
             }
         }
@@ -91,6 +118,13 @@ namespace Overpower.Bots
             foreach (Player player in PhotonNetwork.CurrentRoom.Players.Values)
                 if (player is BotPlayer) return true;
             return false;
+        }
+
+        // The tight walkable map is exactly as wide as the player's capsule.
+        private static float BodyRadius()
+        {
+            float radius = BuildingManager.Instance != null ? BuildingManager.Instance.PlayerBodyRadius : 0f;
+            return radius > 0f ? radius : FallbackBodyRadius;
         }
 
         /// <summary>A bot sees by its team's sight, read from the same VisionConfig as players; a bot holding Scope by the Scope's own

@@ -78,6 +78,38 @@ namespace Overpower.Tests
             Assert.AreEqual(1, ConquestGoalRules.Choose(zones, Vector3.zero, false, settings), "too far away to turn back for");
         }
 
+        [Test]
+        public void AnEnemyCapitalItPushesAnywayNeedsNoTeammatesNear()
+        {
+            var capital = new ConquestZone { Id = 7, Centre = new Vector3(40, 0, 0), IsEnemyCapital = true, MayCapture = true, TeammatesNear = 1, PushAnyway = true };
+            var zones = new List<ConquestZone> { Zone(1, 30f), capital };
+            Assert.AreEqual(7, ConquestGoalRules.Choose(zones, Vector3.zero, false, Rules));
+            capital.MayCapture = false;
+            zones[1] = capital;
+            Assert.AreEqual(1, ConquestGoalRules.Choose(zones, Vector3.zero, false, Rules), "its team may not take it yet");
+        }
+
+        [Test]
+        public void ACaptureItKeepsOnWithComesBeforeItsThreatenedCapital()
+        {
+            var home = new ConquestZone { Id = 9, Centre = new Vector3(50, 0, 0), IsOwnCapital = true, OwnCapitalThreatened = true };
+            var taking = new ConquestZone { Id = 3, Centre = new Vector3(20, 0, 0), IsEnemyCapital = true, KeepTaking = true };
+            Assert.AreEqual(3, ConquestGoalRules.Choose(new List<ConquestZone> { home, taking }, Vector3.zero, false, Rules));
+            taking.KeepTaking = false;
+            Assert.AreEqual(9, ConquestGoalRules.Choose(new List<ConquestZone> { home, taking }, Vector3.zero, false, Rules), "not far enough along: home");
+        }
+
+        [Test]
+        public void WhileSpreadingOutAZoneAnotherBotHeadsForCountsFurther()
+        {
+            ConquestZone taken = Zone(1, 10f);
+            taken.TeammatesHeading = 1;
+            var zones = new List<ConquestZone> { taken, Zone(2, 15f) };
+            Assert.AreEqual(2, ConquestGoalRules.Choose(zones, Vector3.zero, false, new ConquestGoalRules.Settings { SpreadMetres = 9f }),
+                "10 m and 9 more for the bot heading there is further than 15 m");
+            Assert.AreEqual(1, ConquestGoalRules.Choose(zones, Vector3.zero, false, new ConquestGoalRules.Settings()), "not spreading out");
+        }
+
         private static DominionZone DZone(int id, float x, float pps, bool ours = false, bool losing = false, bool centre = false) =>
             new DominionZone { Id = id, Centre = new Vector3(x, 0, 0), PointsPerSecond = pps, Ours = ours, BeingTakenFromUs = losing, IsCentre = centre, Capturable = true };
 
@@ -104,6 +136,16 @@ namespace Overpower.Tests
             defended.EnemiesNear = 1;
             zones[0] = defended;
             Assert.AreEqual(2, DominionGoalRules.Choose(zones, Vector3.zero, false, 8f), "10 m and 8 more for one enemy is further than 16 m");
+        }
+
+        [Test]
+        public void DominionSpreadsOverEquallyPayingZones()
+        {
+            DominionZone taken = DZone(1, 10f, 4f);
+            taken.TeammatesHeading = 1;
+            var zones = new List<DominionZone> { taken, DZone(2, 16f, 4f) };
+            Assert.AreEqual(2, DominionGoalRules.Choose(zones, Vector3.zero, false, 0f, 8f), "10 m and 8 more for the bot heading there is further than 16 m");
+            Assert.AreEqual(1, DominionGoalRules.Choose(zones, Vector3.zero, false, 0f), "not spreading out");
         }
 
         [Test]

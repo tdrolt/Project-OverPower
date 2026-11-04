@@ -340,6 +340,7 @@ namespace Overpower.Dominion
             ResetPointsState();
             inactiveSince.Clear();
             healAreaWarned = false;
+            lastLoggedPoints = null;
         }
 
         /// <summary>A joiner (or a client that rejoined) takes the room's stage as it stands; it is not an edge, so nothing is reset for it.</summary>
@@ -357,6 +358,7 @@ namespace Overpower.Dominion
         {
             if (changed == null || !PhotonNetwork.InRoom) return;
             NoteEchoForPoints(changed);
+            LogPointsIfChanged(changed);
             if (!changed.ContainsKey(DominionKeys.Stage) && !changed.ContainsKey(DominionKeys.Round) && !changed.ContainsKey(DominionKeys.SuddenDeathStart)) return;
             // The echo of the master's own write (or anyone's): the wait for it is over, the next decision may be made.
             waitForEchoUntil = -1f;
@@ -387,6 +389,20 @@ namespace Overpower.Dominion
             // The zones go back to neutral at the start of the break and again at the start of the round: the master does it from the room's
             // dRz (RunZoneReset), not from seeing this edge, so a master that takes over mid-way finishes it.
             ResetControlledBodies(edge);
+        }
+
+        private int[] lastLoggedPoints; // master: the points the match log last got, so an echo carrying the same points again is not logged twice
+
+        /// <summary>The match log's points race: the master logs every team's points each time the room's points change.</summary>
+        private void LogPointsIfChanged(Hashtable changed)
+        {
+            if (!PhotonNetwork.IsMasterClient || !changed.ContainsKey(DominionKeys.Points)) return;
+            MatchTelemetry telemetry = MatchTelemetry.Instance;
+            if (telemetry == null) return;
+            DominionRoomState room = DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties);
+            if (!TelemetryWriteRules.PointsDiffer(lastLoggedPoints, room.Points)) return;
+            lastLoggedPoints = (int[])room.Points.Clone();
+            telemetry.LogTeamPoints(room.Round, (int)room.Stage, room.Points);
         }
 
         /// <summary>The match log's story of the match: round start and end, break, sudden death, match over. Written by the master only, from the
