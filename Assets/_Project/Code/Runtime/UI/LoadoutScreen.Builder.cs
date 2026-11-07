@@ -648,7 +648,7 @@ namespace Overpower.UI
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = false;
 
-            goldLabel = AddLabel(row.transform, "", theme.bodyTextSize, FontStyles.Bold);
+            goldLabel = AddLabel(row.transform, "", theme.loadoutHeaderGoldSize, FontStyles.Bold);
             goldLabel.alignment = TextAlignmentOptions.MidlineLeft;
             goldLabel.color = theme.goldTextColor;
 
@@ -658,8 +658,9 @@ namespace Overpower.UI
             statusLe.flexibleWidth = 1f; // Takes the rest of the row, pushing the gold label to the left edge.
         }
 
-        /// <summary>The always-visible "Loadout (P)" button, bottom-right, clear of the HUD panel (bottom-centre) and chat
-        /// (bottom-left). Its own canvas at HUD depth (UiLayers.Hud), not modal depth (LoadoutScreen.cs, SORT ORDER).</summary>
+        /// <summary>The always-visible shop button on a dark panel, bottom-right, clear of the HUD panel (bottom-centre) and chat
+        /// (bottom-left). Its own canvas at HUD depth (UiLayers.Hud), not modal depth (LoadoutScreen.cs, SORT ORDER). The canvas sits one
+        /// order under the HUD canvas so PlayerHud's credits text (raycastTarget off, so a click goes through to the panel) draws over the panel.</summary>
         private void BuildToggleButtonCanvas()
         {
             GameObject canvasGo = new GameObject("Loadout Toggle Canvas", typeof(RectTransform));
@@ -667,7 +668,7 @@ namespace Overpower.UI
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.overrideSorting = true;
-            canvas.sortingOrder = UiLayers.Hud;
+            canvas.sortingOrder = UiLayers.Hud - 1;
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = theme.referenceResolution;
@@ -683,7 +684,30 @@ namespace Overpower.UI
             cornerRt.anchorMin = cornerRt.anchorMax = cornerRt.pivot = new Vector2(1f, 0f);
             cornerRt.anchoredPosition = Vector2.zero;
             cornerRt.sizeDelta = Vector2.zero;
-            corner.transform.localScale = Vector3.one * theme.hudScale;
+            corner.transform.localScale = Vector3.one * (theme.hudScale * theme.shopCornerScale);
+
+            // A button of its own, behind the shop button: a click on the panel (the credits readout over it included) opens the shop.
+            // The panel is a UI graphic on a raycasting canvas, so PlayerInputRouter's pointer gate keeps that click from firing the weapon.
+            GameObject panelGo = new GameObject("Shop Corner Panel", typeof(RectTransform), typeof(Image), typeof(Button));
+            panelGo.transform.SetParent(corner.transform, false);
+            shopCornerPanel = panelGo.GetComponent<RectTransform>();
+            shopCornerPanel.anchorMin = shopCornerPanel.anchorMax = shopCornerPanel.pivot = new Vector2(1f, 0f);
+            float padding = theme.shopCornerPadding;
+            shopCornerPanel.anchoredPosition = new Vector2(-(theme.loadoutToggleButtonMargin - padding), theme.loadoutToggleButtonMargin - padding);
+            shopCornerPanel.sizeDelta = new Vector2(theme.loadoutToggleButtonWidth + 2f * padding, 0f);
+            Image panelImage = panelGo.GetComponent<Image>();
+            panelImage.color = theme.shopCornerPanelColor;
+            if (theme.shopCornerOutlineWidth > 0f)
+            {
+                Outline border = panelGo.AddComponent<Outline>();
+                border.effectColor = theme.shopCornerOutlineColor;
+                border.effectDistance = new Vector2(theme.shopCornerOutlineWidth, -theme.shopCornerOutlineWidth);
+            }
+            shopCornerPanelButton = panelGo.GetComponent<Button>();
+            shopCornerPanelButton.targetGraphic = panelImage;
+            shopCornerPanelButton.onClick.AddListener(Toggle);
+            shopCornerPanelButton.navigation = new Navigation { mode = Navigation.Mode.None }; // See BuildNodeButton (Enter must not re-click).
+            shopCornerPanelHeight = -1f;
 
             GameObject buttonGo = TMP_DefaultControls.CreateButton(new TMP_DefaultControls.Resources());
             buttonGo.name = "Loadout Toggle Button";
@@ -692,19 +716,35 @@ namespace Overpower.UI
             buttonRt.anchorMin = buttonRt.anchorMax = buttonRt.pivot = new Vector2(1f, 0f);
             buttonRt.sizeDelta = new Vector2(theme.loadoutToggleButtonWidth, theme.loadoutToggleButtonHeight);
             buttonRt.anchoredPosition = new Vector2(-theme.loadoutToggleButtonMargin, theme.loadoutToggleButtonMargin);
-            buttonGo.GetComponent<Image>().color = theme.barTrackColor;
+            buttonGo.GetComponent<Image>().color = theme.shopCornerButtonColor;
 
             TextMeshProUGUI label = buttonGo.GetComponentInChildren<TextMeshProUGUI>();
-            label.text = "Loadout (P)";
+            label.text = theme.loadoutToggleButtonText;
             if (theme.font != null)
                 label.font = theme.font;
-            label.fontSize = theme.bodyTextSize;
+            label.fontSize = theme.shopCornerButtonTextSize;
+            label.fontStyle = FontStyles.Bold;
             label.color = theme.textColor;
             ApplyOutline(label);
 
             loadoutToggleButton = buttonGo.GetComponent<Button>();
             loadoutToggleButton.onClick.AddListener(Toggle);
             loadoutToggleButton.navigation = new Navigation { mode = Navigation.Mode.None }; // See BuildNodeButton (Enter must not re-click).
+        }
+
+        /// <summary>Sizes the panel to what is on it: a Dominion round has no credits readout, only the button.</summary>
+        private void RefreshShopCornerPanel(bool isDominion)
+        {
+            if (shopCornerPanel == null)
+                return;
+
+            float height = ShopCornerRules.PanelHeight(Overpower.Dominion.DominionTerritoryRules.ShowsGold(isDominion), theme.loadoutToggleButtonHeight, theme.goldShopGap,
+                Overpower.Dominion.DominionScoreBarRules.GoldReadoutHeight(theme.bodyTextSize), theme.shopCornerPadding);
+            if (Mathf.Approximately(height, shopCornerPanelHeight))
+                return;
+
+            shopCornerPanelHeight = height;
+            shopCornerPanel.sizeDelta = new Vector2(shopCornerPanel.sizeDelta.x, height);
         }
 
         private void AddSectionHeader(Transform parent, string text)

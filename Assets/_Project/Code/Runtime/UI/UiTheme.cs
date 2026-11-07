@@ -534,12 +534,30 @@ namespace Overpower.UI
         public string loadoutArmorRechargeNextFormat = "Next: level {0}, refills after {1}s out of combat ({2})";
         [Tooltip("Pop-up numbers line for an armour row that has no upgrade left (limit reached or top level).")]
         public string loadoutArmorNoNextText = "Next: no upgrade left";
-        [Tooltip("Width of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]
+        [Tooltip("Width of the always-visible shop button bottom-right of the HUD, in canvas units.")]
         public float loadoutToggleButtonWidth = 190f;
-        [Tooltip("Height of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]
+        [Tooltip("Height of the always-visible shop button bottom-right of the HUD, in canvas units.")]
         public float loadoutToggleButtonHeight = 48f;
-        [Tooltip("Distance from the bottom-right screen corner to the 'Loadout (P)' button, in canvas units, on both axes.")]
+        [Tooltip("Distance from the bottom-right screen corner to the shop button, in canvas units, on both axes.")]
         public float loadoutToggleButtonMargin = 24f;
+        [Tooltip("The text on the always-visible shop button bottom-right of the HUD. It names the key that opens the shop.")]
+        public string loadoutToggleButtonText = "SHOP (B)";
+        [Tooltip("How much bigger the bottom-right block (the credits readout and the shop button) is drawn than the rest of the HUD. 1 = the HUD's own size.")]
+        public float shopCornerScale = 1.4f;
+        [Tooltip("Colour of the dark panel behind the credits readout and the shop button, so they can be seen and clicked against any ground. Clicking anywhere on it opens the shop.")]
+        public Color shopCornerPanelColor = new Color(0.1f, 0.11f, 0.16f, 0.92f);
+        [Tooltip("Colour of the border round that panel, so it stands out from the dark arena floor.")]
+        public Color shopCornerOutlineColor = new Color(0.1216f, 0.5412f, 0.2353f, 1f);
+        [Tooltip("How thick that border is, in canvas units. 0 = no border.")]
+        public float shopCornerOutlineWidth = 3f;
+        [Tooltip("Colour of the shop button on that panel.")]
+        public Color shopCornerButtonColor = new Color(0.1216f, 0.5412f, 0.2353f, 1f);
+        [Tooltip("Text size of the shop button's label.")]
+        public float shopCornerButtonTextSize = 26f;
+        [Tooltip("How far the dark panel reaches past the credits readout and the shop button on every side, in canvas units.")]
+        public float shopCornerPadding = 12f;
+        [Tooltip("Text size of the 'Credits' line at the top of the shop screen.")]
+        public float loadoutHeaderGoldSize = 34f;
 
         [Header("Shots")]
         [Tooltip("Each team's colour, index = team id (0/1/2) - Teams.TryGetTeam's own numbering, read through ShotColorFor " +
@@ -653,7 +671,7 @@ namespace Overpower.UI
                  "family as Highlight Colour/Ultimate Charge Colour, so gold reads as a reward the " +
                  "same way the ultimate-ready glow does, not just another stat.")]
         public Color goldTextColor = new Color(1f, 0.82f, 0.2f, 1f);
-        [Tooltip("Gap between the top of the 'Loadout (P)' button and the gold readout sitting above it, in canvas " +
+        [Tooltip("Gap between the top of the shop button and the gold readout sitting above it, in canvas " +
                  "units. Gold and the shop are the same system, so the readout sits up against the button that spends " +
                  "it, out of the ability bar.")]
         public float goldShopGap = 8f;
@@ -1195,7 +1213,7 @@ namespace Overpower.UI
         [Range(0f, 0.5f)] public float dominionRoundLabelTopShare = 0.1f;
 
         [Header("Dominion HUD: break card (between rounds)")]
-        [Tooltip("How far the break card sits below the top edge of the screen. It sits high so the arena stays in view; the shop (P) opens on top of it.")]
+        [Tooltip("How far the break card sits below the top edge of the screen. It sits high so the arena stays in view; the shop (B) opens on top of it.")]
         public float dominionBreakTop = 195f;
         [Tooltip("The dark box of the break card and the sudden-death banner.")]
         public Color dominionCardFill = new Color(0.059f, 0.063f, 0.078f, 0.85f);
@@ -1273,8 +1291,10 @@ namespace Overpower.UI
         public float dominionBreakDividerThickness = 2f;
         [Tooltip("The label in front of the round-win dots on the break card.")]
         public string dominionBreakWinsLabel = "Round wins";
-        [Tooltip("The button that points to the shop on the break card. The shop opens on P; clicking this opens it too.")]
-        public string dominionBreakPickText = "PICK YOUR BUILD (P)";
+        [Tooltip("The button that points to the shop on the break card. The shop opens on B; clicking this opens it too.")]
+        public string dominionBreakPickText = "PICK YOUR BUILD (B)";
+        [Tooltip("The small line under the pick-your-build button on the break card, telling players the shop key works during the whole break.")]
+        public string dominionBreakShopHintText = "Press B to open the shop at any time during the break";
         [Tooltip("The small countdown line at the bottom of the break card. {0} = the round that starts next, {1} = seconds left.")]
         public string dominionBreakStartsFormat = "ROUND {0} STARTS IN {1}";
         [Tooltip("The big countdown for the last seconds of the break. {0} = the round that starts next, {1} = seconds left.")]

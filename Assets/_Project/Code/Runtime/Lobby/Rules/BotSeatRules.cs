@@ -98,7 +98,45 @@ namespace Overpower.Lobby
             return stem;
         }
 
-        public static int PickBuild(int roll) => Index(roll, BuildCount);
+        /// <summary>A build chosen by roll among those no bot of the team has yet, so a team never fields the same loadout twice.
+        /// When every build is taken (a team larger than the build count) all of them are open again.</summary>
+        public static int PickBuild(int roll, IEnumerable<int> takenOnTeam)
+        {
+            var open = new List<int>();
+            for (int b = 0; b < BuildCount; b++)
+                if (takenOnTeam == null || !Contains(takenOnTeam, b)) open.Add(b);
+            if (open.Count == 0)
+                for (int b = 0; b < BuildCount; b++) open.Add(b);
+            return open[Index(roll, open.Count)];
+        }
+
+        /// <summary>The builds of the bots already seated, per team, read from the room's bot records. Humans and bots without a
+        /// build record are left out.</summary>
+        public static Dictionary<int, List<int>> BuildsByTeam(IReadOnlyDictionary<string, int> seats, Hashtable roomProps)
+        {
+            var byTeam = new Dictionary<int, List<int>>();
+            if (seats == null || roomProps == null) return byTeam;
+            foreach (var pair in seats)
+            {
+                if (!LobbySeatRules.TryTeamOfSeat(pair.Key, out int team)) continue;
+                if (!BotRosterRules.IsBotActor(pair.Value)) continue;
+                if (!roomProps.TryGetValue(BotRosterRules.PropKey(pair.Value, BotRosterRules.BuildKey), out object build) || !(build is int)) continue;
+                if (!byTeam.TryGetValue(team, out List<int> list))
+                {
+                    list = new List<int>();
+                    byTeam[team] = list;
+                }
+                list.Add((int)build);
+            }
+            return byTeam;
+        }
+
+        private static bool Contains(IEnumerable<int> values, int value)
+        {
+            foreach (int v in values)
+                if (v == value) return true;
+            return false;
+        }
 
         private static int Index(int roll, int count) => ((roll % count) + count) % count;
 

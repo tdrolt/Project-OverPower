@@ -249,7 +249,7 @@ namespace Overpower.Weapons
         /// <summary>Where a charging weapon actually fires - with whatever charge the hold reached. TryFire must run BEFORE triggerHeldSince is
         /// cleared, since ChargeFraction() reads it to work out how long the trigger was held.
         /// PlayerInputRouter deliberately does NOT pointer-gate the release event the way it gates the press (see EmitPointerGated: gating release
-        /// risked a stuck-held weapon), so releasing the mouse over the "Loadout (P)" button still reaches here though the matching PRESS was blocked
+        /// risked a stuck-held weapon), so releasing the mouse over the "SHOP (B)" button still reaches here though the matching PRESS was blocked
         /// and never ran HandlePrimaryPressed. Without the triggerHeldSince > 0f guard below, that pair fired an uncharged shot through the button on
         /// every click. triggerHeldSince is 0 whenever the matching press never ran (HandlePrimaryPressed is the only place that sets it; this method's
         /// own clear and Update's InputSuppressed clear both leave it at 0), so the guard is exactly "did a real press start this hold".</summary>

@@ -14,7 +14,9 @@ namespace Overpower.Weapons
     /// compounded three times (1.73x). Setting ProjectileContext's multiplier directly from the bounce count - never reading it back and
     /// re-multiplying - is what keeps that true.
     /// A bounced shot gets NO extra range: Redirect only changes direction (and lifts the projectile off the wall), never the RangeBudget, so the
-    /// metres already flown stay spent and the total distance is still capped at Max Range. Nothing in this file has to enforce that.
+    /// metres already flown stay spent and the total distance is still capped at Max Range. A bounce may also FORFEIT part of the range left
+    /// (rangeKeptAfterBounce): OnHit only hands the fraction to the motor, which applies it after its step's refund so the reach is the same at any
+    /// frame rate.
     /// OnHit calls the Redirect overload that lifts the projectile off the surface and remembers which collider to distrust on the next sweep -
     /// see Redirect for the wall-rattle trap that avoids.
     /// </summary>
@@ -30,11 +32,20 @@ namespace Overpower.Weapons
                  "that has bounced three times deals 1 + 0.2*3 = 1.6x, not 1.2 cubed.")]
         private float damagePerBounce = 0.20f;
 
+        [SerializeField, Tooltip("How much of the distance the shot still had left it keeps after each bounce, one number per bounce: " +
+                 "the first number is for the first bounce. 0.75 means that after bouncing it flies only three quarters of the way it " +
+                 "could still have flown; the next bounce then keeps its share of what is left after that. Past the end of " +
+                 "the list a bounce costs nothing, and an empty list means bounces never shorten the shot.")]
+        private float[] rangeKeptAfterBounce = new float[0];
+
         /// <summary>Max Bounces, read-only - the shop's pop-up shows it.</summary>
         public int MaxBounces => maxBounces;
 
         /// <summary>Damage Per Bounce (a fraction of base damage), read-only - the shop's pop-up shows it.</summary>
         public float DamagePerBounce => damagePerBounce;
+
+        /// <summary>Range Kept After Bounce (per bounce, a fraction of the range left), read-only.</summary>
+        public float[] RangeKeptAfterBounce => rangeKeptAfterBounce;
 
         private int bounces;
 
@@ -73,6 +84,7 @@ namespace Overpower.Weapons
 
             bounces++;
             shot.SetDamageMultiplier(1f + damagePerBounce * bounces);
+            motor.ScheduleRangeKept(BounceRules.RangeKept(rangeKeptAfterBounce, bounces));
             motor.Redirect(Vector3.Reflect(motor.Direction, hit.normal), hit.normal, hit.collider);
             return ProjectileHitResponse.KeepFlying;
         }

@@ -89,8 +89,8 @@ MonoBehaviour:
   targetLostSeconds: 1
   targetSwitchMetres: 3
   thinkSeconds: 0.1
-  aimErrorStartMetres: 2.2
-  aimErrorMinMetres: 0.9
+  aimErrorStartMetres: 3.6
+  aimErrorMinMetres: 1.7
   aimSettleSeconds: 2
   aimWobbleSeconds: 0.3
   turnDegreesPerSecond: 360
@@ -99,6 +99,8 @@ MonoBehaviour:
   objectiveGuardMetres: 12
   hitMemorySeconds: 3
   goalHoldSeconds: 1.5
+  freeZoneEnemySeconds: 2.5
+  freeZoneSpreadMetres: 55
   strafeSwitchMinSeconds: 1.5
   strafeSwitchMaxSeconds: 2.5
   fightStandStillChance: 0.3

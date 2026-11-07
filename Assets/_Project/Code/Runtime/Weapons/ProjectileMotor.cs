@@ -65,6 +65,9 @@ namespace Overpower.Weapons
         private RangeBudget range;
         private IProjectileBehaviour[] behaviours;
 
+        // Set by a bounce while its hit resolves, applied once the step has refunded its unmoved part, then back to 1 (no shrink).
+        private float pendingRangeKept = 1f;
+
         private Vector3 direction;
         private float speed;
         private float radius;
@@ -102,6 +105,7 @@ namespace Overpower.Weapons
             speed = shot.ProjectileSpeed;
             radius = shot.ProjectileRadius;
             range = new RangeBudget(shot.MaxRange);
+            pendingRangeKept = 1f;
             mask = BuildMask();
             transform.forward = direction;
             initialised = true;
@@ -126,6 +130,15 @@ namespace Overpower.Weapons
             transform.forward = direction;
             transform.position += hitNormal * BounceSurfaceSkin;
             justBouncedOffCollider = hitCollider;
+        }
+
+        /// <summary>
+        /// Asks the motor to forfeit part of the range left at the end of this step: keepFraction of it is kept. The motor applies it after the step's
+        /// refund (see Step), which is why a bounce hands it over here instead of touching the budget itself.
+        /// </summary>
+        public void ScheduleRangeKept(float keepFraction)
+        {
+            pendingRangeKept = keepFraction;
         }
 
         /// <summary>Fly through this collider from now on. The seam a pierce behaviour uses.</summary>
@@ -196,6 +209,10 @@ namespace Overpower.Weapons
                 // hit.distance was moved. Refund the difference, or a bounced/pierced shot's total reach would depend on the frame's step size (a lower
                 // frame rate forfeits more per hit).
                 range.Refund(step - hit.distance);
+
+                if (pendingRangeKept < 1f)
+                    range.ShrinkRemaining(pendingRangeKept);
+                pendingRangeKept = 1f;
             }
             else
             {

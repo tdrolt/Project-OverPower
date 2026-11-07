@@ -1050,7 +1050,7 @@ namespace Overpower.UI
             return ring;
         }
 
-        /// <summary>The gold readout, bottom-right, directly above the "Loadout (P)" button (gold and shop are tied). It
+        /// <summary>The gold readout, bottom-right, directly above the shop button (gold and shop are tied). It
         /// lives on THIS canvas because PlayerHud holds the GoldWallet and the change caches (UpdateGold). The two canvases
         /// line up because both use an identical (1, 0)-anchored, (1, 0)-pivoted root scaled by Hud Scale, so the gap is
         /// Gold Shop Gap at every screen size (LoadoutScreen.BuildToggleButtonCanvas, Shop Corner).</summary>
@@ -1062,7 +1062,7 @@ namespace Overpower.UI
             cornerRt.anchorMin = cornerRt.anchorMax = cornerRt.pivot = new Vector2(1f, 0f);
             cornerRt.anchoredPosition = Vector2.zero;
             cornerRt.sizeDelta = Vector2.zero;
-            corner.transform.localScale = Vector3.one * theme.hudScale;
+            corner.transform.localScale = Vector3.one * (theme.hudScale * theme.shopCornerScale); // The same scale as LoadoutScreen's Shop Corner: the readout and the button share one panel there.
 
             goldText = AddLabel(corner.transform, "", theme.bodyTextSize, FontStyles.Bold);
             RectTransform goldRt = goldText.rectTransform;

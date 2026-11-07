@@ -53,7 +53,7 @@ namespace Overpower.Dominion
         public static int PointsOf(int[] points, int team) =>
             points != null && team >= 0 && team < points.Length ? Math.Max(0, points[team]) : 0;
 
-        /// <summary>The gold readout's height over the Loadout (P) button: two lines of body text and the padding. PlayerHud sizes the readout with this.</summary>
+        /// <summary>The gold readout's height over the shop button: two lines of body text and the padding. PlayerHud sizes the readout with this.</summary>
         public static float GoldReadoutHeight(float bodyTextSize) => 2f * bodyTextSize + GoldReadoutPadding;
 
         /// <summary>The extra height PlayerHud gives the gold readout beyond its two lines of text.</summary>

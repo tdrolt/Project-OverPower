@@ -114,7 +114,7 @@ namespace Overpower.Lobby
         }
 
         /// <summary>The host's Add bot (one bot, the first empty seat of team) or Fill with bots (team null: every empty team seat). Names
-        /// come from namePool (never one already in the room, never a build's name), builds by chance. True means the write was sent.</summary>
+        /// come from namePool (never one already in the room, never a build's name), builds by chance but never one already on that bot's team. True means the write was sent.</summary>
         public bool AddBots(int? team, IReadOnlyList<string> namePool, IReadOnlyList<string> buildNames)
         {
             if (!CanWrite() || !PhotonNetwork.IsMasterClient) return false;
@@ -125,13 +125,22 @@ namespace Overpower.Lobby
             foreach (Player p in PhotonNetwork.PlayerList) taken.Add(p.NickName);
             if (buildNames != null) taken.AddRange(buildNames);
             var who = new List<(string nick, int build)>();
-            foreach (string _ in free)
+            Hashtable room = PhotonNetwork.CurrentRoom.CustomProperties;
+            Dictionary<int, List<int>> buildsByTeam = BotSeatRules.BuildsByTeam(seats, room);
+            foreach (string seatKey in free)
             {
                 string nick = BotSeatRules.PickName(namePool, taken, UnityEngine.Random.Range(0, int.MaxValue));
                 taken.Add(nick);
-                who.Add((nick, BotSeatRules.PickBuild(UnityEngine.Random.Range(0, BotSeatRules.BuildCount))));
+                LobbySeatRules.TryTeamOfSeat(seatKey, out int seatTeam);
+                if (!buildsByTeam.TryGetValue(seatTeam, out List<int> onTeam))
+                {
+                    onTeam = new List<int>();
+                    buildsByTeam[seatTeam] = onTeam;
+                }
+                int build = BotSeatRules.PickBuild(UnityEngine.Random.Range(0, int.MaxValue), onTeam);
+                onTeam.Add(build);
+                who.Add((nick, build));
             }
-            Hashtable room = PhotonNetwork.CurrentRoom.CustomProperties;
             room.TryGetValue(BotRosterRules.NextKey, out object nextSeen);
             bool sent = Send(BotSeatRules.AddBots(free, who, nextSeen, BotRosterRules.Roster(room), layout, seats));
             Debug.Log($"[BOTS] add {free.Count} bot(s) to {string.Join(", ", free)}: " + (sent ? "sent" : "not sent"));

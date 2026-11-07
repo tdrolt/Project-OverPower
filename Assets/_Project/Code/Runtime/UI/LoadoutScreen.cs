@@ -16,11 +16,11 @@ using Overpower.Weapons;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The shop screen (P or the bottom-right "Loadout (P)" button; closed by P, Esc or its X): weapon upgrade tree, the two armor
+    /// The shop screen (B or the bottom-right shop button; closed by B, Esc or its X): weapon upgrade tree, the two armor
     /// paths and ability cards on two tabs ("Weapons", "Abilities & Armor"), reopening on the page last used
     /// (ShopPageMemory). OWNER ONLY, built in code like PlayerHud (every listener sits on its button's line), dormant on
     /// remote copies. SORT ORDER (UiLayers): modal canvas at Shop, above PlayerHud and the death card (a dead player sees and clicks the
-    /// whole shop) but below the F1 panel and MatchUi's win/lose panels, which must show over an open shop; the "Loadout (P)" button has its
+    /// whole shop) but below the F1 panel and MatchUi's win/lose panels, which must show over an open shop; the shop button has its
     /// own canvas at HUD depth.
     /// INPUT: PlayerInputRouter's Shop action / ShopToggled (own emit gate, see ShopSuppressed); while open it claims tool
     /// focus (SetToolFocus), keyed by owner so it and the F1 panel can be open together. Hover pop-up: LoadoutScreen.Tooltip.cs.
@@ -223,9 +223,14 @@ namespace Overpower.UI
         /// <summary>The modal canvas (dim + panel); SetActive(false/true) is the whole show/hide, it is never destroyed.</summary>
         private GameObject screenRoot;
 
-        /// <summary>The always-visible "Loadout (P)" button, kept so Update() can disable it once the match is over
+        /// <summary>The always-visible shop button, kept so Update() can disable it once the match is over
         /// (matching Open()'s refusal) instead of leaving a button that silently no-ops.</summary>
         private Button loadoutToggleButton;
+
+        /// <summary>The dark panel behind the shop button and the credits readout: clicking anywhere on it opens the shop. Its height follows the mode (RefreshShopCornerPanel).</summary>
+        private RectTransform shopCornerPanel;
+        private Button shopCornerPanelButton;
+        private float shopCornerPanelHeight = -1f;
 
         /// <summary>This instance's open flag, separate from the static IsOpen (what the rest of the game reads): it
         /// records whether THIS component claimed tool focus, so Close() twice (Esc, then OnDisable) never double-releases.</summary>
@@ -377,6 +382,9 @@ namespace Overpower.UI
             // Runs regardless of isOpenLocal: the button is clickable whether the screen is open or not.
             if (loadoutToggleButton != null)
                 loadoutToggleButton.interactable = !matchOver && !shopShut;
+            if (shopCornerPanelButton != null)
+                shopCornerPanelButton.interactable = !matchOver && !shopShut;
+            RefreshShopCornerPanel(DominionMode.IsActive());
 
             if (!isOpenLocal)
                 return;

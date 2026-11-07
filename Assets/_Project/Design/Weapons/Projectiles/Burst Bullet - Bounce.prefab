@@ -271,6 +271,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxBounces: 2
   damagePerBounce: 0.35
+  rangeKeptAfterBounce:
+  - 0.75
+  - 0.5
 --- !u!114 &694183307610266887
 MonoBehaviour:
   m_ObjectHideFlags: 0

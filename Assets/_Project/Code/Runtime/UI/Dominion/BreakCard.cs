@@ -8,7 +8,7 @@ namespace Overpower.UI
 {
     /// <summary>
     /// The card between rounds (board DomBreak A): "ROUND 1 · PURPLE WINS · 540 / 620" (a tie: "TIED"; a shared round: "SHARED ROUND" and who gets a win), the round-win dots,
-    /// the match score and MATCH POINT from round 2 on, what the next round opens in the shop, a PICK YOUR BUILD (P) button and "ROUND 2 STARTS IN 14". The last seconds (Break Countdown Seconds in the Dominion Config)
+    /// the match score and MATCH POINT from round 2 on, what the next round opens in the shop, a PICK YOUR BUILD (B) button with a line under it naming the shop key, and "ROUND 2 STARTS IN 14". The last seconds (Break Countdown Seconds in the Dominion Config)
     /// read big in the same place. The break before round 1 has no result: GET READY, the same opens line and countdown.
     /// It sits high so the arena stays in view and draws BELOW the shop (its canvas sorts under the shop's): the shop opens on top and nothing of the
     /// card blocks a click on it. Only its button takes the mouse; a spectator has no shop, so no button. Words, sizes, colours are UiTheme fields.
@@ -23,6 +23,7 @@ namespace Overpower.UI
         private bool countdownIsBig;
         private LobbyButton pick;
         private GameObject pickRow;
+        private TextMeshProUGUI shopHint;
         private GameObject pointsRow, winsRow;
         private readonly List<TextMeshProUGUI> pointsTexts = new List<TextMeshProUGUI>();
         private readonly List<Image> winDots = new List<Image>();
@@ -134,6 +135,7 @@ namespace Overpower.UI
                     new OpensTexts(theme.dominionOpensFormat, theme.dominionOpensFirstText, theme.dominionOpensWeaponFamily, theme.dominionOpensWeaponUpgrade,
                                    theme.dominionOpensArmorOne, theme.dominionOpensArmorMore, theme.dominionOpensAnd, theme.dominionOpensNothing));
                 pickRow.SetActive(canPick);
+                shopHint.gameObject.SetActive(canPick);
                 onPickAction = onPick;
             }
 
@@ -325,6 +327,9 @@ namespace Overpower.UI
             LobbyUiKit.Size(pick.Root, -1f, theme.dominionBreakButtonHeight);
             LobbyUiKit.WidenToLabel(pick, theme.dominionBreakButtonPadding);
             pick.Button.onClick.AddListener(() => onPickAction?.Invoke());
+
+            shopHint = Line("Shop Hint", kit.Body, theme.dominionBreakOpensSize, theme.dominionMutedColor, 0f);
+            shopHint.text = theme.dominionBreakShopHintText;
 
             countdown = Line("Countdown", kit.Display, theme.dominionBreakCountdownSize, theme.dominionGoldColor, 0f);
 

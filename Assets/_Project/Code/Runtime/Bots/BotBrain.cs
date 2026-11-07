@@ -19,8 +19,9 @@ namespace Overpower.Bots
     /// router's bot seam (move, trigger, ability keys, Vent), the aim override, the shop's rules and the loadout (its buys go into its match
     /// log as a player's do). Every decision is a pure rule in Bots/Rules with BotConfig's numbers; this class only gathers what the rules
     /// need and presses the keys they choose.
-    /// Objective first: each think it picks the zone it goes for, and an enemy turns it away from that only by BotFocusRules (or, once a
-    /// team is in its last stand, BotHuntRules). The Laser bot goes where its partner goes, as supporting fire (BotSupportRules).
+    /// Objective first: each think it picks the zone it goes for, and an enemy turns it away from that only by BotFocusRules (BotCaptureRules
+    /// on its way to a free zone; or, once a team is in its last stand, BotHuntRules). The Laser bot goes where its partner goes, as
+    /// supporting fire (BotSupportRules).
     /// Thinks every BotConfig.ThinkSeconds and shops twice a second, each bot on its own beat; aims, moves and holds keys every frame.
     /// </summary>
     public sealed class BotBrain : MonoBehaviour
@@ -36,6 +37,8 @@ namespace Overpower.Bots
         private const float PartnerMovingThreshold = 1f;
         // The match log's ids for armour, as the shop screen writes them: 100 + the absorb level reached, 200 + the recharge level.
         private const int ArmourAbsorbItemBase = 100, ArmourRechargeItemBase = 200;
+        // An enemy seen just outside a zone's circle is in it a step later: it already makes the zone no free zone.
+        private const float OnZoneMarginMetres = 1f;
 
         /// <summary>What a goal is for. The goal hold compares this and its key (zone, pack, target, teammate or Heal Zone), never the point.</summary>
         private enum GoalKind { None, Home, Pack, Regroup, Fight, Memory, Objective, HealZone, WalkOut }
@@ -113,6 +116,9 @@ namespace Overpower.Bots
         private Vector3 objectiveCentre;
         private Vector3? objectivePoint;
         private bool objectiveUrgent;
+        // The zone it goes for is a free zone (BotCaptureRules): no detour, pause or far fight before it is taken.
+        private bool objectiveFree;
+        private bool objectiveStanding;
         private bool pushingCapital;
         private bool trading;
         private string objectiveDoing = "";
@@ -530,6 +536,8 @@ namespace Overpower.Bots
             objectiveZone = -1;
             objectivePoint = null;
             objectiveUrgent = false;
+            objectiveFree = false;
+            objectiveStanding = false;
             pushingCapital = false;
             trading = false;
             objectiveDoing = "holding";
@@ -595,7 +603,8 @@ namespace Overpower.Bots
                 bool pushAnyway = enemyCapital && mayCapture && BotPushRules.PushAnyway(BotPushRules.Exposed(enemiesNear, cfg.ExposedMaxDefenders),
                     TeammatesNear(centre, cfg.ExposedPushMetres), cfg.PushCapitalTeammates,
                     BotPushRules.Forced(NearOurTierTwoNextTo(z, team, zones), enemiesNear));
-                bool inside = Flat(Position, centre) <= zones.CaptureRadiusOf(z);
+                float radius = zones.CaptureRadiusOf(z);
+                bool inside = Flat(Position, centre) <= radius;
                 insideAny |= inside;
                 if (inside && owner >= 0 && owner != team) startedOwnedZone = z;
                 bool taking = inside && (othersCapital || EnemyTierTwo(z, team, zones));
@@ -615,21 +624,21 @@ namespace Overpower.Bots
                     EnemiesNear = enemiesNear,
                     PushAnyway = pushAnyway,
                     KeepTaking = BotPushRules.KeepTaking(taking, CaptureDone(z, owner, team, zones, now), cfg.TradeCaptureDone),
+                    EnemyOnIt = EnemiesKnownNear(centre, radius + OnZoneMarginMetres, cfg.FreeZoneEnemySeconds) > 0,
+                    Standing = inside,
                 });
             }
             if (!insideAny) startedOwnedZone = -1;
 
             bool spreading = BotSpreadRules.Spreading(Time.time - matchOnSince <= cfg.SpreadStartSeconds, BotSpreadRules.PushedBack(highestTierHeld),
                 oursUnderAttack);
-            if (spreading)
+            // Free zones are split between the bots all match long, so who heads where is counted every think.
+            CountTeammatesHeading(zones.ZoneCount);
+            for (int i = 0; i < conquestZones.Count; i++)
             {
-                CountTeammatesHeading(zones.ZoneCount);
-                for (int i = 0; i < conquestZones.Count; i++)
-                {
-                    ConquestZone z = conquestZones[i];
-                    z.TeammatesHeading = headingCount[z.Id];
-                    conquestZones[i] = z;
-                }
+                ConquestZone z = conquestZones[i];
+                z.TeammatesHeading = headingCount[z.Id];
+                conquestZones[i] = z;
             }
 
             bool centreUrgent = match != null && match.CutTeam >= 0 && CentreScan.Instance != null
@@ -642,11 +651,18 @@ namespace Overpower.Bots
                 EnemyNearPenaltyMetres = cfg.EnemyNearZonePenaltyMetres,
                 DefendZoneMetres = cfg.DefendZoneMetres,
                 SpreadMetres = spreading ? cfg.SpreadMetres : 0f,
+                FreeZoneSpreadMetres = cfg.FreeZoneSpreadMetres,
             };
             int zone = ConquestGoalRules.Choose(conquestZones, from, centreUrgent, settings);
             settings.SpreadMetres = 0f;
-            int plain = spreading ? ConquestGoalRules.Choose(conquestZones, from, centreUrgent, settings) : zone;
-            zone = HoldWhileSpreading(zone, plain, spreading, ConquestOpen(pickedZone), ConquestUrgent(zone, centreUrgent));
+            settings.FreeZoneSpreadMetres = 0f;
+            int plain = ConquestGoalRules.Choose(conquestZones, from, centreUrgent, settings);
+            bool free = false;
+            foreach (ConquestZone z in conquestZones)
+                if (z.Id == zone) free = BotCaptureRules.FreeZone(z.MayCapture, z.IsOwnCapital || z.IsEnemyCapital, z.EnemyOnIt);
+            // A held pick that stopped being free gives way to a free one at once.
+            zone = HoldWhileSpreading(zone, plain, spreading || free, ConquestOpen(pickedZone) && (!free || ConquestFree(pickedZone)),
+                ConquestUrgent(zone, centreUrgent));
             if (zone < 0)
             {
                 objectivePoint = supporting ? SupportPoint(partnerAt) : human;
@@ -664,10 +680,12 @@ namespace Overpower.Bots
                 objectiveUrgent = z.OwnCapitalThreatened || z.OursUnderAttack;
                 pushingCapital = z.IsEnemyCapital;
                 trading = capitalThreatened && z.KeepTaking;
+                objectiveFree = BotCaptureRules.FreeZone(z.MayCapture, z.IsOwnCapital || z.IsEnemyCapital, z.EnemyOnIt);
+                objectiveStanding = z.Standing;
             }
             objectiveDoing = (objectiveUrgent ? "defending zone " : trading ? "finishing its capture before going home, zone "
-                : pushingCapital ? "pushing the capital, zone " : "taking zone ") + zone;
-            if (supporting && !objectiveUrgent && !pushingCapital && !trading)
+                : pushingCapital ? "pushing the capital, zone " : objectiveFree ? "capturing free zone " : "taking zone ") + zone;
+            if (supporting && !objectiveUrgent && !pushingCapital && !trading && !objectiveFree)
             {
                 objectivePoint = SupportPoint(partnerAt);
                 objectiveDoing = "supporting " + NameOf(partner) + " toward zone " + zone;
@@ -720,7 +738,15 @@ namespace Overpower.Bots
         private bool ConquestUrgent(int zone, bool centreUrgent)
         {
             foreach (ConquestZone z in conquestZones)
-                if (z.Id == zone) return z.OwnCapitalThreatened || z.OursUnderAttack || z.IsEnemyCapital || z.KeepTaking || (centreUrgent && z.IsCentre);
+                if (z.Id == zone) return z.OwnCapitalThreatened || z.OursUnderAttack || z.IsEnemyCapital || z.KeepTaking || (centreUrgent && z.IsCentre)
+                    || (z.Standing && ConquestFree(zone));
+            return false;
+        }
+
+        private bool ConquestFree(int zone)
+        {
+            foreach (ConquestZone z in conquestZones)
+                if (z.Id == zone) return BotCaptureRules.FreeZone(z.MayCapture, z.IsOwnCapital || z.IsEnemyCapital, z.EnemyOnIt);
             return false;
         }
 
@@ -744,6 +770,7 @@ namespace Overpower.Bots
                 int owner = zones.Current.OwnerOf(z);
                 CaptureProgress progress = zones.CaptureProgressOf(z);
                 bool losing = owner == team && progress.Team >= 0 && progress.Team != team && progress.RatePerSecond01 > 0f && progress.Evaluate(now) > 0f;
+                float radius = zones.CaptureRadiusOf(z);
                 dominionZones.Add(new DominionZone
                 {
                     Id = z,
@@ -754,26 +781,31 @@ namespace Overpower.Bots
                     IsCentre = z == centreZone,
                     Capturable = zones.IsCapturableZone(z),
                     EnemiesNear = EnemiesKnownNear(centre, cfg.ObjectiveGuardMetres, cfg.ZoneIntelSeconds),
+                    EnemyOnIt = EnemiesKnownNear(centre, radius + OnZoneMarginMetres, cfg.FreeZoneEnemySeconds) > 0,
+                    Standing = Flat(Position, centre) <= radius,
                 });
             }
 
             bool spreading = BotSpreadRules.Spreading(Time.time - matchOnSince <= cfg.SpreadStartSeconds, false, false);
-            if (spreading)
+            // Free zones are split between the bots all round long, so who heads where is counted every think.
+            CountTeammatesHeading(zones.ZoneCount);
+            for (int i = 0; i < dominionZones.Count; i++)
             {
-                CountTeammatesHeading(zones.ZoneCount);
-                for (int i = 0; i < dominionZones.Count; i++)
-                {
-                    DominionZone z = dominionZones[i];
-                    z.TeammatesHeading = headingCount[z.Id];
-                    dominionZones[i] = z;
-                }
+                DominionZone z = dominionZones[i];
+                z.TeammatesHeading = headingCount[z.Id];
+                dominionZones[i] = z;
             }
 
             bool centreSoon = director != null && centreZone >= 0 && director.SecondsToCentrePayout > 0f
                 && director.SecondsToCentrePayout <= cfg.CentreBeforePayoutSeconds;
-            int zone = DominionGoalRules.Choose(dominionZones, from, centreSoon, cfg.EnemyNearZonePenaltyMetres, spreading ? cfg.SpreadMetres : 0f);
-            int plain = spreading ? DominionGoalRules.Choose(dominionZones, from, centreSoon, cfg.EnemyNearZonePenaltyMetres) : zone;
-            zone = HoldWhileSpreading(zone, plain, spreading, DominionOpen(pickedZone), DominionUrgent(zone, centreSoon));
+            int zone = DominionGoalRules.Choose(dominionZones, from, centreSoon, cfg.EnemyNearZonePenaltyMetres, spreading ? cfg.SpreadMetres : 0f,
+                cfg.FreeZoneSpreadMetres);
+            int plain = DominionGoalRules.Choose(dominionZones, from, centreSoon, cfg.EnemyNearZonePenaltyMetres);
+            bool free = false;
+            foreach (DominionZone z in dominionZones)
+                if (z.Id == zone) free = BotCaptureRules.FreeZone(z.Capturable && !z.Ours, z.IsCentre, z.EnemyOnIt);
+            zone = HoldWhileSpreading(zone, plain, spreading || free, DominionOpen(pickedZone) && (!free || DominionFree(pickedZone)),
+                DominionUrgent(zone, centreSoon));
             if (zone < 0)
             {
                 if (!supporting) return;
@@ -784,9 +816,15 @@ namespace Overpower.Bots
             objectiveZone = zone;
             objectivePoint = SpotIn(zone);
             foreach (DominionZone z in dominionZones)
-                if (z.Id == zone) objectiveUrgent = z.BeingTakenFromUs;
-            objectiveDoing = zone == centreZone ? "going for the centre" : (objectiveUrgent ? "defending zone " : "taking zone ") + zone;
-            if (supporting && !objectiveUrgent && zone != centreZone)
+            {
+                if (z.Id != zone) continue;
+                objectiveUrgent = z.BeingTakenFromUs;
+                objectiveFree = BotCaptureRules.FreeZone(z.Capturable && !z.Ours, z.IsCentre, z.EnemyOnIt);
+                objectiveStanding = z.Standing;
+            }
+            objectiveDoing = zone == centreZone ? "going for the centre"
+                : (objectiveUrgent ? "defending zone " : objectiveFree ? "capturing free zone " : "taking zone ") + zone;
+            if (supporting && !objectiveUrgent && zone != centreZone && !objectiveFree)
             {
                 objectivePoint = SupportPoint(partnerAt);
                 objectiveDoing = "supporting " + NameOf(partner) + " toward zone " + zone;
@@ -803,7 +841,14 @@ namespace Overpower.Bots
         private bool DominionUrgent(int zone, bool centreSoon)
         {
             foreach (DominionZone z in dominionZones)
-                if (z.Id == zone) return z.BeingTakenFromUs || (centreSoon && z.IsCentre);
+                if (z.Id == zone) return z.BeingTakenFromUs || (centreSoon && z.IsCentre) || (z.Standing && DominionFree(zone));
+            return false;
+        }
+
+        private bool DominionFree(int zone)
+        {
+            foreach (DominionZone z in dominionZones)
+                if (z.Id == zone) return BotCaptureRules.FreeZone(z.Capturable && !z.Ours, z.IsCentre, z.EnemyOnIt);
             return false;
         }
 
@@ -1013,9 +1058,14 @@ namespace Overpower.Bots
 
             bool hasTarget = TryTargetPosition(out Vector3 targetAt);
             if (hasTarget && stance == BotStance.Fight)
-                engaged = IsHunted(target) || BotFocusRules.ShouldEngage(objectiveZone >= 0, Flat(targetAt, Position), EngageLimit(),
-                    objectiveZone >= 0 ? Flat(targetAt, objectiveCentre) : float.MaxValue, cfg.ObjectiveGuardMetres,
-                    HitMeLately(target), helping || TeammateFights(targetAt));
+            {
+                if (objectiveFree)
+                    engaged = BotCaptureRules.EngageOnFreeZone(HitMeLately(target), Flat(targetAt, Position), WeaponRange()) || IsHunted(target);
+                else
+                    engaged = IsHunted(target) || BotFocusRules.ShouldEngage(objectiveZone >= 0, Flat(targetAt, Position), EngageLimit(),
+                        objectiveZone >= 0 ? Flat(targetAt, objectiveCentre) : float.MaxValue, cfg.ObjectiveGuardMetres,
+                        HitMeLately(target), helping || TeammateFights(targetAt));
+            }
 
             GoalKind kind;
             int key = 0;
@@ -1054,18 +1104,27 @@ namespace Overpower.Bots
             {
                 kind = GoalKind.Fight;
                 key = target;
-                Vector3 fight = FightPoint(targetAt);
-                point = OffLimits(fight) ? (Vector3?)null : fight;
                 doing = (IsHunted(target) ? "hunting " : "fighting ") + NameOf(target);
+                if (BotCaptureRules.StayOnZone(objectiveStanding, objectiveFree))
+                {
+                    point = objectivePoint;
+                    doing += " from zone " + objectiveZone;
+                }
+                else
+                {
+                    Vector3 fight = FightPoint(targetAt);
+                    point = OffLimits(fight) ? (Vector3?)null : fight;
+                }
             }
-            else if (WaitingToWalkOut())
+            // On its way to a free zone it makes no detour: no wait at the spawn, no look round, no ultimate pack.
+            else if (!objectiveFree && WaitingToWalkOut())
             {
                 kind = GoalKind.WalkOut;
                 key = walkOutWith;
                 point = null;
                 doing = "waiting to walk out with " + NameOf(walkOutWith);
             }
-            else if (RecentMemory(out Vector3 lastPlace))
+            else if (!objectiveFree && RecentMemory(out Vector3 lastPlace))
             {
                 kind = GoalKind.Memory;
                 point = lastPlace;
@@ -1079,7 +1138,7 @@ namespace Overpower.Bots
                 point = healthAt;
                 doing = "taking a health pack";
             }
-            else if (ultimate != null && !ultimate.IsFull && TryPack(true, cfg.UltimatePackMetres, false, out int ultimatePack, out Vector3 ultimateAt))
+            else if (!objectiveFree && ultimate != null && !ultimate.IsFull && TryPack(true, cfg.UltimatePackMetres, false, out int ultimatePack, out Vector3 ultimateAt))
             {
                 kind = GoalKind.Pack;
                 key = ultimatePack;
@@ -1096,8 +1155,10 @@ namespace Overpower.Bots
 
             // A fight's point moves with the strafe and a new target is its own fight: only a change of kind (or of zone, pack, teammate) is held.
             bool differs = kind != heldKind || (key != heldKey && kind != GoalKind.Fight);
+            // Back to a free zone at once; a fight with an enemy at the edge of weapon range is still held, or it would flip every think.
+            bool toFreeZone = objectiveFree && kind == GoalKind.Objective;
             if (differs && heldKind != GoalKind.None
-                && BotPaceRules.KeepGoal(Time.time - heldSince, cfg.GoalHoldSeconds, situationChanged, objectiveUrgent))
+                && BotPaceRules.KeepGoal(Time.time - heldSince, cfg.GoalHoldSeconds, situationChanged, objectiveUrgent || toFreeZone))
             {
                 if (heldKind == GoalKind.Pack) wantedPack = heldKey;
                 return;
@@ -1388,7 +1449,7 @@ namespace Overpower.Bots
         /// <summary>Now and then, with no enemy to fight and nothing urgent, it stands still a moment.</summary>
         private void PauseNowAndThen()
         {
-            bool idle = stance == BotStance.Fight && target < 0 && !objectiveUrgent && Time.time >= scoutUntil;
+            bool idle = stance == BotStance.Fight && target < 0 && !objectiveUrgent && !objectiveFree && Time.time >= scoutUntil;
             if (!idle) pauseUntil = 0f;
             if (Time.time < nextPauseRollAt) return;
             nextPauseRollAt = Time.time + Random.Range(cfg.IdlePauseEveryMinSeconds, cfg.IdlePauseEveryMaxSeconds);
@@ -1402,10 +1463,10 @@ namespace Overpower.Bots
         {
             if (Time.time < scoutUntil)
             {
-                if (target >= 0 || visible.Count > 0 || stance != BotStance.Fight) scoutUntil = 0f;
+                if (target >= 0 || visible.Count > 0 || stance != BotStance.Fight || objectiveFree) scoutUntil = 0f;
                 return;
             }
-            if (bot.Build != BotConfig.Laser || build == null || abilities == null || objectiveZone < 0
+            if (bot.Build != BotConfig.Laser || build == null || abilities == null || objectiveZone < 0 || objectiveFree
                 || heldKind != GoalKind.Objective || heldKey != objectiveZone || target >= 0) return;
             if (!BotAbilityRules.ScoutDue(Time.time - lastScoutAt, cfg.ScoutEverySeconds)) return;
             bool hasScope = build.Attachment != null && abilities.EquippedId(AbilitySlot.Attachment) == build.Attachment.Id;

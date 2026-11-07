@@ -74,9 +74,9 @@ namespace Overpower.Data
 
         [Header("Aim")]
         [Tooltip("How far its shots miss at first, in metres to the side of the target.")]
-        [SerializeField, Min(0f)] private float aimErrorStartMetres = 2.2f;
+        [SerializeField, Min(0f)] private float aimErrorStartMetres = 3.6f;
         [Tooltip("How far its shots still miss once settled, in metres.")]
-        [SerializeField, Min(0f)] private float aimErrorMinMetres = 0.9f;
+        [SerializeField, Min(0f)] private float aimErrorMinMetres = 1.7f;
         [Tooltip("How many seconds of shooting the same target it takes to settle from the first error to the settled one.")]
         [SerializeField, Min(0.01f)] private float aimSettleSeconds = 2f;
         [Tooltip("How often the miss changes direction, in seconds (a new random offset each time).")]
@@ -87,14 +87,20 @@ namespace Overpower.Data
         [SerializeField, Range(0f, 1f)] private float leadFraction = 0.5f;
 
         [Header("Objective first")]
-        [Tooltip("On its way to a zone it turns to fight an enemy only within the furthest it likes to fight (its build's range) plus this many metres. Further away it keeps walking and only shoots enemies that come into its weapon's range.")]
+        [Tooltip("On its way to a zone it turns to fight an enemy only within the furthest it likes to fight (its build's range) plus this many metres. Further away it keeps walking and only shoots enemies that come into its weapon's range. (Going for a free zone it fights only an enemy in its weapon's range or one that hit it.)")]
         [SerializeField, Min(0f)] private float engageExtraMetres = 3f;
-        [Tooltip("An enemy within this many metres of the zone it is going for (or holding) is always fought: it defends its zone. Also how near enemies must be to a zone to count as defending it.")]
+        [Tooltip("An enemy within this many metres of the zone it is going for (or holding) is always fought: it defends its zone (not while it goes for a free zone). Also how near enemies must be to a zone to count as defending it.")]
         [SerializeField, Min(0f)] private float objectiveGuardMetres = 12f;
         [Tooltip("An enemy that hit it in the last this-many seconds is always fought back, wherever it was going.")]
         [SerializeField, Min(0f)] private float hitMemorySeconds = 3f;
         [Tooltip("Once it picks where to go (a zone, a fight, a pack, a teammate) it keeps that at least this many seconds, unless a fight starts or ends, it backs off or regroups, or a zone of its team is being taken. Stops it turning back and forth.")]
         [SerializeField, Min(0f)] private float goalHoldSeconds = 1.5f;
+
+        [Header("Capturing zones first")]
+        [Tooltip("A free zone is one its team may take now, not a capital (nor the Dominion centre), with no enemy on it. Bots take free zones before anything but their own capital in danger, the centre just before a scan or payout and a zone of their team being taken; on one they stay until it is theirs, and on their way they fight only an enemy in weapon range or one that hit them. An enemy their team saw inside a zone's circle in the last this-many seconds makes that zone no longer free.")]
+        [SerializeField, Min(0f)] private float freeZoneEnemySeconds = 2.5f;
+        [Tooltip("Each other bot of its team already heading for a free zone makes that zone count this many metres further, all match long, so the bots split over the free zones instead of all walking to the same one.")]
+        [SerializeField, Min(0f)] private float freeZoneSpreadMetres = 55f;
 
         [Header("Moving in a fight")]
         [Tooltip("It strafes left and right while it fights and switches side after a random time between these two, in seconds.")]
@@ -111,7 +117,7 @@ namespace Overpower.Data
         [SerializeField, Min(0.5f)] private float idlePauseEveryMinSeconds = 6f;
         [Tooltip("...and this many seconds.")]
         [SerializeField, Min(0.5f)] private float idlePauseEveryMaxSeconds = 12f;
-        [Tooltip("Each time, the chance it does stand still (0.25 = 25%). Never while its capital or a zone of its team is being taken.")]
+        [Tooltip("Each time, the chance it does stand still (0.25 = 25%). Never while its capital or a zone of its team is being taken, nor while it goes for a free zone.")]
         [SerializeField, Range(0f, 1f)] private float idlePauseChance = 0.25f;
         [Tooltip("How long it stands still: a random time between this...")]
         [SerializeField, Min(0f)] private float pauseMinSeconds = 1f;
@@ -301,6 +307,9 @@ namespace Overpower.Data
         public float ObjectiveGuardMetres => objectiveGuardMetres;
         public float HitMemorySeconds => hitMemorySeconds;
         public float GoalHoldSeconds => goalHoldSeconds;
+
+        public float FreeZoneEnemySeconds => freeZoneEnemySeconds;
+        public float FreeZoneSpreadMetres => freeZoneSpreadMetres;
 
         public float StrafeSwitchMinSeconds => strafeSwitchMinSeconds;
         public float StrafeSwitchMaxSeconds => strafeSwitchMaxSeconds;

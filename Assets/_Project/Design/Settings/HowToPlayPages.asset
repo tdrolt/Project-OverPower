@@ -14,30 +14,32 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   pages:
   - title: Movement and aiming
-    text: 'Move with WASD. Your character aim and shots follow the cursor. The more
-      you move the less accurate you will shoot. Some movement abilities can go through
-      specific obstacles the arena (example: you can dash/zip across short walls)'
+    text: "Move with WASD and rotate camera with Q and E.\nYour character aim and
+      shots follow the cursor. The more you move the less accurate you will shoot.
+      \nSome movement abilities can go through specific obstacles the arena (example:
+      you can dash/zip across short walls)"
     picture: {fileID: 21300000, guid: c7a379147ed6da147bb7775a3e48f95e, type: 3}
   - title: Shooting and overheat
-    text: 'Left click fires your weapon and builds up heat. Fill the bar and you
-      overheat preventing you from shooting and using abilities. While you cool down
-      a short opening will appear. Press R while its active to massively reduce overheat '
+    text: "Left click fires your weapon and builds up heat. \nFill the bar and you
+      overheat preventing you from shooting and using abilities. \nWhile you cool
+      down a short opening will appear. \nPress R while its active to massively reduce
+      overheat "
     picture: {fileID: 21300000, guid: a19e311976fa1924e9649c1a33336989, type: 3}
   - title: Ability slots
-    text: 'You have 4 abiltiy slots: your weapon on left click, the weapon''s attachment
-      on right click, a movement ability on Shift and an ultimate on Space. Everyone
-      starts with a pistol and buy the rest in the shop. The ultimate charges as
+    text: "You have 4 abiltiy slots: your weapon on left click, the weapon's attachment
+      on right click, a movement ability on Shift and an ultimate on Space. \nEveryone
+      starts with a pistol and buy the rest in the shop. \nThe ultimate charges as
       you deal damage, take damage and take part in kills, and it can only be used
-      when the meter is full. '
+      when the meter is full. "
     picture: {fileID: 21300000, guid: f0ed4ce77673397479ba202a6ef11802, type: 3}
   - title: Vision
-    text: You see in a cone toward your cursor, plus a small circle around you. The
-      vision is also shared between team mates. Everything outside your team's sight
-      goes dark, and enemies in the dark are hidden. You can still hear their guns
-      when they shoot close by.
+    text: "You see in a cone toward your cursor, plus a small circle around you.
+      \nThe vision is also shared between team mates. Everything outside your team's
+      sight goes dark, and enemies in the dark are hidden. \nYou can still hear their
+      guns when they shoot close by."
     picture: {fileID: 21300000, guid: edd03d2852d0839459cdc4ba8e5e86ce, type: 3}
   - title: The shop
-    text: 'Press P to open the shop. It has two pages: weapons with the upgrade tree,
+    text: 'Press B to open the shop. It has two pages: weapons with the upgrade tree,
       and abilities and armor. Hover your cursor on an item to see what it does.
       You can always sell a weapon/abiltiy but don''t expect a full refund! You can
       upgrade your armor twice; each upgrade either lets it take more damage or makes

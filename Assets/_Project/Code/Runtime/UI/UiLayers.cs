@@ -12,7 +12,7 @@ namespace Overpower.UI
         /// <summary>The centre-scan countdown and the tower bounty: under the hit feedback, so a flash of damage draws over them.</summary>
         public const int ScanAndBounty = -21;
         public const int HitFeedback = -20;
-        /// <summary>The HUD, the spectator bar, the warm-up bar and the Loadout (P) button.</summary>
+        /// <summary>The HUD, the spectator bar, the warm-up bar and the shop button (B).</summary>
         public const int Hud = -10;
         public const int Minimap = -9;
         /// <summary>RESPAWN IN n and the waiting card: over the HUD, under the Dominion HUD, the shop and the chat (it is placed clear of them).</summary>

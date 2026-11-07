@@ -225,6 +225,15 @@ MonoBehaviour:
   loadoutToggleButtonWidth: 190
   loadoutToggleButtonHeight: 48
   loadoutToggleButtonMargin: 24
+  loadoutToggleButtonText: SHOP (B)
+  shopCornerScale: 1.4
+  shopCornerPanelColor: {r: 0.16, g: 0.18, b: 0.24, a: 0.95}
+  shopCornerOutlineColor: {r: 0.1216, g: 0.5412, b: 0.2353, a: 1}
+  shopCornerOutlineWidth: 3
+  shopCornerButtonColor: {r: 0.1216, g: 0.5412, b: 0.2353, a: 1}
+  shopCornerButtonTextSize: 26
+  shopCornerPadding: 12
+  loadoutHeaderGoldSize: 34
   teamShotColors:
   - {r: 1, g: 0.45, b: 0.05, a: 1}
   - {r: 0.68, g: 0.32, b: 1, a: 1}
@@ -479,7 +488,8 @@ MonoBehaviour:
   dominionBreakWinsSeparator: "\xB7"
   dominionBreakDividerThickness: 2
   dominionBreakWinsLabel: Round wins
-  dominionBreakPickText: PICK YOUR BUILD (P)
+  dominionBreakPickText: PICK YOUR BUILD (B)
+  dominionBreakShopHintText: Press B to open the shop at any time during the break
   dominionBreakStartsFormat: ROUND {0} STARTS IN {1}
   dominionBreakBigFormat: "Round {0} starts in {1}\u2026"
   dominionOpensFormat: 'Round {0} opens: {1}'

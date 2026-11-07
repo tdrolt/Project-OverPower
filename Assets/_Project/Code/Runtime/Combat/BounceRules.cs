@@ -16,5 +16,17 @@ namespace Overpower.Combat
         {
             return shooterActorNumber > 0 && shooterActorNumber == wallOwnerActorNumber;
         }
+
+        /// <summary>
+        /// The fraction of the range LEFT that a shot keeps after its Nth bounce (1 = the first), read from the weapon's list: entry 0 is the first
+        /// bounce. No shrink (1) for a bounce number below 1, past the end of the list, or when there is no list.
+        /// </summary>
+        public static float RangeKept(float[] keptAfterBounce, int bounceNumber)
+        {
+            if (keptAfterBounce == null || bounceNumber < 1 || bounceNumber > keptAfterBounce.Length)
+                return 1f;
+
+            return keptAfterBounce[bounceNumber - 1];
+        }
     }
 }

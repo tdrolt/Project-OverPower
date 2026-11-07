@@ -160,6 +160,31 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheBrainTakesFreeZonesFirstThroughTheRules()
+        {
+            MethodInfo free = M(typeof(BotCaptureRules), nameof(BotCaptureRules.FreeZone));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ConquestGoal", free));
+            Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "DominionGoal", free));
+            foreach (string field in new[] { nameof(ConquestZone.EnemyOnIt), nameof(ConquestZone.Standing) })
+            {
+                Assert.IsTrue(IlWiring.Stores(typeof(BotBrain), "ConquestGoal", typeof(ConquestZone).GetField(field)), field);
+                Assert.IsTrue(IlWiring.Stores(typeof(BotBrain), "DominionGoal", typeof(DominionZone).GetField(field)), field);
+            }
+            foreach (string mode in new[] { "ConquestGoal", "DominionGoal" })
+            {
+                Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), mode, typeof(BotConfig).GetProperty(nameof(BotConfig.FreeZoneEnemySeconds)).GetGetMethod()), mode);
+                Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), mode, typeof(BotConfig).GetProperty(nameof(BotConfig.FreeZoneSpreadMetres)).GetGetMethod()), mode);
+            }
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(BotBrain), "ChooseGoal", M(typeof(BotCaptureRules), nameof(BotCaptureRules.EngageOnFreeZone))),
+                "on its way to a free zone it fights only an enemy that hit it or is in weapon range");
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(BotBrain), "ChooseGoal", M(typeof(BotCaptureRules), nameof(BotCaptureRules.StayOnZone))),
+                "on a free zone it shoots from the zone");
+            FieldInfo objectiveFree = typeof(BotBrain).GetField("objectiveFree", BindingFlags.Instance | BindingFlags.NonPublic);
+            foreach (string method in new[] { "PauseNowAndThen", "ScoutAhead" })
+                Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), method, objectiveFree), method + ": no stop on the way to a free zone");
+        }
+
+        [Test]
         public void TheLaserBotSupportsAPartnerThroughTheRules()
         {
             Assert.IsTrue(IlWiring.Uses(typeof(BotBrain), "ChoosePartner", M(typeof(BotSupportRules), nameof(BotSupportRules.PickPartner))));

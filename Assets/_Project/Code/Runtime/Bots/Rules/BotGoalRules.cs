@@ -5,10 +5,11 @@ namespace Overpower.Bots
 {
     /// <summary>
     /// Where a Conquest bot goes when no fight holds it: its threatened capital, unless it is finishing a capture it keeps on with (a capital
-    /// trade); the centre just before a scan after the shrink; an enemy capital it may take with enough of its team near (or that it pushes
-    /// anyway); a zone of its team being taken close by; else the closest zone its team may capture, a Tier III or bounty zone counted
-    /// closer, a zone with enemies known near it counted further (it pushes where nobody defends), and while spreading out a zone other bots
-    /// of its team head for counted further. "from" is the bot, or the teammate it sticks with.
+    /// trade); the centre just before a scan after the shrink; the free zone it stands on (BotCaptureRules), or the enemy capital it stands in
+    /// and may take; a zone of its team being taken close by; an enemy capital it pushes anyway (exposed, or next to the Tier II it holds);
+    /// the best free zone; an enemy capital it may take with enough of its team near; else the best zone its team may capture. "Best" is the closest, a Tier III or bounty zone counted closer, a zone with enemies known near it counted
+    /// further (it pushes where nobody defends), and a zone other bots of its team head for counted further (always for free zones, so
+    /// they split over them; for the others only while spreading out). "from" is the bot, or the teammate it sticks with.
     /// </summary>
     public static class ConquestGoalRules
     {
@@ -21,6 +22,8 @@ namespace Overpower.Bots
             public float DefendZoneMetres;
             /// <summary>Per other bot of its team heading for a zone, while spreading out; 0 otherwise.</summary>
             public float SpreadMetres;
+            /// <summary>Per other bot of its team heading for a free zone, always (the larger of this and SpreadMetres counts).</summary>
+            public float FreeZoneSpreadMetres;
         }
 
         public static int Choose(IReadOnlyList<ConquestZone> zones, Vector3 from, bool centreUrgent, Settings settings)
@@ -32,16 +35,11 @@ namespace Overpower.Bots
                 for (int i = 0; i < zones.Count; i++)
                     if (zones[i].IsCentre) return zones[i].Id;
 
-            int push = -1;
-            float pushDistance = float.MaxValue;
             for (int i = 0; i < zones.Count; i++)
-            {
-                ConquestZone z = zones[i];
-                if (!z.IsEnemyCapital || !z.MayCapture || (z.TeammatesNear < settings.PushCapitalTeammates && !z.PushAnyway)) continue;
-                float d = Flat(from, z.Centre);
-                if (d < pushDistance) { pushDistance = d; push = z.Id; }
-            }
-            if (push >= 0) return push;
+                if (BotCaptureRules.StayOnZone(zones[i].Standing, Free(zones[i]))) return zones[i].Id;
+            // A capital capture under way is finished first: it is how a team ends the game.
+            for (int i = 0; i < zones.Count; i++)
+                if (zones[i].Standing && zones[i].IsEnemyCapital && zones[i].MayCapture) return zones[i].Id;
 
             int defend = -1;
             float defendDistance = float.MaxValue;
@@ -54,13 +52,47 @@ namespace Overpower.Bots
             }
             if (defend >= 0) return defend;
 
+            int forced = ClosestPush(zones, from, settings, true);
+            if (forced >= 0) return forced;
+
+            int free = Best(zones, from, settings, Mathf.Max(settings.SpreadMetres, settings.FreeZoneSpreadMetres), true);
+            if (free >= 0) return free;
+
+            int push = ClosestPush(zones, from, settings, false);
+            if (push >= 0) return push;
+
+            return Best(zones, from, settings, settings.SpreadMetres, false);
+        }
+
+        /// <summary>The closest enemy capital its team may take that it pushes anyway (anywayOnly) or with enough of its team near; -1 when none.</summary>
+        private static int ClosestPush(IReadOnlyList<ConquestZone> zones, Vector3 from, Settings settings, bool anywayOnly)
+        {
+            int push = -1;
+            float pushDistance = float.MaxValue;
+            for (int i = 0; i < zones.Count; i++)
+            {
+                ConquestZone z = zones[i];
+                if (!z.IsEnemyCapital || !z.MayCapture) continue;
+                if (anywayOnly ? !z.PushAnyway : z.TeammatesNear < settings.PushCapitalTeammates && !z.PushAnyway) continue;
+                float d = Flat(from, z.Centre);
+                if (d < pushDistance) { pushDistance = d; push = z.Id; }
+            }
+            return push;
+        }
+
+        private static bool Free(ConquestZone z) => BotCaptureRules.FreeZone(z.MayCapture, z.IsOwnCapital || z.IsEnemyCapital, z.EnemyOnIt);
+
+        /// <summary>The best-scored zone its team may capture (capitals left out), only free ones when freeOnly; -1 when none.</summary>
+        private static int Best(IReadOnlyList<ConquestZone> zones, Vector3 from, Settings settings, float headingMetres, bool freeOnly)
+        {
             int best = -1;
             float bestScore = float.MaxValue;
             for (int i = 0; i < zones.Count; i++)
             {
                 ConquestZone z = zones[i];
                 if (!z.MayCapture || z.IsEnemyCapital || z.IsOwnCapital) continue;
-                float score = Flat(from, z.Centre) + settings.EnemyNearPenaltyMetres * z.EnemiesNear + settings.SpreadMetres * z.TeammatesHeading;
+                if (freeOnly && !Free(z)) continue;
+                float score = Flat(from, z.Centre) + settings.EnemyNearPenaltyMetres * z.EnemiesNear + headingMetres * z.TeammatesHeading;
                 if (z.Tier >= 3) score -= settings.TierThreeBonusMetres;
                 if (z.Bounty) score -= settings.BountyBonusMetres;
                 if (score < bestScore) { bestScore = score; best = z.Id; }
@@ -80,27 +112,37 @@ namespace Overpower.Bots
     }
 
     /// <summary>
-    /// Where a Dominion bot goes, for 2v2 and 3v3v3 alike: the centre just before its payout (when the mode has one); a zone of its team
-    /// being taken; the best-paying zone it does not hold, closest first, each enemy known near a zone counting enemyNearPenaltyMetres
-    /// further (of equally paying zones it takes the undefended one), and while spreading out each other bot of its team heading for a zone
-    /// spreadMetres further; when it holds them all, its best-paying zone.
+    /// Where a Dominion bot goes, for 2v2 and 3v3v3 alike: the centre just before its payout (when the mode has one); the free zone it
+    /// stands on (BotCaptureRules); a zone of its team being taken; the best-paying free zone; the best-paying zone it does not hold; when
+    /// it holds them all, its best-paying zone. Of equally paying zones the closest, each enemy known near a zone counting
+    /// enemyNearPenaltyMetres further (it takes the undefended one), and each other bot of its team heading for a zone counting further:
+    /// freeZoneSpreadMetres for a free zone always (the larger of the two while spreading out), spreadMetres for the others while spreading out.
     /// </summary>
     public static class DominionGoalRules
     {
-        public static int Choose(IReadOnlyList<DominionZone> zones, Vector3 from, bool centreSoon, float enemyNearPenaltyMetres, float spreadMetres = 0f)
+        public static int Choose(IReadOnlyList<DominionZone> zones, Vector3 from, bool centreSoon, float enemyNearPenaltyMetres, float spreadMetres = 0f,
+            float freeZoneSpreadMetres = 0f)
         {
             if (centreSoon)
                 for (int i = 0; i < zones.Count; i++)
                     if (zones[i].IsCentre) return zones[i].Id;
 
+            for (int i = 0; i < zones.Count; i++)
+                if (BotCaptureRules.StayOnZone(zones[i].Standing, Free(zones[i]))) return zones[i].Id;
+
             int defend = Closest(zones, from, z => z.Ours && z.BeingTakenFromUs);
             if (defend >= 0) return defend;
+
+            int free = BestPaying(zones, from, enemyNearPenaltyMetres, Mathf.Max(spreadMetres, freeZoneSpreadMetres), Free);
+            if (free >= 0) return free;
 
             int take = BestPaying(zones, from, enemyNearPenaltyMetres, spreadMetres, z => z.Capturable && !z.Ours && !z.IsCentre);
             if (take >= 0) return take;
 
             return BestPaying(zones, from, 0f, spreadMetres, z => z.Ours && !z.IsCentre);
         }
+
+        private static bool Free(DominionZone z) => BotCaptureRules.FreeZone(z.Capturable && !z.Ours, z.IsCentre, z.EnemyOnIt);
 
         public static bool InsideCircle(Vector2 position, Vector2 centre, float radius, float margin) =>
             Vector2.Distance(position, centre) <= Mathf.Max(0f, radius - margin);

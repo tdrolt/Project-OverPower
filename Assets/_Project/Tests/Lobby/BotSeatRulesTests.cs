@@ -101,14 +101,137 @@ namespace Overpower.Tests
             Assert.IsFalse(string.IsNullOrEmpty(BotSeatRules.PickName(new string[0], new string[0], 3)));
         }
 
+        private static readonly int[] Rolls = { -5, -1, 0, 1, 2, 3, 4, 7, 19, 20 };
+
+        private static Hashtable BotRecords(params (int actor, int build)[] bots)
+        {
+            var room = new Hashtable();
+            foreach (var b in bots) room[BotRosterRules.PropKey(b.actor, BotRosterRules.BuildKey)] = b.build;
+            return room;
+        }
+
         [Test]
         public void TheBuildRollIsOneOfTheThree()
         {
             for (int roll = -5; roll < 20; roll++)
             {
-                int build = BotSeatRules.PickBuild(roll);
+                int build = BotSeatRules.PickBuild(roll, null);
                 Assert.IsTrue(build >= 0 && build < BotSeatRules.BuildCount, roll.ToString());
             }
+        }
+
+        [Test]
+        public void WithNothingTakenEveryBuildCanBePicked()
+        {
+            foreach (IEnumerable<int> taken in new IEnumerable<int>[] { null, new int[0] })
+            {
+                var seen = new HashSet<int>();
+                for (int roll = 0; roll < 9; roll++) seen.Add(BotSeatRules.PickBuild(roll, taken));
+                Assert.AreEqual(BotSeatRules.BuildCount, seen.Count);
+            }
+        }
+
+        [Test]
+        public void TheOnlyOpenBuildIsTheOneChosen()
+        {
+            int open = 2;
+            var taken = new List<int>();
+            for (int b = 0; b < BotSeatRules.BuildCount; b++)
+                if (b != open) taken.Add(b);
+            foreach (int roll in Rolls) Assert.AreEqual(open, BotSeatRules.PickBuild(roll, taken), roll.ToString());
+        }
+
+        [Test]
+        public void ABuildAlreadyOnTheTeamIsNeverPickedAndEachOpenOneCan()
+        {
+            var taken = new[] { 0 };
+            var seen = new HashSet<int>();
+            for (int roll = -5; roll <= 20; roll++)
+            {
+                int build = BotSeatRules.PickBuild(roll, taken);
+                Assert.AreNotEqual(0, build, roll.ToString());
+                seen.Add(build);
+            }
+            CollectionAssert.AreEquivalent(new[] { 1, 2 }, seen);
+        }
+
+        [Test]
+        public void WhenEveryBuildIsTakenAnyBuildIsPickedAgain()
+        {
+            var taken = new[] { 0, 1, 2 };
+            var seen = new HashSet<int>();
+            for (int roll = 0; roll < 9; roll++)
+            {
+                int build = BotSeatRules.PickBuild(roll, taken);
+                Assert.IsTrue(build >= 0 && build < BotSeatRules.BuildCount, roll.ToString());
+                seen.Add(build);
+            }
+            Assert.AreEqual(BotSeatRules.BuildCount, seen.Count);
+        }
+
+        [Test]
+        public void ABotAddedAfterAnotherOnTheSameTeamGetsADifferentBuildWhateverTheRolls()
+        {
+            for (int r1 = 0; r1 < 9; r1++)
+                for (int r2 = 0; r2 < 9; r2++)
+                    for (int r3 = 0; r3 < 9; r3++)
+                    {
+                        var team = new List<int>();
+                        foreach (int roll in new[] { r1, r2, r3 }) team.Add(BotSeatRules.PickBuild(roll, team));
+                        Assert.AreEqual(BotSeatRules.BuildCount, new HashSet<int>(team).Count, $"{r1} {r2} {r3}");
+                    }
+        }
+
+        [Test]
+        public void TheBuildsAlreadyOnEachTeamAreReadFromTheBotsOnly()
+        {
+            var seats = Seats(("sT00", 1001), ("sT01", 5), ("sT10", 1002), ("sT11", 1003), ("sS0", 1004));
+            Hashtable room = BotRecords((1001, 1), (1002, 2));
+            room[BotRosterRules.PropKey(1003, BotRosterRules.BuildKey)] = "not a number";
+            room[BotRosterRules.PropKey(5, BotRosterRules.BuildKey)] = 0;
+            room[BotRosterRules.PropKey(1004, BotRosterRules.BuildKey)] = 0;
+
+            Dictionary<int, List<int>> byTeam = BotSeatRules.BuildsByTeam(seats, room);
+
+            CollectionAssert.AreEqual(new[] { 1 }, byTeam[0]);
+            CollectionAssert.AreEqual(new[] { 2 }, byTeam[1]);
+            Assert.AreEqual(2, byTeam.Count);
+        }
+
+        [Test]
+        public void NoBotsMeansNoBuildsTaken()
+        {
+            Assert.AreEqual(0, BotSeatRules.BuildsByTeam(Seats(("sT00", 3)), new Hashtable()).Count);
+            Assert.AreEqual(0, BotSeatRules.BuildsByTeam(null, null).Count);
+        }
+
+        [Test]
+        public void FillingWithBotsGivesEveryTeamThreeDifferentBuildsAroundABotAlreadySeated()
+        {
+            var three = new SeatLayout(new[] { 0, 1, 2 }, 3, 0);
+            var seats = Seats(("sT00", 1001));
+            Hashtable room = BotRecords((1001, 2));
+            for (int salt = 0; salt < 9; salt++)
+            {
+                Dictionary<int, List<int>> byTeam = BotSeatRules.BuildsByTeam(seats, room);
+                int step = salt;
+                foreach (string key in BotSeatRules.FreeTeamSeats(three, seats, null))
+                {
+                    LobbySeatRules.TryTeamOfSeat(key, out int team);
+                    if (!byTeam.TryGetValue(team, out List<int> onTeam)) byTeam[team] = onTeam = new List<int>();
+                    onTeam.Add(BotSeatRules.PickBuild(step++, onTeam));
+                }
+                foreach (int team in three.Teams)
+                    Assert.AreEqual(BotSeatRules.BuildCount, new HashSet<int>(byTeam[team]).Count, $"team {team}, salt {salt}");
+                CollectionAssert.Contains(byTeam[0], 2);
+            }
+        }
+
+        [Test]
+        public void AddingBotsPicksTheirBuildsThroughTheTeamAwareRule()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(LobbySeats), nameof(LobbySeats.AddBots), typeof(BotSeatRules).GetMethod(nameof(BotSeatRules.PickBuild))));
+            Assert.IsTrue(IlWiring.Uses(typeof(LobbySeats), nameof(LobbySeats.AddBots), typeof(BotSeatRules).GetMethod(nameof(BotSeatRules.BuildsByTeam))));
         }
     }
 }

@@ -32,6 +32,10 @@ namespace Overpower.Bots
         public bool KeepTaking;
         /// <summary>Other bots of its team heading for this zone.</summary>
         public int TeammatesHeading;
+        /// <summary>An enemy its team saw (or the scan showed) on the zone just now: it is no free zone (BotCaptureRules.FreeZone).</summary>
+        public bool EnemyOnIt;
+        /// <summary>The bot itself stands inside the zone's capture circle.</summary>
+        public bool Standing;
     }
 
     /// <summary>One zone as a Dominion bot weighs it.</summary>
@@ -48,6 +52,10 @@ namespace Overpower.Bots
         public int EnemiesNear;
         /// <summary>Other bots of its team heading for this zone.</summary>
         public int TeammatesHeading;
+        /// <summary>An enemy its team saw on the zone just now: it is no free zone (BotCaptureRules.FreeZone).</summary>
+        public bool EnemyOnIt;
+        /// <summary>The bot itself stands inside the zone's capture circle.</summary>
+        public bool Standing;
     }
 
     /// <summary>A build as shop steps: catalogue ids and how many of each armour upgrade.</summary>

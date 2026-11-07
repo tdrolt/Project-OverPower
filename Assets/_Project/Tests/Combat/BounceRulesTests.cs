@@ -46,6 +46,36 @@ namespace Overpower.Tests
             Assert.IsFalse(BounceRules.BouncesOffCover(-1, -1));
         }
 
+        private static readonly float[] Kept = { 0.75f, 0.5f };
+
+        [Test]
+        public void EachBounceReadsItsOwnEntryOfTheList()
+        {
+            Assert.AreEqual(0.75f, BounceRules.RangeKept(Kept, 1), 0.0001f);
+            Assert.AreEqual(0.5f, BounceRules.RangeKept(Kept, 2), 0.0001f);
+        }
+
+        [Test]
+        public void ABounceBeyondTheListCostsNoRange()
+        {
+            Assert.AreEqual(1f, BounceRules.RangeKept(Kept, 3), 0.0001f);
+            Assert.AreEqual(1f, BounceRules.RangeKept(Kept, 100), 0.0001f);
+        }
+
+        [Test]
+        public void NoListOrAnEmptyListNeverShortensTheShot()
+        {
+            Assert.AreEqual(1f, BounceRules.RangeKept(null, 1), 0.0001f);
+            Assert.AreEqual(1f, BounceRules.RangeKept(new float[0], 1), 0.0001f);
+        }
+
+        [Test]
+        public void ANumberBelowTheFirstBounceCostsNoRange()
+        {
+            Assert.AreEqual(1f, BounceRules.RangeKept(Kept, 0), 0.0001f);
+            Assert.AreEqual(1f, BounceRules.RangeKept(Kept, -1), 0.0001f);
+        }
+
         [Test]
         public void ActorZeroIsNotARealPlayerEither()
         {

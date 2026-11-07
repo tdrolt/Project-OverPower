@@ -6,12 +6,13 @@ using UnityEngine;
 namespace Overpower.Tests
 {
     /// <summary>
-    /// Where a bot goes when nothing is shooting at it: Conquest's five rules and Dominion's, written once from the mode's zone list.
+    /// Where a bot goes when nothing is shooting at it: Conquest's rules and Dominion's, written once from the mode's zone list. Free zones
+    /// (BotCaptureRules) come first after its threatened capital, the urgent centre and a zone of its team being taken.
     /// </summary>
     public class BotGoalRulesTests
     {
-        private static ConquestZone Zone(int id, float x, int tier = 2, bool may = true, bool bounty = false) =>
-            new ConquestZone { Id = id, Centre = new Vector3(x, 0, 0), Tier = tier, MayCapture = may, Bounty = bounty };
+        private static ConquestZone Zone(int id, float x, int tier = 2, bool may = true, bool bounty = false, bool enemyOn = false, bool standing = false) =>
+            new ConquestZone { Id = id, Centre = new Vector3(x, 0, 0), Tier = tier, MayCapture = may, Bounty = bounty, EnemyOnIt = enemyOn, Standing = standing };
 
         private static readonly ConquestGoalRules.Settings Rules = new ConquestGoalRules.Settings { TierThreeBonusMetres = 10f, BountyBonusMetres = 10f, PushCapitalTeammates = 2 };
 
@@ -35,7 +36,7 @@ namespace Overpower.Tests
         public void AnEnemyCapitalIsPushedOnlyWithEnoughOfTheTeamNear()
         {
             var capital = new ConquestZone { Id = 7, Centre = new Vector3(40, 0, 0), IsEnemyCapital = true, MayCapture = true, TeammatesNear = 1 };
-            var zones = new List<ConquestZone> { Zone(1, 30f), capital };
+            var zones = new List<ConquestZone> { Zone(1, 30f, enemyOn: true), capital };
             Assert.AreEqual(1, ConquestGoalRules.Choose(zones, Vector3.zero, false, Rules));
             capital.TeammatesNear = 2;
             zones[1] = capital;
@@ -83,10 +84,21 @@ namespace Overpower.Tests
         {
             var capital = new ConquestZone { Id = 7, Centre = new Vector3(40, 0, 0), IsEnemyCapital = true, MayCapture = true, TeammatesNear = 1, PushAnyway = true };
             var zones = new List<ConquestZone> { Zone(1, 30f), capital };
-            Assert.AreEqual(7, ConquestGoalRules.Choose(zones, Vector3.zero, false, Rules));
+            Assert.AreEqual(7, ConquestGoalRules.Choose(zones, Vector3.zero, false, Rules), "an exposed or forced push beats even a free zone");
             capital.MayCapture = false;
             zones[1] = capital;
             Assert.AreEqual(1, ConquestGoalRules.Choose(zones, Vector3.zero, false, Rules), "its team may not take it yet");
+        }
+
+        [Test]
+        public void ABotInAnEnemyCapitalItMayTakeFinishesItBeforeAnyFreeZone()
+        {
+            var capital = new ConquestZone { Id = 7, Centre = new Vector3(40, 0, 0), IsEnemyCapital = true, MayCapture = true, Standing = true };
+            var zones = new List<ConquestZone> { Zone(1, 5f), capital };
+            Assert.AreEqual(7, ConquestGoalRules.Choose(zones, new Vector3(40, 0, 0), false, Rules), "it stays in the capital it is taking");
+            capital.Standing = false;
+            zones[1] = capital;
+            Assert.AreEqual(1, ConquestGoalRules.Choose(zones, Vector3.zero, false, Rules), "not in it, too few teammates near: the free zone");
         }
 
         [Test]
@@ -110,8 +122,72 @@ namespace Overpower.Tests
             Assert.AreEqual(1, ConquestGoalRules.Choose(zones, Vector3.zero, false, new ConquestGoalRules.Settings()), "not spreading out");
         }
 
-        private static DominionZone DZone(int id, float x, float pps, bool ours = false, bool losing = false, bool centre = false) =>
-            new DominionZone { Id = id, Centre = new Vector3(x, 0, 0), PointsPerSecond = pps, Ours = ours, BeingTakenFromUs = losing, IsCentre = centre, Capturable = true };
+        [Test]
+        public void AFreeZoneComesBeforeAnEnemyCapitalPush()
+        {
+            var capital = new ConquestZone { Id = 7, Centre = new Vector3(40, 0, 0), IsEnemyCapital = true, MayCapture = true, TeammatesNear = 2 };
+            var zones = new List<ConquestZone> { Zone(1, 30f), capital };
+            Assert.AreEqual(1, ConquestGoalRules.Choose(zones, Vector3.zero, false, Rules), "a zone nobody is on is taken first");
+            zones[0] = Zone(1, 30f, enemyOn: true);
+            Assert.AreEqual(7, ConquestGoalRules.Choose(zones, Vector3.zero, false, Rules), "an enemy is on it: the push goes on");
+        }
+
+        [Test]
+        public void AnEnemyOnAZoneMakesItNoFreeZone()
+        {
+            var zones = new List<ConquestZone> { Zone(1, 10f, enemyOn: true), Zone(2, 30f) };
+            Assert.AreEqual(2, ConquestGoalRules.Choose(zones, Vector3.zero, false, Rules), "the free zone, though further");
+            zones[1] = Zone(2, 30f, may: false);
+            Assert.AreEqual(1, ConquestGoalRules.Choose(zones, Vector3.zero, false, Rules), "no free zone left: the contested one is still taken");
+        }
+
+        [Test]
+        public void ABotStandingOnAFreeZoneStaysUntilItIsTaken()
+        {
+            var bot = new Vector3(28f, 0f, 0f);
+            var zones = new List<ConquestZone> { Zone(1, 30f, standing: true), Zone(2, 20f, tier: 3, bounty: true) };
+            Assert.AreEqual(1, ConquestGoalRules.Choose(zones, bot, false, Rules), "it stays although zone 2 counts closer (8 m less 20)");
+            zones[0] = Zone(1, 30f, may: false, standing: true);
+            Assert.AreEqual(2, ConquestGoalRules.Choose(zones, bot, false, Rules), "zone 1 is its team's now: on to the next");
+            zones[0] = Zone(1, 30f, enemyOn: true, standing: true);
+            Assert.AreEqual(2, ConquestGoalRules.Choose(zones, bot, false, Rules), "an enemy stepped on: no free zone any more");
+        }
+
+        [Test]
+        public void AThreatenedCapitalAndTheUrgentCentreStillComeBeforeTheFreeZoneItStandsOn()
+        {
+            var home = new ConquestZone { Id = 9, Centre = new Vector3(50, 0, 0), IsOwnCapital = true, OwnCapitalThreatened = true };
+            Assert.AreEqual(9, ConquestGoalRules.Choose(new List<ConquestZone> { Zone(1, 0f, standing: true), home }, Vector3.zero, false, Rules));
+            var centre = new ConquestZone { Id = 6, Centre = new Vector3(60, 0, 0), IsCentre = true };
+            var zones = new List<ConquestZone> { Zone(1, 0f, standing: true), centre };
+            Assert.AreEqual(1, ConquestGoalRules.Choose(zones, Vector3.zero, false, Rules));
+            Assert.AreEqual(6, ConquestGoalRules.Choose(zones, Vector3.zero, true, Rules), "the scan is about to start");
+        }
+
+        [Test]
+        public void FreeZonesAreSplitBetweenBotsAllMatchLong()
+        {
+            ConquestZone taken = Zone(1, 10f);
+            taken.TeammatesHeading = 1;
+            var zones = new List<ConquestZone> { taken, Zone(2, 15f) };
+            var notSpreadingOut = new ConquestGoalRules.Settings { FreeZoneSpreadMetres = 9f };
+            Assert.AreEqual(2, ConquestGoalRules.Choose(zones, Vector3.zero, false, notSpreadingOut),
+                "10 m and 9 more for the bot heading there is further than 15 m, also after the start");
+            ConquestZone heading = Zone(1, 10f, enemyOn: true);
+            heading.TeammatesHeading = 1;
+            var contested = new List<ConquestZone> { heading, Zone(2, 15f, enemyOn: true) };
+            Assert.AreEqual(1, ConquestGoalRules.Choose(contested, Vector3.zero, false, notSpreadingOut), "no free zone: split only while spreading out");
+            zones.RemoveAt(1);
+            Assert.AreEqual(1, ConquestGoalRules.Choose(zones, Vector3.zero, false, notSpreadingOut), "the only free zone: every bot goes");
+        }
+
+        private static DominionZone DZone(int id, float x, float pps, bool ours = false, bool losing = false, bool centre = false, bool enemyOn = false,
+            bool standing = false) =>
+            new DominionZone
+            {
+                Id = id, Centre = new Vector3(x, 0, 0), PointsPerSecond = pps, Ours = ours, BeingTakenFromUs = losing, IsCentre = centre, Capturable = true,
+                EnemyOnIt = enemyOn, Standing = standing,
+            };
 
         [Test]
         public void DominionDefendsAZoneBeingTakenFirst()
@@ -161,6 +237,36 @@ namespace Overpower.Tests
             var zones = new List<DominionZone> { DZone(1, 5f, 5f), DZone(9, 40f, 0f, centre: true) };
             Assert.AreEqual(1, DominionGoalRules.Choose(zones, Vector3.zero, false, 0f));
             Assert.AreEqual(9, DominionGoalRules.Choose(zones, Vector3.zero, true, 0f));
+        }
+
+        [Test]
+        public void DominionStaysOnAFreeZoneItStandsOn()
+        {
+            var zones = new List<DominionZone> { DZone(1, 0f, 3f, standing: true), DZone(2, 30f, 5f) };
+            Assert.AreEqual(1, DominionGoalRules.Choose(zones, Vector3.zero, false, 0f), "it stays although zone 2 pays more");
+            zones[0] = DZone(1, 0f, 3f, ours: true, standing: true);
+            Assert.AreEqual(2, DominionGoalRules.Choose(zones, Vector3.zero, false, 0f), "zone 1 is its team's now: on to the next");
+        }
+
+        [Test]
+        public void DominionTakesAFreeZoneBeforeAContestedBetterPayingOne()
+        {
+            var zones = new List<DominionZone> { DZone(1, 20f, 3f), DZone(2, 10f, 5f, enemyOn: true) };
+            Assert.AreEqual(1, DominionGoalRules.Choose(zones, Vector3.zero, false, 0f));
+            zones[1] = DZone(2, 10f, 5f);
+            Assert.AreEqual(2, DominionGoalRules.Choose(zones, Vector3.zero, false, 0f), "both free: the better paying");
+        }
+
+        [Test]
+        public void DominionSplitsFreeZonesBetweenBotsAfterTheStart()
+        {
+            DominionZone taken = DZone(1, 10f, 4f);
+            taken.TeammatesHeading = 1;
+            var zones = new List<DominionZone> { taken, DZone(2, 16f, 4f) };
+            Assert.AreEqual(2, DominionGoalRules.Choose(zones, Vector3.zero, false, 0f, 0f, 9f),
+                "10 m and 9 more for the bot heading there is further than 16 m, also after the start");
+            zones[1] = DZone(2, 16f, 3f);
+            Assert.AreEqual(1, DominionGoalRules.Choose(zones, Vector3.zero, false, 0f, 0f, 9f), "points first: the better-paying zone");
         }
 
         [Test]

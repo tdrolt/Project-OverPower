@@ -209,5 +209,81 @@ namespace Overpower.Tests
             Assert.AreEqual(25f, b.Travelled, 0.0001f);
             Assert.IsFalse(b.IsSpent);
         }
+
+        [Test]
+        public void ShrinkingKeepsThatFractionOfWhatIsLeft()
+        {
+            var b = NewBudget();
+            b.Consume(10f); // 20 left
+
+            b.ShrinkRemaining(0.75f);
+
+            Assert.AreEqual(15f, 30f - b.Travelled, 0.0001f);
+            Assert.AreEqual(30f, b.MaxRange, 0.0001f, "the weapon's full range still reads as the reference for Fraction");
+            Assert.IsFalse(b.IsSpent);
+        }
+
+        [Test]
+        public void TwoShrinksCompoundOnWhatWasLeftEachTime()
+        {
+            var b = NewBudget();
+
+            b.ShrinkRemaining(0.5f); // 15 left
+            b.Consume(5f);           // 10 left
+            b.ShrinkRemaining(0.5f); // 5 left
+
+            Assert.AreEqual(5f, 30f - b.Travelled, 0.0001f);
+        }
+
+        [Test]
+        public void KeepingEverythingOrMoreChangesNothing()
+        {
+            var b = NewBudget();
+            b.Consume(10f);
+
+            b.ShrinkRemaining(1f);
+            b.ShrinkRemaining(1.5f);
+            b.ShrinkRemaining(float.NaN);
+
+            Assert.AreEqual(10f, b.Travelled, 0.0001f, "a shrink must never buy extra range");
+        }
+
+        [Test]
+        public void KeepingNothingOrLessSpendsTheBudgetAndTravelledNeverPassesMaxRange()
+        {
+            var zero = NewBudget();
+            zero.Consume(10f);
+            zero.ShrinkRemaining(0f);
+            Assert.IsTrue(zero.IsSpent);
+            Assert.AreEqual(30f, zero.Travelled, 0.0001f);
+
+            var negative = NewBudget();
+            negative.ShrinkRemaining(-2f);
+            Assert.IsTrue(negative.IsSpent);
+            Assert.AreEqual(30f, negative.Travelled, 0.0001f, "a negative fraction is treated as keeping nothing, not as owing range");
+        }
+
+        [Test]
+        public void ShrinkingASpentBudgetLeavesItSpent()
+        {
+            var b = NewBudget();
+            b.Consume(30f);
+
+            b.ShrinkRemaining(0.5f);
+
+            Assert.IsTrue(b.IsSpent);
+            Assert.AreEqual(30f, b.Travelled, 0.0001f);
+        }
+
+        [Test]
+        public void ARefundAfterAShrinkGivesBackOnlyWhatTheRefundSays()
+        {
+            var b = NewBudget();
+            b.Consume(10f);
+            b.Refund(4f);            // 6 travelled, 24 left
+            b.ShrinkRemaining(0.5f); // 12 left
+
+            Assert.AreEqual(12f, 30f - b.Travelled, 0.0001f);
+        }
     }
 }

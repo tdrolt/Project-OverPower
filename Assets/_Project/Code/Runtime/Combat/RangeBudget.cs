@@ -90,5 +90,26 @@ namespace Overpower.Combat
 
             Travelled = Mathf.Max(0f, Travelled - distance);
         }
+
+        /// <summary>
+        /// Forfeits part of what is LEFT, keeping keepFraction of it (0.75 keeps three quarters, 0 spends the budget). MaxRange stays, so Fraction
+        /// still reads against the weapon's full range. Call it after Refund, never before: on the bounce step the budget still holds the unmoved
+        /// part of the step, and shrinking that would make the reach depend on the frame rate. A fraction of 1 or more (or not a number) changes
+        /// nothing: a shrink must never buy extra range.
+        /// </summary>
+        public void ShrinkRemaining(float keepFraction)
+        {
+            if (!(keepFraction < 1f))
+                return;
+
+            float remaining = MaxRange - Travelled;
+            if (remaining <= 0f)
+                return;
+
+            Travelled = Mathf.Min(MaxRange, Travelled + remaining * (1f - Mathf.Max(0f, keepFraction)));
+
+            if (MaxRange - Travelled <= ReachedTolerance)
+                Travelled = MaxRange;
+        }
     }
 }

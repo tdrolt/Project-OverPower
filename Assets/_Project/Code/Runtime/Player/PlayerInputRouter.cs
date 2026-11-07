@@ -266,7 +266,7 @@ public class PlayerInputRouter : MonoBehaviour
             playerLifecycle.AliveChanged -= HandleAliveChanged;
     }
 
-    /// <summary>A UI click and a mouse-button gameplay action are the SAME physical click: a "Loadout (P)"
+    /// <summary>A UI click and a mouse-button gameplay action are the SAME physical click: a "SHOP (B)"
     /// HUD button press reached the router as a Primary press too and fired the weapon before the button's
     /// onClick claimed tool focus. Hence pointerOverUi, read here once a frame rather than inside the Input
     /// System callback (IsPointerOverGameObject() warns outside a MonoBehaviour message). Only meaningful
